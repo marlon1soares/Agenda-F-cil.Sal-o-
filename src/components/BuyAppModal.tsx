@@ -1,24 +1,29 @@
 import React, { useState, useEffect } from 'react';
-import { SalonApp, SalonConfig, AdminPaymentConfig } from '../types';
+import { SalonApp, SalonConfig, AdminPaymentConfig, UserRole } from '../types';
 import { Storage } from '../utils/storage';
 import { generatePixEMVPayload, generateQrCodeDataUrl } from '../utils/pix';
+import { getCalculatedLicensePlans, getLicensePlanByDays, formatBRL } from '../utils/pricing';
 import { 
   ShoppingCart, Check, Sparkles, Mail, User, ShieldCheck, Phone, 
   FileText, Building2, Key, Copy, Clock, Send, CreditCard, QrCode, 
   ArrowLeft, Settings, Lock, CheckCircle2, DollarSign, Wallet, MapPin, Map, Hash, Search,
-  Maximize2, X
+  Maximize2, X, RefreshCw
 } from 'lucide-react';
 
 interface BuyAppModalProps {
   isOpen: boolean;
   onClose: () => void;
   onPurchaseComplete: (newSalon: SalonApp) => void;
+  userRole?: UserRole;
+  onOpenAdminPaymentConfig?: () => void;
 }
 
 export const BuyAppModal: React.FC<BuyAppModalProps> = ({
   isOpen,
   onClose,
   onPurchaseComplete,
+  userRole = 'salao',
+  onOpenAdminPaymentConfig,
 }) => {
   const [step, setStep] = useState<'form' | 'payment' | 'success'>('form');
   
@@ -154,47 +159,11 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
 
   if (!isOpen) return null;
 
-  // Plan Price Helper
+  // Plan Price Helper based on Admin's configured prices
+  const availablePlans = getCalculatedLicensePlans(adminPaymentConfig);
+
   const getPlanPriceDetails = (days: number) => {
-    switch (days) {
-      case 30:
-        return { 
-          label: '30 Dias (Mensal)', 
-          priceStr: 'R$ 19,90', 
-          numVal: 19.90, 
-          detail: 'Cobrado mensalmente',
-          badge: 'À vista',
-          maxInstallments: 1
-        };
-      case 90:
-        return { 
-          label: '3 Meses (Trimestral)', 
-          priceStr: 'R$ 49,90', 
-          numVal: 49.90, 
-          detail: 'Equivale a R$ 16,60/mês',
-          badge: 'À vista',
-          maxInstallments: 1
-        };
-      case 180:
-        return { 
-          label: '6 Meses (Semestral)', 
-          priceStr: 'R$ 89,90', 
-          numVal: 89.90, 
-          detail: 'Equivale a R$ 14,90/mês',
-          badge: 'Até 6x (3x S/ Juros)',
-          maxInstallments: 6
-        };
-      case 365:
-      default:
-        return { 
-          label: '1 Anual (12 Meses)', 
-          priceStr: 'R$ 159,90', 
-          numVal: 159.90, 
-          detail: 'Equivale a R$ 13,30/mês',
-          badge: 'Até 6x (3x S/ Juros)',
-          maxInstallments: 6
-        };
-    }
+    return getLicensePlanByDays(days, adminPaymentConfig);
   };
 
   const currentPlan = getPlanPriceDetails(planDays);
@@ -360,15 +329,35 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
       <div className="bg-slate-900 border border-slate-700 rounded-3xl w-full max-w-xl text-white shadow-2xl relative my-auto overflow-hidden animate-in fade-in zoom-in-95 duration-200">
         
         {/* Header Bar */}
-        <div className="bg-gradient-to-r from-blue-700 via-indigo-700 to-purple-800 p-5 sm:p-6 text-white flex justify-between items-start">
+        <div 
+          onDoubleClick={() => {
+            if (userRole === 'admin' && onOpenAdminPaymentConfig) {
+              onOpenAdminPaymentConfig();
+            }
+          }}
+          className="bg-gradient-to-r from-blue-700 via-indigo-700 to-purple-800 p-5 sm:p-6 text-white flex justify-between items-start select-none"
+        >
           <div>
-            <div className="flex items-center gap-2 mb-1">
+            <div className="flex items-center gap-2 mb-1 flex-wrap">
               <span className="bg-yellow-400/20 text-yellow-300 border border-yellow-300/40 font-extrabold text-[10px] px-2.5 py-0.5 rounded-full uppercase tracking-wider">
                 Agenda+Fácil.Salão
               </span>
               <span className="bg-emerald-500/20 text-emerald-300 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-400/30">
-                A partir de R$ 19,90/mês
+                A partir de {formatBRL(adminPaymentConfig.precoPlano30Dias || 30)}/mês
               </span>
+              {userRole === 'admin' && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (onOpenAdminPaymentConfig) onOpenAdminPaymentConfig();
+                  }}
+                  className="bg-amber-400/20 hover:bg-amber-400/40 text-amber-200 text-[10px] font-black px-2 py-0.5 rounded-full border border-amber-300/30 transition-colors flex items-center gap-1"
+                  title="Configurar valores das licenças e dados de recebimento"
+                >
+                  <Settings className="w-3 h-3 text-amber-300" />
+                  <span>⚙️ Configurar Valores (2 Cliques)</span>
+                </button>
+              )}
             </div>
             <h2 className="text-xl font-black flex items-center gap-2">
               <ShoppingCart className="w-6 h-6 text-yellow-300" />
@@ -406,18 +395,19 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
                   <Clock className="w-3.5 h-3.5 text-teal-400" />
                   <span>Escolha o Prazo da Licença:</span>
                 </label>
-                <span className="text-[10px] bg-emerald-500/20 text-emerald-300 font-extrabold px-2 py-0.5 rounded-full border border-emerald-500/30">
-                  Desconto nos planos longos
-                </span>
+                {userRole === 'admin' ? (
+                  <span className="text-[10px] bg-amber-500/20 text-amber-300 font-extrabold px-2 py-0.5 rounded-full border border-amber-500/30">
+                    💡 2 Cliques para Configurar Valores
+                  </span>
+                ) : (
+                  <span className="text-[10px] bg-emerald-500/20 text-emerald-300 font-extrabold px-2 py-0.5 rounded-full border border-emerald-500/30">
+                    Desconto nos planos longos
+                  </span>
+                )}
               </div>
 
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                {[
-                  { days: 30, label: '30 Dias', price: 'R$ 19,90', detail: 'Mensal', tag: 'À vista' },
-                  { days: 90, label: '3 Meses', price: 'R$ 49,90', detail: 'R$ 16,60 / mês', tag: 'À vista' },
-                  { days: 180, label: '6 Meses', price: 'R$ 89,90', detail: 'R$ 14,90 / mês', tag: 'Até 6x (3x S/ Juros)' },
-                  { days: 365, label: '1 Anual', price: 'R$ 159,90', detail: 'R$ 13,30 / mês', tag: 'Até 6x (3x S/ Juros)' },
-                ].map((p) => (
+                {availablePlans.map((p) => (
                   <button
                     key={p.days}
                     type="button"
@@ -425,7 +415,21 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
                       setPlanDays(p.days);
                       setCardInstallments('1');
                     }}
-                    className={`p-2.5 rounded-2xl border text-center transition-all flex flex-col items-center justify-between ${
+                    onDoubleClick={() => {
+                      if (userRole === 'admin') {
+                        if (onOpenAdminPaymentConfig) {
+                          onOpenAdminPaymentConfig();
+                        } else {
+                          setShowAdminAccountSetup(true);
+                        }
+                      }
+                    }}
+                    title={
+                      userRole === 'admin'
+                        ? `${p.label} - ${p.priceStr} (2 cliques para configurar este ou outros valores)`
+                        : `${p.label} - ${p.priceStr}`
+                    }
+                    className={`p-2.5 rounded-2xl border text-center transition-all flex flex-col items-center justify-between select-none ${
                       planDays === p.days
                         ? 'bg-blue-600/30 border-blue-500 text-white font-extrabold ring-1 ring-blue-500 shadow-md'
                         : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
@@ -433,7 +437,7 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
                   >
                     <div>
                       <span className="block text-xs font-black">{p.label}</span>
-                      <span className="block text-[11px] font-bold text-emerald-400 mt-0.5">{p.price}</span>
+                      <span className="block text-[11px] font-bold text-emerald-400 mt-0.5">{p.priceStr}</span>
                       <span className="block text-[9px] text-slate-400 mb-1">{p.detail}</span>
                     </div>
                     <span className={`inline-block text-[8px] font-extrabold px-1.5 py-0.5 rounded-full border ${
@@ -920,90 +924,186 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
               </div>
             )}
 
-            {/* ADMIN ACCOUNT CONFIGURATION EXPANDABLE PANEL */}
-            <div className="border-t border-slate-800 pt-3">
-              <button
-                type="button"
-                onClick={() => setShowAdminAccountSetup(!showAdminAccountSetup)}
-                className="text-amber-400 hover:text-amber-300 text-[11px] font-bold flex items-center gap-1.5 transition-colors"
-              >
-                <Settings className="w-3.5 h-3.5" />
-                <span>{showAdminAccountSetup ? 'Ocultar Configuração da Conta do Administrador' : '⚙️ Configurar Minha Conta do Administrador (Chave Pix e Conta de Cartão)'}</span>
-              </button>
-
-              {showAdminAccountSetup && (
-                <form onSubmit={handleSaveAdminPaymentConfig} className="mt-2 p-3 bg-slate-950 border border-amber-500/40 rounded-2xl space-y-2.5 text-[11px] animate-in fade-in duration-200">
-                  <div className="flex items-center justify-between border-b border-slate-800 pb-1.5">
-                    <span className="font-extrabold text-amber-300 flex items-center gap-1">
-                      <Lock className="w-3.5 h-3.5" />
-                      <span>Cadastrar Dados para Recebimento das Vendas</span>
-                    </span>
-                    <span className="text-[9px] text-slate-400">Salvo no sistema</span>
-                  </div>
-
-                  {saveSuccessMsg && (
-                    <div className="bg-emerald-950 border border-emerald-700 text-emerald-200 p-2 rounded-lg text-[10px] font-bold">
-                      {saveSuccessMsg}
-                    </div>
-                  )}
-
-                  <div>
-                    <label className="block text-slate-300 font-bold mb-0.5">Minha Chave Pix (Para receber pagamentos):</label>
-                    <input
-                      type="text"
-                      value={adminPaymentConfig.chavePix}
-                      onChange={(e) => setAdminPaymentConfig({ ...adminPaymentConfig, chavePix: e.target.value })}
-                      placeholder="Ex: marlon1soares28@gmail.com ou CPF/CNPJ"
-                      required
-                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white font-mono"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-slate-300 font-bold mb-0.5">Nome do Beneficiário / Titular da Conta:</label>
-                    <input
-                      type="text"
-                      value={adminPaymentConfig.nomeBeneficiario}
-                      onChange={(e) => setAdminPaymentConfig({ ...adminPaymentConfig, nomeBeneficiario: e.target.value })}
-                      placeholder="Ex: Agenda+Fácil Pagamentos - Marlon Soares"
-                      required
-                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="block text-slate-300 font-bold mb-0.5">Banco / Processador do Pix:</label>
-                      <input
-                        type="text"
-                        value={adminPaymentConfig.bancoOuProcessador}
-                        onChange={(e) => setAdminPaymentConfig({ ...adminPaymentConfig, bancoOuProcessador: e.target.value })}
-                        placeholder="Ex: Mercado Pago / Inter"
-                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-slate-300 font-bold mb-0.5">Conta/ID de Destino do Cartão:</label>
-                      <input
-                        type="text"
-                        value={adminPaymentConfig.cartaoContaDestino}
-                        onChange={(e) => setAdminPaymentConfig({ ...adminPaymentConfig, cartaoContaDestino: e.target.value })}
-                        placeholder="Ex: Mercado Pago ID MP-883921"
-                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white"
-                      />
-                    </div>
-                  </div>
+            {/* ADMIN ACCOUNT CONFIGURATION EXPANDABLE PANEL (ONLY VISIBLE TO ADMIN) */}
+            {userRole === 'admin' && (
+              <div className="border-t border-slate-800 pt-3">
+                <div className="flex items-center justify-between">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (onOpenAdminPaymentConfig) {
+                        onOpenAdminPaymentConfig();
+                      } else {
+                        setShowAdminAccountSetup(!showAdminAccountSetup);
+                      }
+                    }}
+                    className="text-amber-400 hover:text-amber-300 text-[11px] font-bold flex items-center gap-1.5 transition-colors"
+                  >
+                    <Settings className="w-3.5 h-3.5" />
+                    <span>⚙️ Configurar Valores das 4 Licenças & Formas de Pagamento</span>
+                  </button>
 
                   <button
-                    type="submit"
-                    className="w-full bg-amber-600 hover:bg-amber-500 text-slate-950 font-black py-1.5 rounded-xl text-xs transition-colors"
+                    type="button"
+                    onClick={() => setShowAdminAccountSetup(!showAdminAccountSetup)}
+                    className="text-[10px] text-slate-400 hover:text-white"
                   >
-                    Salvar Conta do Administrador
+                    {showAdminAccountSetup ? 'Recolher' : 'Expandir'}
                   </button>
-                </form>
-              )}
-            </div>
+                </div>
+
+                {showAdminAccountSetup && (
+                  <form onSubmit={handleSaveAdminPaymentConfig} className="mt-2 p-3.5 bg-slate-950 border-2 border-amber-500/40 rounded-2xl space-y-3 text-[11px] animate-in fade-in duration-200">
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-1.5">
+                      <span className="font-extrabold text-amber-300 flex items-center gap-1">
+                        <Lock className="w-3.5 h-3.5" />
+                        <span>Configurar Valores das 4 Licenças</span>
+                      </span>
+                      <span className="text-[9px] text-slate-400">Exclusivo Administrador</span>
+                    </div>
+
+                    {saveSuccessMsg && (
+                      <div className="bg-emerald-950 border border-emerald-700 text-emerald-200 p-2 rounded-lg text-[10px] font-bold flex items-center gap-1.5">
+                        <Check className="w-3.5 h-3.5 text-emerald-400" />
+                        <span>{saveSuccessMsg}</span>
+                      </div>
+                    )}
+
+                    {/* 4 Plan Pricing Grid in BuyAppModal */}
+                    <div className="grid grid-cols-2 gap-2 bg-slate-900/90 p-2.5 rounded-xl border border-emerald-500/40">
+                      <div>
+                        <label className="block text-emerald-300 font-bold text-[10px] mb-0.5">1. 30 Dias (Base):</label>
+                        <div className="relative">
+                          <span className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none text-emerald-400 font-bold text-xs">R$</span>
+                          <input
+                            type="number"
+                            step="0.10"
+                            min="1"
+                            value={adminPaymentConfig.precoPlano30Dias || 30}
+                            onChange={(e) => {
+                              const base = Number(e.target.value) || 30;
+                              setAdminPaymentConfig({ 
+                                ...adminPaymentConfig, 
+                                precoPlano30Dias: base,
+                                precoPlano90Dias: Number((base * 2.5).toFixed(2)),
+                                precoPlano180Dias: Number((base * 4.5).toFixed(2)),
+                                precoPlano365Dias: Number((base * 8).toFixed(2))
+                              });
+                            }}
+                            required
+                            className="w-full bg-slate-950 border border-emerald-500/50 rounded-lg pl-7 pr-2 py-1 text-white font-mono font-bold text-xs"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-white font-bold text-[10px] mb-0.5">2. 3 Meses:</label>
+                        <div className="relative">
+                          <span className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none text-emerald-400 font-bold text-xs">R$</span>
+                          <input
+                            type="number"
+                            step="0.10"
+                            min="1"
+                            value={adminPaymentConfig.precoPlano90Dias || 75}
+                            onChange={(e) => setAdminPaymentConfig({ ...adminPaymentConfig, precoPlano90Dias: Number(e.target.value) })}
+                            required
+                            className="w-full bg-slate-950 border border-slate-700 rounded-lg pl-7 pr-2 py-1 text-white font-mono font-bold text-xs"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-white font-bold text-[10px] mb-0.5">3. 6 Meses:</label>
+                        <div className="relative">
+                          <span className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none text-emerald-400 font-bold text-xs">R$</span>
+                          <input
+                            type="number"
+                            step="0.10"
+                            min="1"
+                            value={adminPaymentConfig.precoPlano180Dias || 135}
+                            onChange={(e) => setAdminPaymentConfig({ ...adminPaymentConfig, precoPlano180Dias: Number(e.target.value) })}
+                            required
+                            className="w-full bg-slate-950 border border-slate-700 rounded-lg pl-7 pr-2 py-1 text-white font-mono font-bold text-xs"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-white font-bold text-[10px] mb-0.5">4. 1 Ano:</label>
+                        <div className="relative">
+                          <span className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none text-emerald-400 font-bold text-xs">R$</span>
+                          <input
+                            type="number"
+                            step="0.10"
+                            min="1"
+                            value={adminPaymentConfig.precoPlano365Dias || 240}
+                            onChange={(e) => setAdminPaymentConfig({ ...adminPaymentConfig, precoPlano365Dias: Number(e.target.value) })}
+                            required
+                            className="w-full bg-slate-950 border border-slate-700 rounded-lg pl-7 pr-2 py-1 text-white font-mono font-bold text-xs"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-slate-300 font-bold mb-0.5">Minha Chave Pix (Para receber pagamentos):</label>
+                      <input
+                        type="text"
+                        value={adminPaymentConfig.chavePix}
+                        onChange={(e) => setAdminPaymentConfig({ ...adminPaymentConfig, chavePix: e.target.value })}
+                        placeholder="Ex: marlon1soares28@gmail.com ou CPF/CNPJ"
+                        required
+                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white font-mono"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-slate-300 font-bold mb-0.5">Nome do Beneficiário / Titular da Conta:</label>
+                      <input
+                        type="text"
+                        value={adminPaymentConfig.nomeBeneficiario}
+                        onChange={(e) => setAdminPaymentConfig({ ...adminPaymentConfig, nomeBeneficiario: e.target.value })}
+                        placeholder="Ex: Agenda+Fácil Pagamentos - Marlon Soares"
+                        required
+                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-slate-300 font-bold mb-0.5">Banco / Processador do Pix:</label>
+                        <input
+                          type="text"
+                          value={adminPaymentConfig.bancoOuProcessador}
+                          onChange={(e) => setAdminPaymentConfig({ ...adminPaymentConfig, bancoOuProcessador: e.target.value })}
+                          placeholder="Ex: Mercado Pago / Inter"
+                          className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-slate-300 font-bold mb-0.5">Conta/ID de Destino do Cartão:</label>
+                        <input
+                          type="text"
+                          value={adminPaymentConfig.cartaoContaDestino}
+                          onChange={(e) => setAdminPaymentConfig({ ...adminPaymentConfig, cartaoContaDestino: e.target.value })}
+                          placeholder="Ex: Mercado Pago ID MP-883921"
+                          className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white"
+                        />
+                      </div>
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="w-full bg-amber-600 hover:bg-amber-500 text-slate-950 font-black py-2 rounded-xl text-xs transition-colors flex items-center justify-center gap-1.5 shadow-md"
+                    >
+                      <Check className="w-3.5 h-3.5" />
+                      <span>Salvar Configuração e Atualizar Planos</span>
+                    </button>
+                  </form>
+                )}
+              </div>
+            )}
 
             {/* Final Action Button */}
             <button

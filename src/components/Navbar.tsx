@@ -1,6 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { SalonConfig, UserRole, ThemeConfig } from '../types';
 import { THEMES } from '../data/mockData';
+import { Storage } from '../utils/storage';
+import { formatBRL } from '../utils/pricing';
 import { Crown, Scissors, User, Minimize2, Maximize2, Settings, Image as ImageIcon, Sparkles, FolderOpen, ChevronDown, Building2, ShoppingCart, Link2 } from 'lucide-react';
 
 interface NavbarProps {
@@ -11,6 +13,7 @@ interface NavbarProps {
   onOpenCatalog: () => void;
   onOpenAdminSalons?: () => void;
   onOpenBuyApp?: () => void;
+  onOpenAdminPaymentConfig?: () => void;
   onOpenClientLink?: () => void;
   isExpanded: boolean;
   onToggleExpand: () => void;
@@ -26,6 +29,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenCatalog,
   onOpenAdminSalons,
   onOpenBuyApp,
+  onOpenAdminPaymentConfig,
   onOpenClientLink,
   isExpanded,
   onToggleExpand,
@@ -235,15 +239,37 @@ export const Navbar: React.FC<NavbarProps> = ({
 
               {onOpenBuyApp && (
                 <button
+                  type="button"
                   onClick={onOpenBuyApp}
-                  title="Comprar licença do aplicativo a partir de R$ 19,90/mês"
-                  className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-xs px-3 py-1.5 rounded-xl shadow-md flex items-center gap-1.5 transition-all active:scale-95 border border-emerald-400/40"
+                  onDoubleClick={() => {
+                    if (userRole === 'admin' && onOpenAdminPaymentConfig) {
+                      onOpenAdminPaymentConfig();
+                    }
+                  }}
+                  title={
+                    userRole === 'admin'
+                      ? `[ADMIN] 1 Clique: Abrir Comprar Aplicativo | 2 Cliques Rápidos: Configurar Valores (30d, 3m, 6m, 1a) e Formas de Pagamento`
+                      : `Comprar licença do aplicativo a partir de ${formatBRL(Storage.getAdminPaymentConfig().precoPlano30Dias || 30)}/mês`
+                  }
+                  className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-xs px-3 py-1.5 rounded-xl shadow-md flex items-center gap-1.5 transition-all active:scale-95 border border-emerald-400/40 select-none group"
                 >
-                  <ShoppingCart className="w-3.5 h-3.5 text-yellow-300" />
+                  <ShoppingCart className="w-3.5 h-3.5 text-yellow-300 group-hover:scale-110 transition-transform" />
                   <span>Comprar Aplicativo</span>
                   <span className="bg-yellow-400/20 text-yellow-300 font-bold text-[10px] px-1.5 py-0.5 rounded-md border border-yellow-300/30 hidden sm:inline">
-                    R$ 19,90/mês
+                    {formatBRL(Storage.getAdminPaymentConfig().precoPlano30Dias || 30)}/mês
                   </span>
+                  {userRole === 'admin' && (
+                    <span 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (onOpenAdminPaymentConfig) onOpenAdminPaymentConfig();
+                      }}
+                      title="Clique duplo ou clique neste ícone para configurar os valores e formas de pagamento"
+                      className="bg-amber-400/30 hover:bg-amber-400/50 text-amber-200 hover:text-white text-[9px] font-black px-1.5 py-0.5 rounded-md border border-amber-300/40 transition-colors ml-0.5"
+                    >
+                      ⚙️ 2 Cliques p/ Configurar
+                    </span>
+                  )}
                 </button>
               )}
             </>
@@ -253,26 +279,24 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         {/* Right Side: Control & Window Actions */}
         <div className="flex items-center gap-1.5">
-          {userRole !== 'cliente' && (
-            <>
-              <button
-                onClick={onOpenCatalog}
-                title="Abrir Catálogo de Mídias"
-                className="bg-purple-600/90 hover:bg-purple-600 text-white text-xs font-bold px-2.5 py-1.5 rounded-xl flex items-center gap-1 shadow-xs transition-colors"
-              >
-                <ImageIcon className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Catálogo</span>
-              </button>
+          <button
+            onClick={onOpenCatalog}
+            title={userRole === 'cliente' ? "Ver Catálogo de Fotos, Trabalhos & Produtos" : "Abrir e Gerenciar Catálogo de Mídias"}
+            className="bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold px-2.5 py-1.5 rounded-xl flex items-center gap-1 shadow-xs transition-colors border border-purple-400/30"
+          >
+            <ImageIcon className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Catálogo</span>
+          </button>
 
-              <button
-                onClick={onOpenConfig}
-                title="Configurações do Salão"
-                className="bg-slate-800/80 hover:bg-slate-700 text-white text-xs font-bold px-2.5 py-1.5 rounded-xl flex items-center gap-1 transition-colors border border-slate-700"
-              >
-                <Settings className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Config</span>
-              </button>
-            </>
+          {userRole !== 'cliente' && (
+            <button
+              onClick={onOpenConfig}
+              title="Configurações do Salão"
+              className="bg-slate-800/80 hover:bg-slate-700 text-white text-xs font-bold px-2.5 py-1.5 rounded-xl flex items-center gap-1 transition-colors border border-slate-700"
+            >
+              <Settings className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Config</span>
+            </button>
           )}
 
           {/* Seta de Diminuir (Minimizar) - visível em todos os módulos */}

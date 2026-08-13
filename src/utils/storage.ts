@@ -155,13 +155,41 @@ export const Storage = {
 
   getAdminPaymentConfig(): AdminPaymentConfig {
     const saved = localStorage.getItem('salaoAdminPaymentConfig');
-    return saved ? JSON.parse(saved) : {
+    const defaults: AdminPaymentConfig = {
       chavePix: 'marlon1soares28@gmail.com',
       nomeBeneficiario: 'Agenda+Fácil.Salão Oficial',
       bancoOuProcessador: 'Mercado Pago / Pix Instantâneo',
       cartaoContaDestino: 'Conta Principal - Marlon Soares (MP-883921)',
-      instrucoesPagamento: 'O valor do cartão ou Pix é creditado diretamente na conta cadastrada pelo Administrador.'
+      instrucoesPagamento: 'O valor do cartão ou Pix é creditado diretamente na conta cadastrada pelo Administrador.',
+      precoPlano30Dias: 30.00,
+      precoPlano90Dias: 75.00,
+      precoPlano180Dias: 135.00,
+      precoPlano365Dias: 240.00
     };
+    if (!saved) return defaults;
+    try {
+      const parsed = JSON.parse(saved);
+      const base30 = (parsed.precoPlano30Dias !== undefined && parsed.precoPlano30Dias !== null && !isNaN(Number(parsed.precoPlano30Dias)) && Number(parsed.precoPlano30Dias) > 0)
+        ? Number(parsed.precoPlano30Dias)
+        : 30.00;
+
+      return {
+        ...defaults,
+        ...parsed,
+        precoPlano30Dias: base30,
+        precoPlano90Dias: (parsed.precoPlano90Dias !== undefined && parsed.precoPlano90Dias !== null && !isNaN(Number(parsed.precoPlano90Dias)) && Number(parsed.precoPlano90Dias) > 0)
+          ? Number(parsed.precoPlano90Dias)
+          : Number((base30 * 2.5).toFixed(2)),
+        precoPlano180Dias: (parsed.precoPlano180Dias !== undefined && parsed.precoPlano180Dias !== null && !isNaN(Number(parsed.precoPlano180Dias)) && Number(parsed.precoPlano180Dias) > 0)
+          ? Number(parsed.precoPlano180Dias)
+          : Number((base30 * 4.5).toFixed(2)),
+        precoPlano365Dias: (parsed.precoPlano365Dias !== undefined && parsed.precoPlano365Dias !== null && !isNaN(Number(parsed.precoPlano365Dias)) && Number(parsed.precoPlano365Dias) > 0)
+          ? Number(parsed.precoPlano365Dias)
+          : Number((base30 * 8).toFixed(2))
+      };
+    } catch {
+      return defaults;
+    }
   },
   saveAdminPaymentConfig(config: AdminPaymentConfig) {
     localStorage.setItem('salaoAdminPaymentConfig', JSON.stringify(config));

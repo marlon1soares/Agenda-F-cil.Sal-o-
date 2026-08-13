@@ -2,9 +2,11 @@ import React, { useState } from 'react';
 import { SalonApp, ServiceItem, Professional, Appointment, ClientRecord } from '../types';
 import { Storage } from '../utils/storage';
 import { DEFAULT_TIMESLOTS } from '../data/mockData';
+import { generatePixEMVPayload, generateQrCodeDataUrl } from '../utils/pix';
 import { 
   Scissors, Calendar, Clock, User, Phone, CheckCircle2, Building2, 
-  Sparkles, Search, ArrowRight, ShieldCheck, Heart, MapPin, Share2, Award, ChevronRight, Lock, Image as ImageIcon
+  Sparkles, Search, ArrowRight, ShieldCheck, Heart, MapPin, Share2, Award, ChevronRight, Lock, Image as ImageIcon,
+  QrCode, Copy, CheckCheck, CreditCard, ExternalLink, MessageCircle, X
 } from 'lucide-react';
 
 interface ClientePortalViewProps {
@@ -36,6 +38,12 @@ export const ClientePortalView: React.FC<ClientePortalViewProps> = ({
   const [clientNotes, setClientNotes] = useState('');
   const [isSuccess, setIsSuccess] = useState(false);
   const [lastAppointment, setLastAppointment] = useState<Appointment | null>(null);
+
+  // Payment states for Client
+  const [copiedPix, setCopiedPix] = useState(false);
+  const [showPixQr, setShowPixQr] = useState(false);
+  const [qrCodeUrl, setQrCodeUrl] = useState('');
+  const [pixPayload, setPixPayload] = useState('');
 
   // Compute Current Day Appointments & Time Shift
   const currentDayAppointments = appointments[selectedDate] || {};
@@ -167,17 +175,30 @@ export const ClientePortalView: React.FC<ClientePortalViewProps> = ({
             </p>
           </div>
 
-          {/* Salon Selector Pill */}
-          <div className="bg-slate-950/70 backdrop-blur-md px-3 py-2 rounded-xl border border-white/20 w-full md:w-auto shrink-0">
-            <span className="text-[9px] font-bold text-rose-200 uppercase tracking-wider block mb-0.5">
-              Salão Selecionado:
-            </span>
-            <div className="flex items-center gap-1.5 text-white font-extrabold text-xs">
-              <Building2 className="w-3.5 h-3.5 text-rose-300" />
-              <span>{activeSalon.config.nomeSalao}</span>
-              <span className="bg-rose-500/40 text-rose-100 text-[9px] px-1.5 py-0.2 rounded-full font-mono">
-                {activeSalon.appCode}
+          {/* Salon Selector Pill & Catalog Button */}
+          <div className="flex items-center gap-2 w-full md:w-auto shrink-0 flex-wrap">
+            {onOpenCatalog && (
+              <button
+                type="button"
+                onClick={onOpenCatalog}
+                className="bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs px-3.5 py-2 rounded-xl shadow-md flex items-center gap-1.5 transition-all border border-purple-400/40 active:scale-95"
+              >
+                <ImageIcon className="w-3.5 h-3.5" />
+                <span>Ver Catálogo & Produtos</span>
+              </button>
+            )}
+
+            <div className="bg-slate-950/70 backdrop-blur-md px-3 py-2 rounded-xl border border-white/20">
+              <span className="text-[9px] font-bold text-rose-200 uppercase tracking-wider block mb-0.5">
+                Salão Selecionado:
               </span>
+              <div className="flex items-center gap-1.5 text-white font-extrabold text-xs">
+                <Building2 className="w-3.5 h-3.5 text-rose-300" />
+                <span>{activeSalon.config.nomeSalao}</span>
+                <span className="bg-rose-500/40 text-rose-100 text-[9px] px-1.5 py-0.2 rounded-full font-mono">
+                  {activeSalon.appCode}
+                </span>
+              </div>
             </div>
           </div>
         </div>
@@ -551,6 +572,147 @@ export const ClientePortalView: React.FC<ClientePortalViewProps> = ({
               <span>WhatsApp: <strong>{lastAppointment?.clientPhone}</strong></span>
             </div>
           </div>
+
+          {/* Payment Instructions & Credentials Box */}
+          <div className="bg-slate-950 p-5 rounded-2xl border border-purple-500/30 text-left text-xs space-y-3.5 shadow-md">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+              <span className="font-extrabold text-purple-300 flex items-center gap-1.5 text-xs">
+                <CreditCard className="w-4 h-4 text-emerald-400" /> Formas de Pagamento Aceitas
+              </span>
+              <span className="text-[10px] text-slate-400">Pague agora via Pix ou Cartão</span>
+            </div>
+
+            {/* Pix Section */}
+            <div className="bg-purple-950/40 p-3 rounded-xl border border-purple-500/30 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-extrabold text-purple-300 flex items-center gap-1">
+                  <QrCode className="w-3.5 h-3.5 text-purple-400" /> Pagamento Pix:
+                </span>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const pixKey = activeSalon.config.chavePix || 'marlon1soares28@gmail.com';
+                      navigator.clipboard.writeText(pixKey);
+                      setCopiedPix(true);
+                      setTimeout(() => setCopiedPix(false), 2500);
+                    }}
+                    className="bg-purple-600 hover:bg-purple-500 text-white text-[10px] font-black px-2.5 py-1 rounded-lg transition-all flex items-center gap-1"
+                  >
+                    {copiedPix ? (
+                      <>
+                        <CheckCheck className="w-3 h-3 text-emerald-300" /> Chave Copiada!
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3 h-3" /> Copiar Chave Pix
+                      </>
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const pixKey = activeSalon.config.chavePix || 'marlon1soares28@gmail.com';
+                      const beneficiary = activeSalon.config.titularPix || activeSalon.config.nomeSalao;
+                      const city = activeSalon.config.cidadePix || 'SAO PAULO';
+                      const amount = lastAppointment?.price;
+                      const payload = generatePixEMVPayload(pixKey, beneficiary, city, amount);
+                      setPixPayload(payload);
+                      const qrUrl = await generateQrCodeDataUrl(payload);
+                      setQrCodeUrl(qrUrl);
+                      setShowPixQr(true);
+                    }}
+                    className="bg-purple-800 hover:bg-purple-700 text-purple-200 text-[10px] font-bold px-2 py-1 rounded-lg transition-all flex items-center gap-1"
+                  >
+                    <QrCode className="w-3 h-3" /> QR Code
+                  </button>
+                </div>
+              </div>
+
+              <div className="font-mono text-xs font-bold text-purple-200 break-all">
+                {activeSalon.config.chavePix || 'marlon1soares28@gmail.com'}
+              </div>
+
+              {activeSalon.config.titularPix && (
+                <div className="text-[10px] text-slate-400">
+                  Titular: <strong className="text-white">{activeSalon.config.titularPix}</strong>
+                </div>
+              )}
+            </div>
+
+            {/* Card Receiving Account Info */}
+            <div className="bg-sky-950/40 p-3 rounded-xl border border-sky-500/30 space-y-1.5">
+              <span className="text-[11px] font-extrabold text-sky-300 flex items-center gap-1">
+                <Building2 className="w-3.5 h-3.5 text-sky-400" /> Pagamento com Cartão de Crédito / Débito:
+              </span>
+              {activeSalon.config.bancoCartao || activeSalon.config.contaCartao || activeSalon.config.linkCartao ? (
+                <div className="text-[11px] text-slate-300 space-y-0.5">
+                  <div>Banco: <strong className="text-white">{activeSalon.config.bancoCartao || 'Banco Cadastrado'}</strong></div>
+                  <div>Agência: <strong className="font-mono text-white">{activeSalon.config.agenciaCartao || '0001'}</strong> • Conta: <strong className="font-mono text-white">{activeSalon.config.contaCartao || '-'}</strong> ({activeSalon.config.tipoContaCartao || 'Corrente'})</div>
+                  {activeSalon.config.titularCartao && (
+                    <div>Titular da Conta: <strong className="text-white">{activeSalon.config.titularCartao}</strong></div>
+                  )}
+                  {activeSalon.config.linkCartao && (
+                    <div className="pt-1.5">
+                      <a
+                        href={activeSalon.config.linkCartao}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="w-full bg-sky-600 hover:bg-sky-500 text-white font-bold text-[11px] py-1.5 rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-md"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" /> Pagar com Cartão de Crédito Online
+                      </a>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p className="text-[10px] text-slate-400">
+                  Aceitamos cartões de crédito e débito presencialmente na maquininha do salão.
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Dynamic Pix QR Code Modal in Client Confirmation */}
+          {showPixQr && (
+            <div className="fixed inset-0 z-80 bg-black/85 backdrop-blur-xs flex items-center justify-center p-4">
+              <div className="bg-slate-900 border border-purple-500/50 p-5 rounded-3xl max-w-xs w-full text-center space-y-3 shadow-2xl">
+                <div className="flex justify-between items-center border-b border-slate-800 pb-2">
+                  <span className="text-xs font-black text-purple-300 flex items-center gap-1">
+                    <QrCode className="w-4 h-4" /> QR Code Pix
+                  </span>
+                  <button onClick={() => setShowPixQr(false)} className="text-slate-400 hover:text-white p-1">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div className="text-sm font-black text-emerald-400">
+                  R$ {lastAppointment?.price.toFixed(2)}
+                </div>
+
+                <div className="bg-white p-3 rounded-2xl inline-block mx-auto border border-purple-400">
+                  {qrCodeUrl && <img src={qrCodeUrl} alt="Pix QR" className="w-44 h-44" />}
+                </div>
+
+                <div className="text-[10px] font-mono text-purple-200 bg-slate-950 p-2 rounded-xl border border-slate-800 break-all">
+                  {activeSalon.config.chavePix || 'marlon1soares28@gmail.com'}
+                </div>
+
+                <button
+                  onClick={() => {
+                    if (pixPayload) {
+                      navigator.clipboard.writeText(pixPayload);
+                      alert('Código Pix Copia e Cola copiado!');
+                    }
+                  }}
+                  className="w-full bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs py-2 rounded-xl"
+                >
+                  Copiar Código "Copia e Cola"
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* WhatsApp Share Button */}
           <button

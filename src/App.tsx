@@ -264,6 +264,7 @@ export function App() {
             }
           }}
           onOpenBuyApp={() => setIsBuyAppOpen(true)}
+          onOpenAdminPaymentConfig={() => setIsAdminPaymentOpen(true)}
           onOpenClientLink={() => setIsClientLinkOpen(true)}
           isExpanded={isExpanded}
           onToggleExpand={() => setIsExpanded(!isExpanded)}
@@ -477,9 +478,14 @@ export function App() {
       </div>
 
       {/* Catalog Lightbox Modal */}
+      {/* Photos & Products Media Catalog Modal */}
       <CatalogoView
         isOpen={isCatalogOpen}
         onClose={() => setIsCatalogOpen(false)}
+        userRole={userRole}
+        readOnly={userRole === 'cliente'}
+        config={config}
+        onSaveConfig={handleSaveConfig}
       />
 
       {/* Settings Modal */}
@@ -524,6 +530,8 @@ export function App() {
       <BuyAppModal
         isOpen={isBuyAppOpen}
         onClose={() => setIsBuyAppOpen(false)}
+        userRole={userRole}
+        onOpenAdminPaymentConfig={() => setIsAdminPaymentOpen(true)}
         onPurchaseComplete={(newSalon) => {
           handleCreateSalon(newSalon);
         }}

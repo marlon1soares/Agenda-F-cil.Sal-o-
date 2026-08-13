@@ -1,1 +1,28 @@
 @import "tailwindcss";
+
+/* Custom High-Visibility Scrollbar for Catalog & Containers */
+.custom-scrollbar {
+  scrollbar-width: auto;
+  scrollbar-color: #a855f7 #090d16;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: #090d16;
+  border-left: 1px solid rgba(148, 163, 184, 0.15);
+  border-radius: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #a855f7;
+  border-radius: 8px;
+  border: 2px solid #090d16;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #c084fc;
+}

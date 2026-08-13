@@ -80,6 +80,9 @@ export interface CatalogMedia {
   folder: CatalogFolder;
   url: string;
   title?: string;
+  price?: number | string;
+  stock?: number | string;
+  description?: string;
   mediaType: 'image' | 'video';
   createdAt: string;
 }
@@ -107,6 +110,22 @@ export interface SalonConfig {
   temaKey: string;
   corCustom: string;
   profs: { nome: string; porc: number; id?: string }[];
+  
+  // Payment receiving config for store & catalog (unified for all products)
+  chavePix?: string;
+  tipoChavePix?: 'cpf' | 'cnpj' | 'email' | 'telefone' | 'aleatoria';
+  titularPix?: string;
+  cidadePix?: string;
+  
+  // Bank Account for Credit Card Receipts / Deposits
+  bancoCartao?: string;
+  agenciaCartao?: string;
+  contaCartao?: string;
+  tipoContaCartao?: 'corrente' | 'poupanca' | 'pagamento';
+  titularCartao?: string;
+  cpfCnpjCartao?: string;
+  linkCartao?: string;
+  instrucoesPagamento?: string;
 }
 
 export interface SalonApp {
@@ -162,6 +181,10 @@ export interface AdminPaymentConfig {
   bancoOuProcessador: string;
   cartaoContaDestino: string;
   instrucoesPagamento?: string;
+  precoPlano30Dias?: number; // 30 Dias (padrão: 30.00)
+  precoPlano90Dias?: number; // 3 Meses (padrão: 75.00)
+  precoPlano180Dias?: number; // 6 Meses (padrão: 135.00)
+  precoPlano365Dias?: number; // 1 Ano (padrão: 240.00)
 }
 
 

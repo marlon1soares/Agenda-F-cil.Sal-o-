@@ -22,7 +22,19 @@ export const DEFAULT_CONFIG: SalonConfig = {
   profs: [
     { id: "prof-1", nome: "Michael", porc: 70 },
     { id: "prof-2", nome: "Marlon", porc: 30 }
-  ]
+  ],
+  chavePix: "marlon1soares28@gmail.com",
+  tipoChavePix: "email",
+  titularPix: "Marlon & Michael - Salão dos Parças",
+  cidadePix: "São Paulo",
+  bancoCartao: "Banco Nubank / Itaú",
+  agenciaCartao: "0001",
+  contaCartao: "9876543-2",
+  tipoContaCartao: "corrente",
+  titularCartao: "Salão dos Parças Ltda",
+  cpfCnpjCartao: "12.345.678/0001-90",
+  linkCartao: "",
+  instrucoesPagamento: "Aceitamos Pix imediato e compras no Cartão de Crédito/Débito."
 };
 
 export const DEFAULT_SALON_APPS: SalonApp[] = [
@@ -57,7 +69,19 @@ export const DEFAULT_SALON_APPS: SalonApp[] = [
       profs: [
         { id: "prof-1", nome: "Michael", porc: 70 },
         { id: "prof-2", nome: "Marlon", porc: 30 }
-      ]
+      ],
+      chavePix: "marlon1soares28@gmail.com",
+      tipoChavePix: "email",
+      titularPix: "Marlon & Michael - Salão dos Parças",
+      cidadePix: "São Paulo",
+      bancoCartao: "Banco Nubank / Itaú",
+      agenciaCartao: "0001",
+      contaCartao: "9876543-2",
+      tipoContaCartao: "corrente",
+      titularCartao: "Salão dos Parças Ltda",
+      cpfCnpjCartao: "12.345.678/0001-90",
+      linkCartao: "",
+      instrucoesPagamento: "Aceitamos Pix imediato e compras no Cartão de Crédito/Débito."
     }
   },
   {
@@ -368,25 +392,25 @@ export const INITIAL_APPOINTMENTS: Record<string, Record<string, Appointment>> =
 
 export const INITIAL_CATALOG: Record<string, CatalogMedia[]> = {
   salao: [
-    { id: "cat-s1", folder: "salao", url: "https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&w=600&q=80", title: "Fachada & Recepção do Salão", mediaType: "image", createdAt: todayISO },
-    { id: "cat-s2", folder: "salao", url: "https://images.unsplash.com/photo-1521590832167-7bcbfaa6381f?auto=format&fit=crop&w=600&q=80", title: "Bancadas & Equipamentos", mediaType: "image", createdAt: todayISO }
+    { id: "cat-s1", folder: "salao", url: "https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&w=600&q=80", title: "Fachada & Recepção do Salão", description: "Ambiente climatizado e aconchegante", mediaType: "image", createdAt: todayISO },
+    { id: "cat-s2", folder: "salao", url: "https://images.unsplash.com/photo-1521590832167-7bcbfaa6381f?auto=format&fit=crop&w=600&q=80", title: "Bancadas & Equipamentos", description: "Equipamentos esterilizados de ponta", mediaType: "image", createdAt: todayISO }
   ],
   cliente: [
-    { id: "cat-c1", folder: "cliente", url: "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?auto=format&fit=crop&w=600&q=80", title: "Resultado de Atendimento - Ana Clara", mediaType: "image", createdAt: todayISO }
+    { id: "cat-c1", folder: "cliente", url: "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?auto=format&fit=crop&w=600&q=80", title: "Resultado de Atendimento - Ana Clara", description: "Corte e finalização especial", price: 120, mediaType: "image", createdAt: todayISO }
   ],
   portfolio: [
-    { id: "cat-5", folder: "portfolio", url: "https://images.unsplash.com/photo-1562322140-8baeececf3df?auto=format&fit=crop&w=600&q=80", title: "Penteado Noiva & Festa", mediaType: "image", createdAt: todayISO },
-    { id: "cat-6", folder: "portfolio", url: "https://images.unsplash.com/photo-1622286342621-4bd786c2447c?auto=format&fit=crop&w=600&q=80", title: "Corte Fade Moderno", mediaType: "image", createdAt: todayISO }
+    { id: "cat-5", folder: "portfolio", url: "https://images.unsplash.com/photo-1562322140-8baeececf3df?auto=format&fit=crop&w=600&q=80", title: "Penteado Noiva & Festa", description: "Produção completa para noivas e formandas", price: 250, mediaType: "image", createdAt: todayISO },
+    { id: "cat-6", folder: "portfolio", url: "https://images.unsplash.com/photo-1622286342621-4bd786c2447c?auto=format&fit=crop&w=600&q=80", title: "Corte Fade Moderno", description: "Degradê navalhado com alinhamento", price: 65, mediaType: "image", createdAt: todayISO }
   ],
   higiene: [
-    { id: "cat-3", folder: "higiene", url: "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?auto=format&fit=crop&w=600&q=80", title: "Linha Capilar Profissional", mediaType: "image", createdAt: todayISO },
-    { id: "cat-4", folder: "higiene", url: "https://images.unsplash.com/photo-1571781926291-c477ebfd024b?auto=format&fit=crop&w=600&q=80", title: "Óleos Essenciais e Serums", mediaType: "image", createdAt: todayISO }
+    { id: "cat-3", folder: "higiene", url: "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?auto=format&fit=crop&w=600&q=80", title: "Linha Capilar Profissional", description: "Shampoo e máscara hidratante reconstrutora", price: 89.90, mediaType: "image", createdAt: todayISO },
+    { id: "cat-4", folder: "higiene", url: "https://images.unsplash.com/photo-1571781926291-c477ebfd024b?auto=format&fit=crop&w=600&q=80", title: "Óleos Essenciais e Serums", description: "Serum reparador de pontas com óleo de argan", price: 45.00, mediaType: "image", createdAt: todayISO }
   ],
   roupas: [
-    { id: "cat-1", folder: "roupas", url: "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=600&q=80", title: "Look Verão Elegante", mediaType: "image", createdAt: todayISO },
-    { id: "cat-2", folder: "roupas", url: "https://images.unsplash.com/photo-1490481651871-ab68de25d43d?auto=format&fit=crop&w=600&q=80", title: "Coleção Acessórios Ouro", mediaType: "image", createdAt: todayISO }
+    { id: "cat-1", folder: "roupas", url: "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=600&q=80", title: "Look Verão Elegante", description: "Vestido casual em tecido premium", price: 159.90, mediaType: "image", createdAt: todayISO },
+    { id: "cat-2", folder: "roupas", url: "https://images.unsplash.com/photo-1490481651871-ab68de25d43d?auto=format&fit=crop&w=600&q=80", title: "Coleção Acessórios Ouro", description: "Brincos e colares folheados", price: 79.90, mediaType: "image", createdAt: todayISO }
   ],
   diversos: [
-    { id: "cat-7", folder: "diversos", url: "https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&w=600&q=80", title: "Documentos & Imagens Gerais", mediaType: "image", createdAt: todayISO }
+    { id: "cat-7", folder: "diversos", url: "https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&w=600&q=80", title: "Documentos & Imagens Gerais", description: "Informativos e tabela de horários", mediaType: "image", createdAt: todayISO }
   ]
 };
