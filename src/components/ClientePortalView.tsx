@@ -80,6 +80,10 @@ export const ClientePortalView: React.FC<ClientePortalViewProps> = ({
   // Submit Booking
   const handleConfirmBooking = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!selectedTime) {
+      alert('Por favor, escolha um horário disponível (botão verde) para agendar.');
+      return;
+    }
     if (!selectedService) {
       alert('Por favor, selecione um serviço.');
       return;
@@ -145,33 +149,33 @@ export const ClientePortalView: React.FC<ClientePortalViewProps> = ({
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-300">
+    <div className="space-y-3 animate-in fade-in duration-300">
       
-      {/* Client Header Banner */}
-      <div className="bg-gradient-to-r from-rose-600 via-pink-600 to-purple-700 rounded-3xl p-6 text-white shadow-xl relative overflow-hidden">
-        <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      {/* Client Header Banner (Compact Height) */}
+      <div className="bg-gradient-to-r from-rose-600 via-pink-600 to-purple-700 rounded-2xl p-3 sm:p-4 text-white shadow-md relative overflow-hidden">
+        <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-2 sm:gap-4">
           <div>
-            <span className="bg-white/20 text-white font-black text-[10px] px-3 py-1 rounded-full uppercase tracking-wider border border-white/20">
+            <span className="bg-white/20 text-white font-black text-[9px] px-2.5 py-0.5 rounded-full uppercase tracking-wider border border-white/20 inline-block">
               Agenda mais fácil.cliente
             </span>
-            <h2 className="text-2xl sm:text-3xl font-black mt-2 tracking-tight flex items-center gap-2">
-              <Heart className="w-7 h-7 text-rose-200 fill-rose-200" />
+            <h2 className="text-base sm:text-lg font-black mt-1 tracking-tight flex items-center gap-1.5">
+              <Heart className="w-4 h-4 text-rose-200 fill-rose-200" />
               <span>Agendamento Online do Cliente</span>
             </h2>
-            <p className="text-white/90 text-xs sm:text-sm mt-1 max-w-2xl">
-              Escolha seu salão preferido, consulte horários livres em tempo real e agende seu horário em segundos sem precisar ligar.
+            <p className="text-white/90 text-xs mt-0.5 max-w-xl leading-tight">
+              Escolha seu salão preferido, consulte horários livres em tempo real e agende em segundos.
             </p>
           </div>
 
           {/* Salon Selector Pill */}
-          <div className="bg-slate-950/70 backdrop-blur-md p-3.5 rounded-2xl border border-white/20 w-full md:w-auto">
-            <span className="text-[10px] font-bold text-rose-200 uppercase tracking-wider block mb-1">
-              Salão Selecionado Atual:
+          <div className="bg-slate-950/70 backdrop-blur-md px-3 py-2 rounded-xl border border-white/20 w-full md:w-auto shrink-0">
+            <span className="text-[9px] font-bold text-rose-200 uppercase tracking-wider block mb-0.5">
+              Salão Selecionado:
             </span>
-            <div className="flex items-center gap-2 text-white font-extrabold text-sm">
-              <Building2 className="w-4 h-4 text-rose-300" />
+            <div className="flex items-center gap-1.5 text-white font-extrabold text-xs">
+              <Building2 className="w-3.5 h-3.5 text-rose-300" />
               <span>{activeSalon.config.nomeSalao}</span>
-              <span className="bg-rose-500/40 text-rose-100 text-[10px] px-2 py-0.5 rounded-full font-mono">
+              <span className="bg-rose-500/40 text-rose-100 text-[9px] px-1.5 py-0.2 rounded-full font-mono">
                 {activeSalon.appCode}
               </span>
             </div>
@@ -405,20 +409,20 @@ export const ClientePortalView: React.FC<ClientePortalViewProps> = ({
                       <button
                         key={baseSlot}
                         type="button"
-                        onClick={() => setSelectedTime(baseSlot)}
+                        onClick={() => setSelectedTime(prev => prev === baseSlot ? '' : baseSlot)}
                         className={`py-2 px-2.5 rounded-xl text-xs font-bold flex items-center justify-between transition-all border ${
                           isSelected
-                            ? 'bg-emerald-600 text-white font-black border-emerald-400 ring-2 ring-emerald-400/80 shadow-md scale-[1.02]'
+                            ? 'bg-emerald-600 text-white font-black border-emerald-500 shadow-md scale-[1.02]'
                             : 'bg-slate-950 text-slate-200 border-slate-800 hover:border-emerald-500/60 hover:bg-slate-900'
                         }`}
                       >
                         <span className="font-mono text-xs font-extrabold flex items-center gap-1">
-                          <Clock className="w-3 h-3 text-emerald-400" /> {displayTime}
+                          <Clock className={`w-3 h-3 ${isSelected ? 'text-white' : 'text-emerald-400'}`} /> {displayTime}
                         </span>
                         <span className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded ${
-                          isSelected ? 'bg-white/20 text-white' : 'text-emerald-400 bg-emerald-950/70'
+                          isSelected ? 'bg-emerald-800 text-white' : 'text-emerald-400 bg-emerald-950/70'
                         }`}>
-                          LIVRE ✓
+                          {isSelected ? 'SELECIONADO ✓' : 'LIVRE ✓'}
                         </span>
                       </button>
                     );

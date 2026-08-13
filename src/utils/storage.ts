@@ -135,6 +135,15 @@ export const Storage = {
     return ok;
   },
 
+  getCatalogFolderList(): { key: string; title: string; icon: string }[] | null {
+    const saved = localStorage.getItem('salaoCatalogFolders');
+    return saved ? JSON.parse(saved) : null;
+  },
+  saveCatalogFolderList(folders: { key: string; title: string; icon: string }[]) {
+    localStorage.setItem('salaoCatalogFolders', JSON.stringify(folders));
+    window.dispatchEvent(new CustomEvent('salao_sync_data', { detail: { key: 'salaoCatalogFolders' } }));
+  },
+
   getAdminCredentials(): AdminCredentials {
     const saved = localStorage.getItem('salaoAdminCredentials');
     return saved ? JSON.parse(saved) : { email: 'admin@salao.com', phone: '(11) 99999-9999', password: '123456' };
