@@ -4,7 +4,7 @@ import { Storage } from '../utils/storage';
 import { DEFAULT_TIMESLOTS } from '../data/mockData';
 import { 
   Scissors, Calendar, Clock, User, Phone, CheckCircle2, Building2, 
-  Sparkles, Search, ArrowRight, ShieldCheck, Heart, MapPin, Share2, Award, ChevronRight, Lock
+  Sparkles, Search, ArrowRight, ShieldCheck, Heart, MapPin, Share2, Award, ChevronRight, Lock, Image as ImageIcon
 } from 'lucide-react';
 
 interface ClientePortalViewProps {
@@ -14,6 +14,7 @@ interface ClientePortalViewProps {
   appointments?: Record<string, Record<string, Appointment>>;
   timeAdjustments?: Record<string, number>;
   onAppointmentBooked: (date: string, timeSlot: string, ap: Appointment) => void;
+  onOpenCatalog?: () => void;
 }
 
 export const ClientePortalView: React.FC<ClientePortalViewProps> = ({
@@ -23,6 +24,7 @@ export const ClientePortalView: React.FC<ClientePortalViewProps> = ({
   appointments = {},
   timeAdjustments = {},
   onAppointmentBooked,
+  onOpenCatalog,
 }) => {
   const [searchCode, setSearchCode] = useState('');
   const [selectedService, setSelectedService] = useState<ServiceItem | null>(null);
@@ -560,6 +562,21 @@ export const ClientePortalView: React.FC<ClientePortalViewProps> = ({
             className="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold py-2.5 rounded-2xl text-xs transition-colors"
           >
             Fazer Novo Agendamento
+          </button>
+        </div>
+      )}
+
+      {/* Bottom Catalog Action Button for Clients */}
+      {onOpenCatalog && (
+        <div className="pt-3 flex items-center justify-center">
+          <button
+            type="button"
+            onClick={onOpenCatalog}
+            className="bg-gradient-to-r from-purple-700 via-indigo-700 to-purple-800 hover:from-purple-600 hover:to-indigo-600 text-white font-extrabold text-xs sm:text-sm px-6 py-3 rounded-2xl shadow-xl border border-purple-400/30 flex items-center gap-2.5 transition-all active:scale-95 hover:shadow-purple-500/20"
+          >
+            <ImageIcon className="w-4 h-4 text-purple-200" />
+            <span>📸 Ver Catálogo de Fotos & Trabalhos do Salão</span>
+            <Sparkles className="w-3.5 h-3.5 text-amber-300" />
           </button>
         </div>
       )}

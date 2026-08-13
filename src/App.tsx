@@ -274,7 +274,7 @@ export function App() {
 
 
         {!isMinimized && (
-          <div className="p-3 sm:p-6 space-y-6">
+          <div className="p-2 sm:p-4 space-y-4">
             
             {/* ROLE CONTEXT QUICK TOOLBAR */}
             {userRole === 'admin' && (
@@ -317,6 +317,7 @@ export function App() {
                 onAppointmentBooked={(date, timeSlot, ap) => {
                   handleSaveAppointment(date, timeSlot, ap);
                 }}
+                onOpenCatalog={() => setIsCatalogOpen(true)}
               />
             ) : (
               <>

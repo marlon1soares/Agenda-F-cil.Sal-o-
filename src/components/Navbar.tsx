@@ -133,7 +133,7 @@ export const Navbar: React.FC<NavbarProps> = ({
       className="w-full text-white p-3 sm:p-5 shadow-md transition-all flex flex-col items-center justify-between select-none space-y-3"
     >
       {/* Top Action Bar Container (No overlapping) */}
-      <div className="w-full flex flex-wrap items-center justify-between gap-2.5 bg-slate-950/60 backdrop-blur-md p-2 sm:px-3 sm:py-2 rounded-2xl border border-white/10 shadow-lg z-30">
+      <div className="w-full flex items-center justify-between gap-2 bg-slate-950/70 backdrop-blur-md p-1.5 sm:px-3 sm:py-1.5 rounded-2xl border border-white/10 shadow-lg z-30">
         
         {/* Left Side: Role Selector & Action Buttons */}
         <div className="flex items-center gap-2 flex-wrap" ref={dropdownRef}>
@@ -208,105 +208,117 @@ export const Navbar: React.FC<NavbarProps> = ({
             )}
           </div>
 
-          {/* Quick Buttons */}
-          {onOpenClientLink && (
-            <button
-              onClick={onOpenClientLink}
-              title="Criar e compartilhar link de agendamento online para clientes"
-              className="bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-500 hover:to-pink-500 text-white font-extrabold text-xs px-3 py-1.5 rounded-xl shadow-md flex items-center gap-1.5 transition-all active:scale-95 border border-rose-400/40 shrink-0 animate-pulse hover:animate-none"
-            >
-              <Link2 className="w-3.5 h-3.5 text-rose-200" />
-              <span>Criar Link p/ Clientes</span>
-            </button>
-          )}
+          {/* Quick Buttons - Hidden in Client Role */}
+          {userRole !== 'cliente' && (
+            <>
+              {onOpenClientLink && (
+                <button
+                  onClick={onOpenClientLink}
+                  title="Criar e compartilhar link de agendamento online para clientes"
+                  className="bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-500 hover:to-pink-500 text-white font-extrabold text-xs px-3 py-1.5 rounded-xl shadow-md flex items-center gap-1.5 transition-all active:scale-95 border border-rose-400/40 shrink-0"
+                >
+                  <Link2 className="w-3.5 h-3.5 text-rose-200" />
+                  <span>Criar Link p/ Clientes</span>
+                </button>
+              )}
 
-          {onOpenAdminSalons && (
-            <button
-              onClick={onOpenAdminSalons}
-              title="Abrir painel de salões conectados e solicitações para novos salões"
-              className="bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-xs px-3 py-1.5 rounded-xl shadow-md flex items-center gap-1.5 transition-all active:scale-95 border border-blue-400/40 shrink-0"
-            >
-              <Building2 className="w-3.5 h-3.5 text-sky-200" />
-              <span>Meus Salões</span>
-            </button>
-          )}
+              {userRole === 'admin' && onOpenAdminSalons && (
+                <button
+                  onClick={onOpenAdminSalons}
+                  title="Abrir painel de salões conectados e solicitações para novos salões"
+                  className="bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-xs px-3 py-1.5 rounded-xl shadow-md flex items-center gap-1.5 transition-all active:scale-95 border border-blue-400/40 shrink-0"
+                >
+                  <Building2 className="w-3.5 h-3.5 text-sky-200" />
+                  <span>Meus Salões</span>
+                </button>
+              )}
 
-          {onOpenBuyApp && (
-            <button
-              onClick={onOpenBuyApp}
-              title="Comprar licença do aplicativo a partir de R$ 19,90/mês"
-              className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-xs px-3 py-1.5 rounded-xl shadow-md flex items-center gap-1.5 transition-all active:scale-95 border border-emerald-400/40"
-            >
-              <ShoppingCart className="w-3.5 h-3.5 text-yellow-300" />
-              <span>Comprar Aplicativo</span>
-              <span className="bg-yellow-400/20 text-yellow-300 font-bold text-[10px] px-1.5 py-0.5 rounded-md border border-yellow-300/30 hidden sm:inline">
-                R$ 19,90/mês
-              </span>
-            </button>
+              {onOpenBuyApp && (
+                <button
+                  onClick={onOpenBuyApp}
+                  title="Comprar licença do aplicativo a partir de R$ 19,90/mês"
+                  className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-xs px-3 py-1.5 rounded-xl shadow-md flex items-center gap-1.5 transition-all active:scale-95 border border-emerald-400/40"
+                >
+                  <ShoppingCart className="w-3.5 h-3.5 text-yellow-300" />
+                  <span>Comprar Aplicativo</span>
+                  <span className="bg-yellow-400/20 text-yellow-300 font-bold text-[10px] px-1.5 py-0.5 rounded-md border border-yellow-300/30 hidden sm:inline">
+                    R$ 19,90/mês
+                  </span>
+                </button>
+              )}
+            </>
           )}
 
         </div>
 
-        {/* Right Side: Secondary Actions */}
+        {/* Right Side: Control & Window Actions */}
         <div className="flex items-center gap-1.5">
-          <button
-            onClick={onOpenCatalog}
-            title="Abrir Catálogo de Mídias"
-            className="bg-purple-600/90 hover:bg-purple-600 text-white text-xs font-bold px-2.5 py-1.5 rounded-xl flex items-center gap-1 shadow-xs transition-colors"
-          >
-            <ImageIcon className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Catálogo</span>
-          </button>
+          {userRole !== 'cliente' && (
+            <>
+              <button
+                onClick={onOpenCatalog}
+                title="Abrir Catálogo de Mídias"
+                className="bg-purple-600/90 hover:bg-purple-600 text-white text-xs font-bold px-2.5 py-1.5 rounded-xl flex items-center gap-1 shadow-xs transition-colors"
+              >
+                <ImageIcon className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Catálogo</span>
+              </button>
 
-          <button
-            onClick={onOpenConfig}
-            title="Configurações do Salão"
-            className="bg-slate-800/80 hover:bg-slate-700 text-white text-xs font-bold px-2.5 py-1.5 rounded-xl flex items-center gap-1 transition-colors border border-slate-700"
-          >
-            <Settings className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Config</span>
-          </button>
+              <button
+                onClick={onOpenConfig}
+                title="Configurações do Salão"
+                className="bg-slate-800/80 hover:bg-slate-700 text-white text-xs font-bold px-2.5 py-1.5 rounded-xl flex items-center gap-1 transition-colors border border-slate-700"
+              >
+                <Settings className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Config</span>
+              </button>
+            </>
+          )}
 
+          {/* Seta de Diminuir (Minimizar) - visível em todos os módulos */}
           <button
             onClick={onToggleMinimize}
-            title="Minimizar em barra"
-            className="bg-black/40 hover:bg-black/60 text-white text-xs font-bold p-1.5 rounded-xl transition-colors"
+            title="Diminuir / Minimizar em barra"
+            className="bg-black/50 hover:bg-black/80 text-white text-xs font-bold p-1.5 sm:px-2.5 rounded-xl transition-all border border-white/10 flex items-center gap-1"
           >
-            <Minimize2 className="w-3.5 h-3.5" />
+            <Minimize2 className="w-3.5 h-3.5 text-amber-300" />
+            <span className="hidden md:inline text-[10px]">Diminuir</span>
           </button>
 
+          {/* Seta de Expandir (Tela Cheia) - visível em todos os módulos */}
           <button
             onClick={onToggleExpand}
-            title="Alternar Tela Cheia"
-            className="bg-black/40 hover:bg-black/60 text-white text-xs font-bold p-1.5 rounded-xl transition-colors"
+            title="Expandir / Alternar Tela Cheia"
+            className="bg-emerald-700/80 hover:bg-emerald-600 text-white text-xs font-bold p-1.5 sm:px-2.5 rounded-xl transition-all border border-emerald-400/40 shadow-sm flex items-center gap-1"
           >
-            <Maximize2 className="w-3.5 h-3.5" />
+            <Maximize2 className="w-3.5 h-3.5 text-emerald-200" />
+            <span className="hidden md:inline text-[10px]">Expandir</span>
           </button>
         </div>
 
       </div>
 
-      {/* Center Salon Header Title & Clean Module Badge */}
-      <div className="py-2 flex flex-col items-center justify-center text-center max-w-2xl w-full">
+      {/* Center Salon Header Title & Clean Module Badge - Compact to move content UP */}
+      <div className="py-1 flex flex-col items-center justify-center text-center max-w-2xl w-full">
         {config.logoUrl && (
           <img
             src={config.logoUrl}
             alt="Logo Salão"
-            className="max-h-20 max-w-md object-contain rounded-xl shadow-md bg-white p-1 mb-2"
+            className="max-h-12 max-w-xs object-contain rounded-xl shadow-md bg-white p-1 mb-1"
           />
         )}
         
-        <h1 className="text-2xl sm:text-3xl font-black tracking-tight drop-shadow-md font-display flex items-center justify-center gap-2">
+        <h1 className="text-xl sm:text-2xl font-black tracking-tight drop-shadow-md font-display flex items-center justify-center gap-2">
           <span>{config.nomeSalao}</span>
         </h1>
 
         {/* Status & Active Mode Badge in Portuguese */}
-        <div className="mt-2 text-xs font-bold px-3.5 py-1 rounded-full flex items-center justify-center gap-2 border shadow-sm backdrop-blur-md bg-black/50 border-white/15 text-white/90">
-          <Sparkles className="w-3.5 h-3.5 text-amber-300 shrink-0" />
+        <div className="mt-1 text-[11px] font-bold px-3 py-0.5 rounded-full flex items-center justify-center gap-1.5 border shadow-sm backdrop-blur-md bg-black/50 border-white/15 text-white/90">
+          <Sparkles className="w-3 h-3 text-amber-300 shrink-0" />
           <span>
-            {userRole === 'admin' && '👑 Módulo Administrador • Gestão da Plataforma e Salões Comprados'}
+            {userRole === 'admin' && '👑 Módulo Administrador • Gestão da Plataforma e Salões'}
             {userRole === 'salao' && '💈 Módulo Salão de Beleza • Painel do Profissional'}
-            {userRole === 'cliente' && '👤 Módulo do Cliente • Agendamentos Online'}
+            {userRole === 'cliente' && '👤 Portal do Cliente • Agendamento Online'}
           </span>
         </div>
       </div>
