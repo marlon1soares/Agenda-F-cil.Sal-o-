@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { SalonApp } from '../types';
+import { getSalonSlug } from '../utils/storage';
 import { 
   X, Link2, Copy, Check, Share2, MessageSquare, ExternalLink, 
   Sparkles, Building2, UserCheck, ShieldCheck, Heart, Scissors, CheckCircle2
@@ -29,8 +30,9 @@ export const ClientLinkModal: React.FC<ClientLinkModalProps> = ({
 
   // Build client link for this specific salon
   // Convert -dev- to -pre- if present so external devices (Android/iOS) can access without AI Studio authentication
+  const salonSlug = getSalonSlug(activeSalon.config.nomeSalao || activeSalon.name);
   const publicOrigin = (window.location.origin + window.location.pathname).replace('ais-dev-', 'ais-pre-');
-  const clientUrl = `${publicOrigin}?role=cliente&salon=${activeSalon.id}`;
+  const clientUrl = `${publicOrigin}?role=cliente&salon=${salonSlug}`;
 
   const defaultWhatsappMsg = `Olá! 💈 Agende seu horário no *${activeSalon.config.nomeSalao}* de forma simples e rápida!\n\n` +
     `Acesse o nosso portal de agendamentos online pelo link abaixo:\n` +

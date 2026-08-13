@@ -1,15 +1,18 @@
 import React, { useState } from 'react';
 import { SalonApp, ServiceItem, Professional, Appointment, ClientRecord } from '../types';
 import { Storage } from '../utils/storage';
+import { DEFAULT_TIMESLOTS } from '../data/mockData';
 import { 
   Scissors, Calendar, Clock, User, Phone, CheckCircle2, Building2, 
-  Sparkles, Search, ArrowRight, ShieldCheck, Heart, MapPin, Share2, Award, ChevronRight
+  Sparkles, Search, ArrowRight, ShieldCheck, Heart, MapPin, Share2, Award, ChevronRight, Lock
 } from 'lucide-react';
 
 interface ClientePortalViewProps {
   salons: SalonApp[];
   activeSalon: SalonApp;
   onSelectSalon: (salon: SalonApp) => void;
+  appointments?: Record<string, Record<string, Appointment>>;
+  timeAdjustments?: Record<string, number>;
   onAppointmentBooked: (date: string, timeSlot: string, ap: Appointment) => void;
 }
 
@@ -17,25 +20,32 @@ export const ClientePortalView: React.FC<ClientePortalViewProps> = ({
   salons,
   activeSalon,
   onSelectSalon,
+  appointments = {},
+  timeAdjustments = {},
   onAppointmentBooked,
 }) => {
   const [searchCode, setSearchCode] = useState('');
   const [selectedService, setSelectedService] = useState<ServiceItem | null>(null);
   const [selectedProf, setSelectedProf] = useState<Professional | null>(null);
   const [selectedDate, setSelectedDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
-  const [selectedTime, setSelectedTime] = useState<string>('09:00');
+  const [selectedTime, setSelectedTime] = useState<string>('10:00');
   const [clientName, setClientName] = useState('');
   const [clientPhone, setClientPhone] = useState('');
   const [clientNotes, setClientNotes] = useState('');
   const [isSuccess, setIsSuccess] = useState(false);
   const [lastAppointment, setLastAppointment] = useState<Appointment | null>(null);
 
-  // Available Time Slots
-  const timeSlots = [
-    '08:00', '08:30', '09:00', '09:30', '10:00', '10:30', 
-    '11:00', '11:30', '13:00', '13:30', '14:00', '14:30', 
-    '15:00', '15:30', '16:00', '16:30', '17:00', '17:30', '18:00', '18:30'
-  ];
+  // Compute Current Day Appointments & Time Shift
+  const currentDayAppointments = appointments[selectedDate] || {};
+  const currentDayShift = timeAdjustments[selectedDate] || 0;
+
+  const getDisplayTime = (baseTime: string) => {
+    const [hbH, hbM] = baseTime.split(':').map(Number);
+    const totalMins = hbH * 60 + hbM + currentDayShift;
+    const shiftedH = Math.floor(totalMins / 60).toString().padStart(2, '0');
+    const shiftedM = (totalMins % 60).toString().padStart(2, '0');
+    return `${shiftedH}:${shiftedM}`;
+  };
 
   // Salon Services and Professionals
   const services: ServiceItem[] = Storage.getServices();
@@ -74,6 +84,13 @@ export const ClientePortalView: React.FC<ClientePortalViewProps> = ({
     }
     if (!clientName.trim() || !clientPhone.trim()) {
       alert('Por favor, preencha seu nome e WhatsApp.');
+      return;
+    }
+
+    // Check if slot was booked or blocked in real-time
+    const existingAp = currentDayAppointments[selectedTime];
+    if (existingAp && (existingAp.status === 'agendado' || existingAp.status === 'concluido' || existingAp.status === 'bloqueado')) {
+      alert('Atenção: O horário selecionado acabou de ser reservado ou bloqueado pelo salão. Por favor, escolha outro horário livre.');
       return;
     }
 
@@ -340,25 +357,70 @@ export const ClientePortalView: React.FC<ClientePortalViewProps> = ({
               </div>
 
               {/* Time Slots */}
-              <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1">
-                  Horário Disponível:
-                </label>
-                <div className="grid grid-cols-4 gap-1.5 max-h-40 overflow-y-auto pr-1">
-                  {timeSlots.map((ts) => (
-                    <button
-                      key={ts}
-                      type="button"
-                      onClick={() => setSelectedTime(ts)}
-                      className={`py-1.5 rounded-lg text-xs font-bold transition-all ${
-                        selectedTime === ts
-                          ? 'bg-emerald-600 text-white font-black ring-1 ring-emerald-400 shadow-sm'
-                          : 'bg-slate-950 text-slate-300 border border-slate-800 hover:border-slate-700'
-                      }`}
-                    >
-                      {ts}
-                    </button>
-                  ))}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-bold text-slate-300">
+                    Horários Disponíveis (10h às 22h - Intervalo de 1 hora):
+                  </label>
+                  <span className="text-[10px] text-emerald-400 font-extrabold bg-emerald-950/80 px-2 py-0.5 rounded-full border border-emerald-800/50 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
+                    Sincronizado c/ Salão
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 max-h-56 overflow-y-auto custom-scrollbar pr-1">
+                  {DEFAULT_TIMESLOTS.map((baseSlot) => {
+                    const displayTime = getDisplayTime(baseSlot);
+                    const ap = currentDayAppointments[baseSlot];
+                    const isBooked = ap && (ap.status === 'agendado' || ap.status === 'concluido');
+                    const isBlocked = ap && ap.status === 'bloqueado';
+                    const isOccupied = isBooked || isBlocked;
+                    const isSelected = selectedTime === baseSlot;
+
+                    if (isOccupied) {
+                      return (
+                        <button
+                          key={baseSlot}
+                          type="button"
+                          disabled
+                          className={`py-2 px-2.5 rounded-xl text-xs font-bold flex items-center justify-between transition-all opacity-85 cursor-not-allowed border select-none ${
+                            isBlocked
+                              ? 'bg-rose-950/60 text-rose-300 border-rose-800/70'
+                              : 'bg-amber-950/60 text-amber-200 border-amber-800/70'
+                          }`}
+                        >
+                          <span className="font-mono text-xs flex items-center gap-1">
+                            <Clock className="w-3 h-3 opacity-60" /> {displayTime}
+                          </span>
+                          <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-black/40">
+                            {isBlocked ? '🔒 Bloqueado' : '📌 Reservado'}
+                          </span>
+                        </button>
+                      );
+                    }
+
+                    return (
+                      <button
+                        key={baseSlot}
+                        type="button"
+                        onClick={() => setSelectedTime(baseSlot)}
+                        className={`py-2 px-2.5 rounded-xl text-xs font-bold flex items-center justify-between transition-all border ${
+                          isSelected
+                            ? 'bg-emerald-600 text-white font-black border-emerald-400 ring-2 ring-emerald-400/80 shadow-md scale-[1.02]'
+                            : 'bg-slate-950 text-slate-200 border-slate-800 hover:border-emerald-500/60 hover:bg-slate-900'
+                        }`}
+                      >
+                        <span className="font-mono text-xs font-extrabold flex items-center gap-1">
+                          <Clock className="w-3 h-3 text-emerald-400" /> {displayTime}
+                        </span>
+                        <span className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded ${
+                          isSelected ? 'bg-white/20 text-white' : 'text-emerald-400 bg-emerald-950/70'
+                        }`}>
+                          LIVRE ✓
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 

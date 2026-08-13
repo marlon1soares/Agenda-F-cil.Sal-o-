@@ -14,6 +14,7 @@ import { BuyAppModal } from './components/BuyAppModal';
 import { ClientePortalView } from './components/ClientePortalView';
 import { AdminPaymentAccountModal } from './components/AdminPaymentAccountModal';
 import { ClientLinkModal } from './components/ClientLinkModal';
+import { SalonAuthModal } from './components/SalonAuthModal';
 
 import { Transaction, Appointment, SalonConfig, UserRole, Professional, ServiceItem, ClientRecord, SalonApp } from './types';
 import { Storage } from './utils/storage';
@@ -47,12 +48,13 @@ export function App() {
   const [isCatalogOpen, setIsCatalogOpen] = useState(false);
   const [isConfigOpen, setIsConfigOpen] = useState(false);
   const [isAdminAuthOpen, setIsAdminAuthOpen] = useState(false);
+  const [isSalonAuthOpen, setIsSalonAuthOpen] = useState(false);
   const [isAdminSalonsOpen, setIsAdminSalonsOpen] = useState(false);
   const [isAdminPaymentOpen, setIsAdminPaymentOpen] = useState(false);
   const [isBuyAppOpen, setIsBuyAppOpen] = useState(false);
   const [isClientLinkOpen, setIsClientLinkOpen] = useState(false);
 
-  // Detect URL parameters for Client Direct Link (e.g. ?role=cliente&salon=salon-id)
+  // Detect URL parameters for Client Direct Link (e.g. ?role=cliente&salon=nome-do-salao)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const roleParam = params.get('role');
@@ -63,12 +65,12 @@ export function App() {
     }
 
     if (salonParam) {
-      const list = Storage.getSalons();
-      const targetSalon = list.find(s => s.id === salonParam || s.appCode.toLowerCase() === salonParam.toLowerCase());
+      const targetSalon = Storage.getSalonBySlugOrCode(salonParam);
       if (targetSalon) {
         setActiveSalonId(targetSalon.id);
         setConfig(targetSalon.config);
         Storage.saveConfig(targetSalon.config);
+        setUserRole('cliente');
       }
     }
   }, []);
@@ -87,7 +89,11 @@ export function App() {
     };
 
     window.addEventListener('salao_sync_data', handleSync);
-    return () => window.removeEventListener('salao_sync_data', handleSync);
+    window.addEventListener('storage', handleSync);
+    return () => {
+      window.removeEventListener('salao_sync_data', handleSync);
+      window.removeEventListener('storage', handleSync);
+    };
   }, []);
 
   // Multi-salon handlers
@@ -131,6 +137,8 @@ export function App() {
       if (userRole !== 'admin') {
         setIsAdminAuthOpen(true);
       }
+    } else if (targetRole === 'salao') {
+      setIsSalonAuthOpen(true);
     } else {
       setUserRole(targetRole);
     }
@@ -299,6 +307,8 @@ export function App() {
               <ClientePortalView
                 salons={salons}
                 activeSalon={salons.find(s => s.id === activeSalonId) || salons[0]}
+                appointments={appointments}
+                timeAdjustments={timeAdjustments}
                 onSelectSalon={(s) => {
                   setActiveSalonId(s.id);
                   setConfig(s.config);
@@ -528,6 +538,18 @@ export function App() {
         onOpenClientView={(salon) => {
           handleSelectSalon(salon);
           setUserRole('cliente');
+        }}
+      />
+
+      {/* Salon Owner CPF + Token Login Modal */}
+      <SalonAuthModal
+        isOpen={isSalonAuthOpen}
+        onClose={() => setIsSalonAuthOpen(false)}
+        salons={salons}
+        onSuccess={(salon) => {
+          handleSelectSalon(salon);
+          setUserRole('salao');
+          setIsSalonAuthOpen(false);
         }}
       />
 

@@ -178,10 +178,15 @@ export const Navbar: React.FC<NavbarProps> = ({
                     setIsDropdownOpen(false);
                     onSelectRole('salao');
                   }}
-                  className="w-full text-left px-3 py-2.5 font-bold text-[#34d399] hover:bg-slate-800/80 flex items-center gap-2 border-b border-slate-800/60 transition-colors"
+                  className="w-full text-left px-3 py-2.5 font-bold text-[#34d399] hover:bg-slate-800/80 flex items-center justify-between border-b border-slate-800/60 transition-colors"
                 >
-                  <Scissors className="w-4 h-4 text-emerald-300 shrink-0" />
-                  <span>💈 Salão de Beleza / Barbearia</span>
+                  <div className="flex items-center gap-2">
+                    <Scissors className="w-4 h-4 text-emerald-300 shrink-0" />
+                    <div className="flex flex-col">
+                      <span>💈 Salão / Barbearia</span>
+                      <span className="text-[9px] font-medium text-emerald-400/80">Entrada c/ CPF e Token</span>
+                    </div>
+                  </div>
                 </button>
 
                 <button
@@ -189,10 +194,15 @@ export const Navbar: React.FC<NavbarProps> = ({
                     setIsDropdownOpen(false);
                     onSelectRole('cliente');
                   }}
-                  className="w-full text-left px-3 py-2.5 font-bold text-[#f43f5e] hover:bg-slate-800/80 flex items-center gap-2 transition-colors"
+                  className="w-full text-left px-3 py-2.5 font-bold text-[#f43f5e] hover:bg-slate-800/80 flex items-center justify-between transition-colors"
                 >
-                  <User className="w-4 h-4 text-rose-300 shrink-0" />
-                  <span>👤 Cliente (Agendamento Online)</span>
+                  <div className="flex items-center gap-2">
+                    <User className="w-4 h-4 text-rose-300 shrink-0" />
+                    <div className="flex flex-col">
+                      <span>👤 Cliente (Agendamento)</span>
+                      <span className="text-[9px] font-medium text-rose-400/80">Acesso por Link Exclusivo</span>
+                    </div>
+                  </div>
                 </button>
               </div>
             )}

@@ -50,6 +50,16 @@ export async function saveMediaToIDB(key: string, value: any): Promise<boolean> 
   }
 }
 
+export function getSalonSlug(name: string): string {
+  if (!name) return 'salao';
+  return name
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
 // LocalStorage Persistence Wrappers
 export const Storage = {
   getConfig(): SalonConfig {
@@ -156,6 +166,18 @@ export const Storage = {
   saveSalons(salons: SalonApp[]) {
     localStorage.setItem('salaoAppsList', JSON.stringify(salons));
     window.dispatchEvent(new CustomEvent('salao_sync_data', { detail: { key: 'salaoAppsList' } }));
+  },
+  getSalonBySlugOrCode(query: string): SalonApp | undefined {
+    if (!query) return undefined;
+    const list = this.getSalons();
+    const cleanQuery = query.toLowerCase().trim();
+    return list.find(s => {
+      const slugName = getSalonSlug(s.name);
+      const slugConfigName = getSalonSlug(s.config.nomeSalao);
+      const code = (s.appCode || '').toLowerCase();
+      const id = (s.id || '').toLowerCase();
+      return id === cleanQuery || code === cleanQuery || slugName === cleanQuery || slugConfigName === cleanQuery;
+    });
   },
   addSalonApp(newSalon: SalonApp): SalonApp[] {
     const current = this.getSalons();
