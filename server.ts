@@ -1,0 +1,279 @@
+import express from "express";
+import path from "path";
+import { createServer as createViteServer } from "vite";
+import { GoogleGenAI } from "@google/genai";
+import dotenv from "dotenv";
+import nodemailer from "nodemailer";
+
+dotenv.config();
+
+const app = express();
+app.use(express.json({ limit: "50mb" }));
+
+const PORT = 3000;
+
+const getGenAI = () => {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error("GEMINI_API_KEY environment variable is missing.");
+  }
+  return new GoogleGenAI({
+    apiKey,
+    httpOptions: {
+      headers: {
+        "User-Agent": "aistudio-build",
+      },
+    },
+  });
+};
+
+const getTransporter = () => {
+  const host = process.env.SMTP_HOST || "smtp.gmail.com";
+  const port = parseInt(process.env.SMTP_PORT || "587", 10);
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS;
+
+  if (user && pass) {
+    return nodemailer.createTransport({
+      host,
+      port,
+      secure: port === 465,
+      auth: { user, pass },
+    });
+  }
+  return null;
+};
+
+// API Health Check
+app.get("/api/health", (_req, res) => {
+  res.json({ status: "ok", envKeySet: !!process.env.GEMINI_API_KEY });
+});
+
+// Send Purchase Confirmation & Access Token Email
+app.post("/api/send-purchase-email", async (req, res) => {
+  try {
+    const {
+      ownerEmail,
+      ownerName,
+      salonName,
+      purchaseToken,
+      planDays,
+      priceStr,
+      paymentMethod,
+      expiresAt,
+      purchaseDate,
+    } = req.body;
+
+    if (!ownerEmail || !purchaseToken) {
+      return res.status(400).json({ error: "ownerEmail and purchaseToken are required." });
+    }
+
+    const appUrl = process.env.APP_URL || "https://ais-pre-d346mjayvlc3hoo4qxkj32-769591162576.us-east1.run.app";
+    const paymentMethodLabel = paymentMethod === "cartao" ? "Cartão de Crédito" : "Pix Instantâneo";
+
+    const emailHtml = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Compra Confirmada - Agenda Fácil</title>
+</head>
+<body style="font-family: Arial, sans-serif; background-color: #0f172a; color: #f8fafc; margin: 0; padding: 20px;">
+  <div style="max-width: 600px; margin: 0 auto; background-color: #1e293b; border-radius: 16px; border: 1px solid #334155; padding: 30px; box-shadow: 0 10px 25px rgba(0,0,0,0.5);">
+    
+    <!-- Header -->
+    <div style="text-align: center; border-bottom: 1px solid #334155; padding-bottom: 20px; margin-bottom: 20px;">
+      <h1 style="color: #38bdf8; font-size: 24px; margin: 0; font-weight: 800;">💈 Agenda Fácil - Salão & Barbearia</h1>
+      <p style="color: #94a3b8; font-size: 13px; margin-top: 5px;">Notificação de Pagamento & Liberação de Licença</p>
+    </div>
+
+    <!-- Status Banner -->
+    <div style="background-color: rgba(16, 185, 129, 0.15); border: 1px solid #10b981; border-radius: 12px; padding: 15px; text-align: center; margin-bottom: 25px;">
+      <h2 style="color: #34d399; font-size: 18px; margin: 0; font-weight: bold;">🎉 Pagamento Realizado com Sucesso!</h2>
+      <p style="color: #e2e8f0; font-size: 13px; margin: 5px 0 0 0;">Sua licença foi ativada e seu aplicativo já está liberado para uso.</p>
+    </div>
+
+    <!-- Credentials Box -->
+    <div style="background-color: #020617; border: 2px solid #38bdf8; border-radius: 14px; padding: 20px; margin-bottom: 25px;">
+      <h3 style="color: #f59e0b; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; margin: 0 0 15px 0;">🔑 SUAS CREDENCIAIS DE ACESSO:</h3>
+      
+      <div style="margin-bottom: 12px;">
+        <span style="color: #94a3b8; font-size: 12px; display: block;">Login (E-mail do Proprietário):</span>
+        <strong style="color: #ffffff; font-size: 16px;">${ownerEmail}</strong>
+      </div>
+
+      <div>
+        <span style="color: #94a3b8; font-size: 12px; display: block;">Token de Acesso (Senha Única):</span>
+        <div style="background-color: #0f172a; border: 1px dashed #38bdf8; border-radius: 8px; padding: 10px 15px; font-family: monospace; font-size: 22px; font-weight: bold; color: #34d399; letter-spacing: 2px; text-align: center; margin-top: 5px;">
+          ${purchaseToken}
+        </div>
+      </div>
+    </div>
+
+    <!-- Purchase Details -->
+    <div style="background-color: #0f172a; border-radius: 12px; padding: 18px; margin-bottom: 25px; border: 1px solid #334155;">
+      <h3 style="color: #cbd5e1; font-size: 14px; margin: 0 0 12px 0; border-bottom: 1px solid #334155; padding-bottom: 8px;">📋 Resumo do Pedido:</h3>
+      <table style="width: 100%; font-size: 13px; color: #cbd5e1; border-collapse: collapse;">
+        <tr>
+          <td style="padding: 6px 0; color: #94a3b8;">Salão / Barbearia:</td>
+          <td style="padding: 6px 0; font-weight: bold; text-align: right; color: #ffffff;">${salonName || "Salão"}</td>
+        </tr>
+        <tr>
+          <td style="padding: 6px 0; color: #94a3b8;">Proprietário:</td>
+          <td style="padding: 6px 0; font-weight: bold; text-align: right; color: #ffffff;">${ownerName || "Cliente"}</td>
+        </tr>
+        <tr>
+          <td style="padding: 6px 0; color: #94a3b8;">Plano Adquirido:</td>
+          <td style="padding: 6px 0; font-weight: bold; text-align: right; color: #38bdf8;">${planDays || 30} Dias</td>
+        </tr>
+        <tr>
+          <td style="padding: 6px 0; color: #94a3b8;">Forma de Pagamento:</td>
+          <td style="padding: 6px 0; font-weight: bold; text-align: right; color: #f59e0b;">${paymentMethodLabel}</td>
+        </tr>
+        <tr>
+          <td style="padding: 6px 0; color: #94a3b8;">Valor Pago:</td>
+          <td style="padding: 6px 0; font-weight: bold; text-align: right; color: #34d399;">${priceStr || "R$ 0,00"}</td>
+        </tr>
+        <tr>
+          <td style="padding: 6px 0; color: #94a3b8;">Data do Pagamento:</td>
+          <td style="padding: 6px 0; font-weight: bold; text-align: right; color: #ffffff;">${purchaseDate || new Date().toLocaleDateString("pt-BR")}</td>
+        </tr>
+        <tr>
+          <td style="padding: 6px 0; color: #94a3b8;">Validade da Licença:</td>
+          <td style="padding: 6px 0; font-weight: bold; text-align: right; color: #e2e8f0;">Até ${expiresAt || "Indefinida"}</td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- Instructions -->
+    <div style="color: #94a3b8; font-size: 12px; line-height: 1.6; margin-bottom: 25px;">
+      <p style="margin: 0 0 8px 0;"><strong>Como acessar seu aplicativo:</strong></p>
+      <ol style="margin: 0; padding-left: 20px;">
+        <li>Abra o aplicativo pelo seu celular ou computador.</li>
+        <li>Clique na opção de <strong>Entrar / Login</strong>.</li>
+        <li>Utilize seu e-mail (<strong>${ownerEmail}</strong>) e/ou seu Token de Acesso (<strong>${purchaseToken}</strong>).</li>
+      </ol>
+    </div>
+
+    <!-- CTA Button -->
+    <div style="text-align: center; margin-bottom: 20px;">
+      <a href="${appUrl}" target="_blank" style="display: inline-block; background-color: #2563eb; color: #ffffff; text-decoration: none; font-weight: bold; font-size: 15px; padding: 14px 28px; border-radius: 12px; box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);">
+        🚀 Acessar o Aplicativo Agora
+      </a>
+    </div>
+
+    <!-- Footer -->
+    <div style="text-align: center; border-top: 1px solid #334155; padding-top: 15px; font-size: 11px; color: #64748b;">
+      <p style="margin: 0;">Este e-mail é gerado automaticamente após a confirmação de compra.</p>
+      <p style="margin: 4px 0 0 0;">Caso precise de suporte, entre em contato com o suporte da plataforma.</p>
+    </div>
+
+  </div>
+</body>
+</html>
+    `;
+
+    const transporter = getTransporter();
+
+    if (transporter) {
+      const fromAddr = process.env.SMTP_FROM || `"Agenda Fácil" <${process.env.SMTP_USER}>`;
+      const mailOptions = {
+        from: fromAddr,
+        to: ownerEmail,
+        subject: `🎉 Compra Confirmada! Seu Token de Acesso: ${purchaseToken} - ${salonName || "Agenda Fácil"}`,
+        html: emailHtml,
+      };
+
+      const info = await transporter.sendMail(mailOptions);
+      console.log("E-mail enviado com sucesso:", info.messageId);
+      return res.json({
+        success: true,
+        delivered: true,
+        messageId: info.messageId,
+        message: `E-mail enviado com sucesso para ${ownerEmail}`,
+      });
+    } else {
+      console.log(`[SMTP SIMULATOR] Notificação para ${ownerEmail}:`);
+      console.log(`Login: ${ownerEmail} | Token: ${purchaseToken} | Plano: ${planDays} dias`);
+      return res.json({
+        success: true,
+        delivered: false,
+        simulated: true,
+        message: `Notificação enviada com sucesso para ${ownerEmail}! (Login: ${ownerEmail} | Token: ${purchaseToken})`,
+      });
+    }
+  } catch (err: any) {
+    console.error("Erro ao enviar e-mail de confirmação:", err);
+    return res.status(500).json({
+      success: false,
+      error: err.message || "Falha ao enviar e-mail de confirmação.",
+    });
+  }
+});
+
+
+// AI Assistant for Salon Admin (Marketing Copy, Client Messages, Intelligent Summary)
+app.post("/api/salon-ai-assistant", async (req, res) => {
+  try {
+    const { prompt, contextType } = req.body;
+    if (!prompt) {
+      return res.status(400).json({ error: "Prompt is required." });
+    }
+
+    const ai = getGenAI();
+    let systemInstruction = "You are an expert AI business consultant and marketing expert for beauty salons, barbershops, and spa managers in Brazil/Globally. Provide clear, professional, friendly responses in Portuguese.";
+
+    if (contextType === "whatsapp_reminder") {
+      systemInstruction = "Create friendly, polite, short WhatsApp appointment confirmation or promo messages for salon clients.";
+    } else if (contextType === "financial_analysis") {
+      systemInstruction = "Analyze salon daily financial stats and provide 3 quick actionable tips to increase revenue or optimize commissions.";
+    }
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3.5-flash",
+      contents: prompt,
+      config: {
+        systemInstruction,
+      },
+    });
+
+    res.json({ success: true, result: response.text });
+  } catch (err: any) {
+    console.error("Error in salon-ai-assistant:", err);
+    res.status(500).json({ success: false, error: err.message || "Failed to process request" });
+  }
+});
+
+async function startServer() {
+  if (process.env.NODE_ENV !== "production") {
+    const vite = await createViteServer({
+      server: { middlewareMode: true },
+      appType: "spa",
+    });
+    app.use(vite.middlewares);
+    
+    // SPA Fallback for dev mode
+    app.use("*", async (req, res) => {
+      try {
+        const fs = await import("fs");
+        let template = fs.readFileSync(path.resolve(process.cwd(), "index.html"), "utf-8");
+        template = await vite.transformIndexHtml(req.originalUrl, template);
+        res.status(200).set({ "Content-Type": "text/html" }).end(template);
+      } catch (e: any) {
+        res.status(500).end(e.message);
+      }
+    });
+  } else {
+    const distPath = path.join(process.cwd(), "dist");
+    app.use(express.static(distPath));
+    app.get("*", (_req, res) => {
+      res.sendFile(path.join(distPath, "index.html"));
+    });
+  }
+
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`Server listening on http://0.0.0.0:${PORT}`);
+  });
+}
+
+startServer();

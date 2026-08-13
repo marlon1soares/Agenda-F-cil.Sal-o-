@@ -1,0 +1,6 @@
+{
+  "name": "Agenda+Fácil.Salão",
+  "description": "Sistema completo de gestão para salões de beleza e barbearias (Agenda mais fácil.salão e Agenda mais fácil.cliente) com agendamento, caixa, comissões e gestão de compradores.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
