@@ -212,8 +212,19 @@ export const Navbar: React.FC<NavbarProps> = ({
             )}
           </div>
 
-          {/* Quick Buttons - Hidden in Client Role */}
-          {userRole !== 'cliente' && (
+          {/* Quick Buttons for Salon/Admin, and Prominent Horizontal Catalog for Client */}
+          {userRole === 'cliente' ? (
+            <button
+              type="button"
+              onClick={onOpenCatalog}
+              title="Ver Catálogo de Fotos, Trabalhos & Produtos do Salão"
+              className="bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 hover:from-purple-500 hover:to-indigo-500 text-white font-black text-xs sm:text-sm px-4 sm:px-6 py-2 rounded-xl shadow-lg border border-purple-400/50 flex items-center gap-2 transition-all active:scale-95 hover:shadow-purple-500/25"
+            >
+              <ImageIcon className="w-4 h-4 text-purple-200" />
+              <span className="tracking-wide">Catálogo de Fotos & Trabalhos</span>
+              <Sparkles className="w-3.5 h-3.5 text-amber-300 hidden sm:inline" />
+            </button>
+          ) : (
             <>
               {onOpenClientLink && (
                 <button
@@ -279,14 +290,16 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         {/* Right Side: Control & Window Actions */}
         <div className="flex items-center gap-1.5">
-          <button
-            onClick={onOpenCatalog}
-            title={userRole === 'cliente' ? "Ver Catálogo de Fotos, Trabalhos & Produtos" : "Abrir e Gerenciar Catálogo de Mídias"}
-            className="bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold px-2.5 py-1.5 rounded-xl flex items-center gap-1 shadow-xs transition-colors border border-purple-400/30"
-          >
-            <ImageIcon className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Catálogo</span>
-          </button>
+          {userRole !== 'cliente' && (
+            <button
+              onClick={onOpenCatalog}
+              title="Abrir e Gerenciar Catálogo de Mídias"
+              className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs sm:text-sm font-black px-3.5 py-1.5 rounded-xl flex items-center gap-1.5 shadow-md transition-all border border-purple-400/30 active:scale-95"
+            >
+              <ImageIcon className="w-3.5 h-3.5 text-purple-200" />
+              <span>Catálogo</span>
+            </button>
+          )}
 
           {userRole !== 'cliente' && (
             <button

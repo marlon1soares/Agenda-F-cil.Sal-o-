@@ -54,11 +54,20 @@ export function App() {
   const [isBuyAppOpen, setIsBuyAppOpen] = useState(false);
   const [isClientLinkOpen, setIsClientLinkOpen] = useState(false);
 
-  // Detect URL parameters for Client Direct Link (e.g. ?role=cliente&salon=nome-do-salao)
+  // Detect URL parameters for Client Direct Link (e.g. ?role=cliente&salon=nome-do-salao&phone=11999998888&name=Joao)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const roleParam = params.get('role');
     const salonParam = params.get('salon');
+    const phoneParam = params.get('phone') || params.get('celular') || params.get('tel');
+    const nameParam = params.get('name') || params.get('nome');
+
+    if (phoneParam) {
+      localStorage.setItem('salao_cliente_phone', phoneParam.replace(/\D/g, ''));
+    }
+    if (nameParam) {
+      localStorage.setItem('salao_cliente_name', nameParam);
+    }
 
     if (roleParam === 'cliente') {
       setUserRole('cliente');

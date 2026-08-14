@@ -4,15 +4,15 @@ import { Storage } from '../utils/storage';
 import { DEFAULT_TIMESLOTS } from '../data/mockData';
 import { generatePixEMVPayload, generateQrCodeDataUrl } from '../utils/pix';
 import { 
-  Scissors, Calendar, Clock, User, Phone, CheckCircle2, Building2, 
-  Sparkles, Search, ArrowRight, ShieldCheck, Heart, MapPin, Share2, Award, ChevronRight, Lock, Image as ImageIcon,
+  Scissors, Calendar, Clock, User, Phone, CheckCircle2, Building2,
+  Sparkles, ArrowRight, ShieldCheck, Heart, MapPin, Share2, Award, ChevronRight, Lock, Image as ImageIcon,
   QrCode, Copy, CheckCheck, CreditCard, ExternalLink, MessageCircle, X
 } from 'lucide-react';
 
 interface ClientePortalViewProps {
-  salons: SalonApp[];
+  salons?: SalonApp[];
   activeSalon: SalonApp;
-  onSelectSalon: (salon: SalonApp) => void;
+  onSelectSalon?: (salon: SalonApp) => void;
   appointments?: Record<string, Record<string, Appointment>>;
   timeAdjustments?: Record<string, number>;
   onAppointmentBooked: (date: string, timeSlot: string, ap: Appointment) => void;
@@ -20,15 +20,12 @@ interface ClientePortalViewProps {
 }
 
 export const ClientePortalView: React.FC<ClientePortalViewProps> = ({
-  salons,
   activeSalon,
-  onSelectSalon,
   appointments = {},
   timeAdjustments = {},
   onAppointmentBooked,
   onOpenCatalog,
 }) => {
-  const [searchCode, setSearchCode] = useState('');
   const [selectedService, setSelectedService] = useState<ServiceItem | null>(null);
   const [selectedProf, setSelectedProf] = useState<Professional | null>(null);
   const [selectedDate, setSelectedDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
@@ -66,24 +63,6 @@ export const ClientePortalView: React.FC<ClientePortalViewProps> = ({
     commissionPercent: p.porc,
     active: true
   }));
-
-  // Handle Salon Search by Code or Name
-  const handleSearchSalon = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!searchCode.trim()) return;
-    const term = searchCode.trim().toLowerCase();
-    const found = salons.find(s => 
-      s.appCode.toLowerCase() === term || 
-      s.name.toLowerCase().includes(term) ||
-      s.config.nomeSalao.toLowerCase().includes(term)
-    );
-    if (found) {
-      onSelectSalon(found);
-      setSearchCode('');
-    } else {
-      alert(`Nenhum salão encontrado com o código ou nome "${searchCode}". Tente "SALAO-1001", "SALAO-1002" ou o nome do salão.`);
-    }
-  };
 
   // Submit Booking
   const handleConfirmBooking = (e: React.FormEvent) => {
@@ -168,91 +147,29 @@ export const ClientePortalView: React.FC<ClientePortalViewProps> = ({
             </span>
             <h2 className="text-base sm:text-lg font-black mt-1 tracking-tight flex items-center gap-1.5">
               <Heart className="w-4 h-4 text-rose-200 fill-rose-200" />
-              <span>Agendamento Online do Cliente</span>
+              <span>Agendamento Online de Horários</span>
             </h2>
             <p className="text-white/90 text-xs mt-0.5 max-w-xl leading-tight">
-              Escolha seu salão preferido, consulte horários livres em tempo real e agende em segundos.
+              Consulte os horários livres em tempo real e confirme seu agendamento em segundos.
             </p>
           </div>
 
-          {/* Salon Selector Pill & Catalog Button */}
+          {/* Salon Identification Badge */}
           <div className="flex items-center gap-2 w-full md:w-auto shrink-0 flex-wrap">
-            {onOpenCatalog && (
-              <button
-                type="button"
-                onClick={onOpenCatalog}
-                className="bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs px-3.5 py-2 rounded-xl shadow-md flex items-center gap-1.5 transition-all border border-purple-400/40 active:scale-95"
-              >
-                <ImageIcon className="w-3.5 h-3.5" />
-                <span>Ver Catálogo & Produtos</span>
-              </button>
-            )}
-
-            <div className="bg-slate-950/70 backdrop-blur-md px-3 py-2 rounded-xl border border-white/20">
-              <span className="text-[9px] font-bold text-rose-200 uppercase tracking-wider block mb-0.5">
-                Salão Selecionado:
-              </span>
-              <div className="flex items-center gap-1.5 text-white font-extrabold text-xs">
-                <Building2 className="w-3.5 h-3.5 text-rose-300" />
-                <span>{activeSalon.config.nomeSalao}</span>
-                <span className="bg-rose-500/40 text-rose-100 text-[9px] px-1.5 py-0.2 rounded-full font-mono">
-                  {activeSalon.appCode}
+            <div className="bg-slate-950/70 backdrop-blur-md px-3.5 py-2 rounded-xl border border-white/20 flex items-center gap-2">
+              <div className="w-7 h-7 rounded-lg bg-rose-500/30 flex items-center justify-center text-rose-200">
+                <Scissors className="w-4 h-4" />
+              </div>
+              <div>
+                <span className="text-[9px] font-bold text-rose-200 uppercase tracking-wider block leading-none">
+                  Salão:
+                </span>
+                <span className="text-white font-black text-xs block leading-tight">
+                  {activeSalon.config.nomeSalao}
                 </span>
               </div>
             </div>
           </div>
-        </div>
-      </div>
-
-      {/* SALON SELECTION / CODE SEARCH BAR */}
-      <div className="bg-slate-900 border border-slate-800 p-4 rounded-3xl space-y-3">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-          <div>
-            <h3 className="text-sm font-black text-white flex items-center gap-2">
-              <Building2 className="w-4 h-4 text-purple-400" />
-              <span>Selecione ou Busque um Salão Parceiro</span>
-            </h3>
-            <p className="text-xs text-slate-400">
-              Alterne entre os salões do sistema ou digite o código de um aplicativo (ex: SALAO-1001)
-            </p>
-          </div>
-
-          <form onSubmit={handleSearchSalon} className="flex items-center gap-2 w-full sm:w-auto">
-            <input
-              type="text"
-              value={searchCode}
-              onChange={(e) => setSearchCode(e.target.value)}
-              placeholder="Digite o código (Ex: SALAO-1001)..."
-              className="bg-slate-950 border border-slate-700 text-white placeholder-slate-500 text-xs rounded-xl px-3 py-2 focus:outline-none focus:border-rose-500 w-full sm:w-48"
-            />
-            <button
-              type="submit"
-              className="bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs px-3 py-2 rounded-xl flex items-center gap-1 shrink-0 transition-colors"
-            >
-              <Search className="w-3.5 h-3.5" />
-              <span>Buscar</span>
-            </button>
-          </form>
-        </div>
-
-        {/* Quick Salon Switcher Pills */}
-        <div className="flex items-center gap-2 overflow-x-auto pt-2 border-t border-slate-800/80">
-          <span className="text-[11px] font-bold text-slate-400 shrink-0">Salões Cadastrados:</span>
-          {salons.map((s) => (
-            <button
-              key={s.id}
-              onClick={() => onSelectSalon(s)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 border ${
-                s.id === activeSalon.id
-                  ? 'bg-rose-600 text-white border-rose-400 shadow-md ring-1 ring-rose-400'
-                  : 'bg-slate-950 text-slate-300 border-slate-800 hover:border-slate-700 hover:bg-slate-800'
-              }`}
-            >
-              <Scissors className="w-3 h-3 text-rose-300" />
-              <span>{s.config.nomeSalao}</span>
-              <span className="text-[10px] opacity-75 font-mono">({s.appCode})</span>
-            </button>
-          ))}
         </div>
       </div>
 
@@ -728,21 +645,6 @@ export const ClientePortalView: React.FC<ClientePortalViewProps> = ({
             className="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold py-2.5 rounded-2xl text-xs transition-colors"
           >
             Fazer Novo Agendamento
-          </button>
-        </div>
-      )}
-
-      {/* Bottom Catalog Action Button for Clients */}
-      {onOpenCatalog && (
-        <div className="pt-3 flex items-center justify-center">
-          <button
-            type="button"
-            onClick={onOpenCatalog}
-            className="bg-gradient-to-r from-purple-700 via-indigo-700 to-purple-800 hover:from-purple-600 hover:to-indigo-600 text-white font-extrabold text-xs sm:text-sm px-6 py-3 rounded-2xl shadow-xl border border-purple-400/30 flex items-center gap-2.5 transition-all active:scale-95 hover:shadow-purple-500/20"
-          >
-            <ImageIcon className="w-4 h-4 text-purple-200" />
-            <span>📸 Ver Catálogo de Fotos & Trabalhos do Salão</span>
-            <Sparkles className="w-3.5 h-3.5 text-amber-300" />
           </button>
         </div>
       )}
