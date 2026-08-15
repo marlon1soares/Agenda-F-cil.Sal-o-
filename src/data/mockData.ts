@@ -57,7 +57,7 @@ export const DEFAULT_SALON_APPS: SalonApp[] = [
     expiresAt: "2027-01-10",
     planDays: 365,
     status: "active",
-    appCode: "SALAO-1001",
+    appCode: "SALAO-1",
     purchaseToken: "TOK-PARCAS-2026",
     emailSentAt: "2026-01-10 14:30",
     config: {
@@ -103,7 +103,7 @@ export const DEFAULT_SALON_APPS: SalonApp[] = [
     expiresAt: "2026-08-15",
     planDays: 180,
     status: "active",
-    appCode: "SALAO-1002",
+    appCode: "SALAO-2",
     purchaseToken: "TOK-GLAMOUR-8812",
     emailSentAt: "2026-02-15 09:12",
     config: {
@@ -137,7 +137,7 @@ export const DEFAULT_SALON_APPS: SalonApp[] = [
     expiresAt: "2026-09-20",
     planDays: 180,
     status: "active",
-    appCode: "SALAO-1003",
+    appCode: "SALAO-3",
     purchaseToken: "TOK-ROTA66-7731",
     emailSentAt: "2026-03-20 18:45",
     config: {
@@ -171,7 +171,7 @@ export const DEFAULT_SALON_APPS: SalonApp[] = [
     expiresAt: "2026-05-05",
     planDays: 30,
     status: "pending_approval",
-    appCode: "SALAO-1004",
+    appCode: "SALAO-4",
     purchaseToken: "TOK-VIPNOIVAS-4091",
     emailSentAt: "2026-04-05 11:20",
     config: {
@@ -205,7 +205,7 @@ export const DEFAULT_SALON_APPS: SalonApp[] = [
     expiresAt: "2027-04-10",
     planDays: 365,
     status: "pending_approval",
-    appCode: "SALAO-1005",
+    appCode: "SALAO-5",
     purchaseToken: "TOK-BELEZAPURA-5510",
     emailSentAt: "2026-04-10 16:15",
     config: {

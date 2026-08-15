@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { SalonApp, ServiceItem, Professional, Appointment, ClientRecord } from '../types';
 import { Storage } from '../utils/storage';
 import { DEFAULT_TIMESLOTS } from '../data/mockData';
@@ -6,7 +6,7 @@ import { generatePixEMVPayload, generateQrCodeDataUrl } from '../utils/pix';
 import { 
   Scissors, Calendar, Clock, User, Phone, CheckCircle2, Building2,
   Sparkles, ArrowRight, ShieldCheck, Heart, MapPin, Share2, Award, ChevronRight, Lock, Image as ImageIcon,
-  QrCode, Copy, CheckCheck, CreditCard, ExternalLink, MessageCircle, X
+  QrCode, Copy, CheckCheck, CreditCard, ExternalLink, MessageCircle, X, Check
 } from 'lucide-react';
 
 interface ClientePortalViewProps {
@@ -30,11 +30,42 @@ export const ClientePortalView: React.FC<ClientePortalViewProps> = ({
   const [selectedProf, setSelectedProf] = useState<Professional | null>(null);
   const [selectedDate, setSelectedDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
   const [selectedTime, setSelectedTime] = useState<string>('10:00');
-  const [clientName, setClientName] = useState('');
-  const [clientPhone, setClientPhone] = useState('');
+  const [clientName, setClientName] = useState(() => localStorage.getItem('salao_cliente_name') || '');
+  const [clientPhone, setClientPhone] = useState(() => localStorage.getItem('salao_cliente_phone') || '');
   const [clientNotes, setClientNotes] = useState('');
   const [isSuccess, setIsSuccess] = useState(false);
   const [lastAppointment, setLastAppointment] = useState<Appointment | null>(null);
+
+  // Sync / Detect phone & name from URL params or stored clients
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const phoneParam = params.get('phone') || params.get('celular') || params.get('tel');
+    const nameParam = params.get('name') || params.get('nome');
+
+    const effectivePhone = phoneParam ? phoneParam.replace(/\D/g, '') : (localStorage.getItem('salao_cliente_phone') || '');
+    let effectiveName = nameParam || localStorage.getItem('salao_cliente_name') || '';
+
+    if (effectivePhone) {
+      setClientPhone(effectivePhone);
+      localStorage.setItem('salao_cliente_phone', effectivePhone);
+
+      // Check if client name is already recorded in salon's clients database
+      if (!effectiveName) {
+        const clients = Storage.getClients();
+        const found = clients.find(c => c.phone.replace(/\D/g, '') === effectivePhone);
+        if (found && found.name) {
+          effectiveName = found.name;
+          setClientName(found.name);
+          localStorage.setItem('salao_cliente_name', found.name);
+        }
+      }
+    }
+
+    if (effectiveName) {
+      setClientName(effectiveName);
+      localStorage.setItem('salao_cliente_name', effectiveName);
+    }
+  }, []);
 
   // Payment states for Client
   const [copiedPix, setCopiedPix] = useState(false);
@@ -142,15 +173,23 @@ export const ClientePortalView: React.FC<ClientePortalViewProps> = ({
       <div className="bg-gradient-to-r from-rose-600 via-pink-600 to-purple-700 rounded-2xl p-3 sm:p-4 text-white shadow-md relative overflow-hidden">
         <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-2 sm:gap-4">
           <div>
-            <span className="bg-white/20 text-white font-black text-[9px] px-2.5 py-0.5 rounded-full uppercase tracking-wider border border-white/20 inline-block">
-              Agenda mais fácil.cliente
-            </span>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="bg-white/20 text-white font-black text-[9px] px-2.5 py-0.5 rounded-full uppercase tracking-wider border border-white/20 inline-block">
+                Agenda mais fácil.cliente
+              </span>
+              {clientPhone && (
+                <span className="bg-emerald-500/30 text-emerald-100 font-bold text-[9px] px-2.5 py-0.5 rounded-full border border-emerald-300/30 inline-flex items-center gap-1">
+                  <Check className="w-3 h-3 text-emerald-300" />
+                  Link Permanente Atrelado: {clientPhone} {clientName ? `(${clientName})` : ''}
+                </span>
+              )}
+            </div>
             <h2 className="text-base sm:text-lg font-black mt-1 tracking-tight flex items-center gap-1.5">
               <Heart className="w-4 h-4 text-rose-200 fill-rose-200" />
               <span>Agendamento Online de Horários</span>
             </h2>
             <p className="text-white/90 text-xs mt-0.5 max-w-xl leading-tight">
-              Consulte os horários livres em tempo real e confirme seu agendamento em segundos.
+              {clientName ? `Olá, ${clientName}! ` : ''}Consulte os horários livres em tempo real e confirme seu agendamento em segundos. Este link é permanente e pode ser utilizado quantas vezes desejar!
             </p>
           </div>
 
@@ -631,20 +670,34 @@ export const ClientePortalView: React.FC<ClientePortalViewProps> = ({
             </div>
           )}
 
+          {/* Repeat Booking Notice */}
+          <div className="bg-slate-950/80 p-3 rounded-2xl border border-slate-800 text-center space-y-1">
+            <span className="text-[11px] font-bold text-emerald-400 flex items-center justify-center gap-1.5">
+              <Check className="w-3.5 h-3.5" />
+              <span>Link Permanente & Reutilizável</span>
+            </span>
+            <p className="text-[10px] text-slate-300 leading-tight">
+              Este link é exclusivo do seu celular ({clientPhone || 'seu número'}). Salve esta página nos favoritos do seu navegador para agendar seus próximos horários no <strong>{activeSalon.config.nomeSalao}</strong> sempre que precisar, sem precisar solicitar um novo link!
+            </p>
+          </div>
+
           {/* WhatsApp Share Button */}
           <button
             onClick={handleShareWhatsapp}
-            className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold py-3 rounded-2xl text-xs flex items-center justify-center gap-2 shadow-lg transition-colors"
+            className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold py-3 rounded-2xl text-xs flex items-center justify-center gap-2 shadow-lg transition-all active:scale-95"
           >
             <Share2 className="w-4 h-4" />
             <span>Enviar Confirmação para o Salão via WhatsApp</span>
           </button>
 
           <button
-            onClick={() => setIsSuccess(false)}
-            className="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold py-2.5 rounded-2xl text-xs transition-colors"
+            onClick={() => {
+              setIsSuccess(false);
+              setSelectedService(null);
+            }}
+            className="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold py-2.5 rounded-2xl text-xs transition-colors flex items-center justify-center gap-2"
           >
-            Fazer Novo Agendamento
+            <span>Fazer Outro Agendamento com Este Mesmo Link</span>
           </button>
         </div>
       )}

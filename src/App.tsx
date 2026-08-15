@@ -14,6 +14,7 @@ import { BuyAppModal } from './components/BuyAppModal';
 import { ClientePortalView } from './components/ClientePortalView';
 import { AdminPaymentAccountModal } from './components/AdminPaymentAccountModal';
 import { ClientLinkModal } from './components/ClientLinkModal';
+import { SalonLinkModal } from './components/SalonLinkModal';
 import { SalonAuthModal } from './components/SalonAuthModal';
 
 import { Transaction, Appointment, SalonConfig, UserRole, Professional, ServiceItem, ClientRecord, SalonApp } from './types';
@@ -53,14 +54,28 @@ export function App() {
   const [isAdminPaymentOpen, setIsAdminPaymentOpen] = useState(false);
   const [isBuyAppOpen, setIsBuyAppOpen] = useState(false);
   const [isClientLinkOpen, setIsClientLinkOpen] = useState(false);
+  const [isSalonLinkOpen, setIsSalonLinkOpen] = useState(false);
 
-  // Detect URL parameters for Client Direct Link (e.g. ?role=cliente&salon=nome-do-salao&phone=11999998888&name=Joao)
+  // Detect URL parameters for Direct Links (e.g. Salon Purchase Link ?action=comprar-licenca or Client Link ?role=cliente&salon=...)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+    const actionParam = params.get('action');
+    const comprarParam = params.get('comprar') || params.get('compra') || params.get('licenca') || params.get('buy');
     const roleParam = params.get('role');
     const salonParam = params.get('salon');
     const phoneParam = params.get('phone') || params.get('celular') || params.get('tel');
     const nameParam = params.get('name') || params.get('nome');
+
+    // If salon license purchase link is accessed, open the purchase license modal immediately
+    if (
+      actionParam === 'comprar-licenca' ||
+      actionParam === 'comprar' ||
+      actionParam === 'comprar_licenca' ||
+      comprarParam === 'true' ||
+      comprarParam === '1'
+    ) {
+      setIsBuyAppOpen(true);
+    }
 
     if (phoneParam) {
       localStorage.setItem('salao_cliente_phone', phoneParam.replace(/\D/g, ''));
@@ -275,6 +290,7 @@ export function App() {
           onOpenBuyApp={() => setIsBuyAppOpen(true)}
           onOpenAdminPaymentConfig={() => setIsAdminPaymentOpen(true)}
           onOpenClientLink={() => setIsClientLinkOpen(true)}
+          onOpenSalonLink={() => setIsSalonLinkOpen(true)}
           isExpanded={isExpanded}
           onToggleExpand={() => setIsExpanded(!isExpanded)}
           isMinimized={isMinimized}
@@ -295,6 +311,14 @@ export function App() {
                 </div>
 
                 <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto justify-end">
+                  <button
+                    onClick={() => setIsSalonLinkOpen(true)}
+                    className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white font-extrabold text-xs px-3.5 py-2 rounded-xl transition-all flex items-center gap-2 shadow-sm border border-violet-400/30 active:scale-95"
+                    title="Gerar e enviar link de compra de licença para donos de salão de cabeleireiro"
+                  >
+                    <span>🔗 Enviar Link p/ Salão</span>
+                  </button>
+
                   <button
                     onClick={() => setIsAdminPaymentOpen(true)}
                     className="bg-amber-600 hover:bg-amber-500 text-slate-950 font-black text-xs px-3.5 py-2 rounded-xl transition-all flex items-center gap-2 shadow-sm"
@@ -527,6 +551,7 @@ export function App() {
         onUpdateSalon={handleUpdateSalon}
         onDeleteSalon={handleDeleteSalon}
         onOpenPaymentConfig={() => setIsAdminPaymentOpen(true)}
+        onOpenSalonLink={() => setIsSalonLinkOpen(true)}
       />
 
       {/* Admin Receiving Payment Account Modal */}
@@ -544,6 +569,14 @@ export function App() {
         onPurchaseComplete={(newSalon) => {
           handleCreateSalon(newSalon);
         }}
+      />
+
+      {/* Salon Direct Purchase Link Generator Modal for Admins */}
+      <SalonLinkModal
+        isOpen={isSalonLinkOpen}
+        onClose={() => setIsSalonLinkOpen(false)}
+        onOpenBuyApp={() => setIsBuyAppOpen(true)}
+        onOpenAdminPaymentConfig={() => setIsAdminPaymentOpen(true)}
       />
 
       {/* Client Direct Link & WhatsApp Generator Modal */}

@@ -148,8 +148,36 @@ export const Storage = {
     const saved = localStorage.getItem('salaoAdminCredentials');
     return saved ? JSON.parse(saved) : { email: 'admin@salao.com', phone: '(11) 99999-9999', password: '123456' };
   },
+  getAdminCredentialsList(): AdminCredentials[] {
+    const savedList = localStorage.getItem('salaoAdminCredentialsList');
+    const defaultList: AdminCredentials[] = [
+      { email: 'admin@salao.com', phone: '(11) 99999-9999', password: '123456', registeredAt: new Date().toISOString() }
+    ];
+    let list: AdminCredentials[] = savedList ? JSON.parse(savedList) : defaultList;
+
+    // Check single stored credential as well
+    const single = this.getAdminCredentials();
+    if (single && single.email) {
+      const idx = list.findIndex(c => c.email.toLowerCase() === single.email.toLowerCase());
+      if (idx === -1) {
+        list.push(single);
+      } else {
+        list[idx] = { ...list[idx], ...single };
+      }
+    }
+    return list;
+  },
   saveAdminCredentials(creds: AdminCredentials) {
     localStorage.setItem('salaoAdminCredentials', JSON.stringify(creds));
+    const list = this.getAdminCredentialsList();
+    const cleanEmail = creds.email.toLowerCase().trim();
+    const existingIndex = list.findIndex(c => c.email.toLowerCase().trim() === cleanEmail);
+    if (existingIndex >= 0) {
+      list[existingIndex] = { ...list[existingIndex], ...creds };
+    } else {
+      list.push(creds);
+    }
+    localStorage.setItem('salaoAdminCredentialsList', JSON.stringify(list));
     window.dispatchEvent(new CustomEvent('salao_sync_data', { detail: { key: 'salaoAdminCredentials' } }));
   },
 
@@ -198,11 +226,53 @@ export const Storage = {
 
   getSalons(): SalonApp[] {
     const saved = localStorage.getItem('salaoAppsList');
-    return saved ? JSON.parse(saved) : DEFAULT_SALON_APPS;
+    let list: SalonApp[] = saved ? JSON.parse(saved) : DEFAULT_SALON_APPS;
+    
+    // Normalize any legacy SALAO-100X codes to SALAO-X (e.g. SALAO-1, SALAO-2, ...)
+    let changed = false;
+    list = list.map((s, idx) => {
+      if (s.appCode) {
+        const legacyMatch = s.appCode.match(/^SALAO-100(\d+)$/i);
+        if (legacyMatch) {
+          changed = true;
+          return { ...s, appCode: `SALAO-${legacyMatch[1]}` };
+        }
+      } else {
+        changed = true;
+        return { ...s, appCode: `SALAO-${idx + 1}` };
+      }
+      return s;
+    });
+
+    if (changed && saved) {
+      localStorage.setItem('salaoAppsList', JSON.stringify(list));
+    }
+    return list;
   },
   saveSalons(salons: SalonApp[]) {
     localStorage.setItem('salaoAppsList', JSON.stringify(salons));
     window.dispatchEvent(new CustomEvent('salao_sync_data', { detail: { key: 'salaoAppsList' } }));
+  },
+  getNextSalonCode(): string {
+    const list = this.getSalons();
+    let maxNum = 0;
+    list.forEach((s, idx) => {
+      const code = s.appCode || '';
+      const match = code.match(/(?:SALAO|SALÃO)[-_]?(\d+)/i);
+      if (match) {
+        const n = parseInt(match[1], 10);
+        if (n >= 1000 && n <= 1999) {
+          const norm = n - 1000;
+          if (norm > maxNum) maxNum = norm;
+        } else if (n > maxNum) {
+          maxNum = n;
+        }
+      }
+    });
+    if (maxNum === 0) {
+      maxNum = list.length;
+    }
+    return `SALAO-${maxNum + 1}`;
   },
   getSalonBySlugOrCode(query: string): SalonApp | undefined {
     if (!query) return undefined;

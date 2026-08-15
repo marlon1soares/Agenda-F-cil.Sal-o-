@@ -19,9 +19,10 @@ export const AdminPasswordModal: React.FC<AdminPasswordModalProps> = ({
 
   // Existing Stored Credentials
   const [storedCreds, setStoredCreds] = useState<AdminCredentials>(() => Storage.getAdminCredentials());
+  const [credsList, setCredsList] = useState<AdminCredentials[]>(() => Storage.getAdminCredentialsList());
 
   // Login Form State
-  const [loginInput, setLoginInput] = useState('');
+  const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [loginError, setLoginError] = useState('');
 
@@ -44,10 +45,13 @@ export const AdminPasswordModal: React.FC<AdminPasswordModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       const current = Storage.getAdminCredentials();
+      const list = Storage.getAdminCredentialsList();
       setStoredCreds(current);
+      setCredsList(list);
       setRegEmail(current.email || '');
       setRegPhone(current.phone || '');
-      setLoginInput(current.email || '');
+      setLoginEmail(current.email || 'admin@salao.com');
+      setLoginPassword('');
       setLoginError('');
       setRegError('');
       setRegSuccess(false);
@@ -57,37 +61,69 @@ export const AdminPasswordModal: React.FC<AdminPasswordModalProps> = ({
 
   if (!isOpen) return null;
 
-  // Handle Login Attempt
+  // Handle Login Attempt with Email + Password verification
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    const currentCreds = Storage.getAdminCredentials();
-    const inputClean = loginPassword.trim();
-    
-    // Check if entered password matches stored admin password
-    const isMasterPasswordValid = inputClean === currentCreds.password || inputClean === '123456';
-    
-    // Check if entered password is a Buyer Purchase Token (TOK-XXXX)
+    setLoginError('');
+
+    const emailClean = loginEmail.trim().toLowerCase();
+    const passClean = loginPassword.trim();
+
+    if (!emailClean) {
+      setLoginError('Por favor, informe o e-mail do Administrador.');
+      return;
+    }
+
+    if (!passClean) {
+      setLoginError('Por favor, digite a senha do Administrador.');
+      return;
+    }
+
+    const allCreds = Storage.getAdminCredentialsList();
+    const matchingCred = allCreds.find(c => c.email.toLowerCase().trim() === emailClean);
+
+    // Master/default credentials
+    const defaultMaster = Storage.getAdminCredentials();
+    const isMasterEmail = emailClean === (defaultMaster.email || 'admin@salao.com').toLowerCase().trim() || emailClean === 'admin@salao.com';
+
+    // Salons owner check
     const salons = Storage.getSalons();
-    const matchingSalonToken = salons.find(s => 
-      s.purchaseToken && s.purchaseToken.toLowerCase() === inputClean.toLowerCase()
+    const matchingSalon = salons.find(s => 
+      s.ownerEmail && s.ownerEmail.toLowerCase().trim() === emailClean
     );
 
-    if (isMasterPasswordValid) {
-      setLoginPassword('');
-      setLoginError('');
-      onSuccess();
-    } else if (matchingSalonToken) {
-      if (matchingSalonToken.status === 'blocked') {
-        setLoginError(`Este Token (${matchingSalonToken.purchaseToken}) está bloqueado pelo Administrador.`);
+    if (matchingCred) {
+      if (passClean === matchingCred.password || (matchingCred.email === 'admin@salao.com' && passClean === '123456')) {
+        setLoginPassword('');
+        setLoginError('');
+        onSuccess();
+        return;
+      } else {
+        setLoginError(`Senha incorreta para o e-mail "${matchingCred.email}". Verifique a senha e tente novamente.`);
         return;
       }
-      // Save active salon and grant access
-      Storage.saveConfig(matchingSalonToken.config);
+    } else if (isMasterEmail && (passClean === defaultMaster.password || passClean === '123456')) {
       setLoginPassword('');
       setLoginError('');
       onSuccess();
+      return;
+    } else if (matchingSalon) {
+      if (matchingSalon.status === 'blocked') {
+        setLoginError(`O salão (${matchingSalon.name}) vinculado a este e-mail está bloqueado pelo Administrador.`);
+        return;
+      }
+      if (matchingSalon.purchaseToken && matchingSalon.purchaseToken.toLowerCase() === passClean.toLowerCase()) {
+        Storage.saveConfig(matchingSalon.config);
+        setLoginPassword('');
+        setLoginError('');
+        onSuccess();
+        return;
+      } else {
+        setLoginError(`Senha ou Token incorreto para o e-mail "${matchingSalon.ownerEmail}".`);
+        return;
+      }
     } else {
-      setLoginError("Senha ou Token incorretos! Caso tenha comprado o aplicativo, digite o Token enviado para seu e-mail.");
+      setLoginError(`E-mail "${loginEmail}" não encontrado nas credenciais registradas! Digite o e-mail cadastrado ou use a aba "Cadastrar Senha".`);
     }
   };
 
@@ -127,6 +163,8 @@ export const AdminPasswordModal: React.FC<AdminPasswordModalProps> = ({
 
     Storage.saveAdminCredentials(newCreds);
     setStoredCreds(newCreds);
+    setCredsList(Storage.getAdminCredentialsList());
+    setLoginEmail(newCreds.email);
     setRegSuccess(true);
 
     // Auto-grant access after successful registration
@@ -137,16 +175,22 @@ export const AdminPasswordModal: React.FC<AdminPasswordModalProps> = ({
 
   // Handle Password Reset Request
   const handleVerifyResetData = () => {
+    const allCreds = Storage.getAdminCredentialsList();
     const currentCreds = Storage.getAdminCredentials();
-    const emailMatch = resetEmail.trim().toLowerCase() === currentCreds.email.trim().toLowerCase();
-    const phoneMatch = resetPhone.trim().replace(/\D/g, '') === currentCreds.phone.trim().replace(/\D/g, '');
+    const targetEmail = resetEmail.trim().toLowerCase();
+    const targetPhone = resetPhone.trim().replace(/\D/g, '');
 
-    if (!resetEmail.trim() && !resetPhone.trim()) {
+    if (!targetEmail && !targetPhone) {
       setFeedbackMsg({ type: 'error', text: 'Preencha seu e-mail ou telefone cadastrado.' });
       return;
     }
 
-    if (emailMatch || phoneMatch || currentCreds.password === '123456') {
+    const matched = allCreds.find(c => 
+      (targetEmail && c.email.toLowerCase().trim() === targetEmail) ||
+      (targetPhone && c.phone.replace(/\D/g, '') === targetPhone)
+    );
+
+    if (matched || currentCreds.password === '123456') {
       setFeedbackMsg({
         type: 'success',
         text: 'Dados validados com sucesso! Defina a sua nova senha abaixo.'
@@ -182,6 +226,8 @@ export const AdminPasswordModal: React.FC<AdminPasswordModalProps> = ({
 
     Storage.saveAdminCredentials(updatedCreds);
     setStoredCreds(updatedCreds);
+    setCredsList(Storage.getAdminCredentialsList());
+    setLoginEmail(updatedCreds.email);
 
     setFeedbackMsg({
       type: 'success',
@@ -249,14 +295,67 @@ export const AdminPasswordModal: React.FC<AdminPasswordModalProps> = ({
         {/* TAB 1: LOGIN MODE */}
         {activeTab === 'login' && (
           <form onSubmit={handleLogin} className="space-y-4">
-            <div className="bg-slate-950/60 p-3 rounded-xl border border-slate-800/80 text-xs text-slate-300">
-              <span className="font-bold text-sky-400">Credenciais Registradas:</span>{' '}
-              {storedCreds.email ? storedCreds.email : 'Nenhum e-mail registrado ainda'}
+            
+            {/* Registered Credentials Badge with Quick Selector if multiple */}
+            <div className="bg-slate-950/80 p-3 rounded-xl border border-sky-800/40 text-xs space-y-1.5">
+              <div className="flex items-center justify-between text-slate-300">
+                <span className="font-bold text-sky-400 flex items-center gap-1.5">
+                  <Mail className="w-3.5 h-3.5" />
+                  <span>Credenciais Registradas:</span>
+                </span>
+                <span className="text-[10px] text-slate-400 font-mono">
+                  {credsList.length} cadastrada(s)
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5 flex-wrap pt-1">
+                {credsList.map((c, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => {
+                      setLoginEmail(c.email);
+                      setLoginError('');
+                    }}
+                    className={`text-[11px] px-2.5 py-1 rounded-lg font-mono font-bold transition-all border ${
+                      loginEmail.toLowerCase() === c.email.toLowerCase()
+                        ? 'bg-sky-600 text-white border-sky-400 shadow-sm'
+                        : 'bg-slate-900 text-slate-300 border-slate-700 hover:border-slate-500'
+                    }`}
+                  >
+                    {c.email}
+                  </button>
+                ))}
+              </div>
             </div>
 
+            {/* FIELD 1: E-mail do Administrador */}
             <div>
-              <label className="block text-xs font-bold text-slate-300 mb-1">
-                Digite a senha do Administrador:
+              <label className="block text-xs font-bold text-slate-300 mb-1 flex items-center gap-1.5">
+                <Mail className="w-3.5 h-3.5 text-sky-400" />
+                <span>E-mail do Administrador:</span>
+              </label>
+              <div className="relative">
+                <input
+                  type="email"
+                  value={loginEmail}
+                  onChange={(e) => {
+                    setLoginEmail(e.target.value);
+                    setLoginError('');
+                  }}
+                  placeholder="ex: admin@salao.com ou seu e-mail cadastrado"
+                  required
+                  autoFocus
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-9 pr-3 py-2.5 text-xs sm:text-sm text-white focus:outline-none focus:border-sky-500 font-medium"
+                />
+                <Mail className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
+              </div>
+            </div>
+
+            {/* FIELD 2: Senha do Administrador */}
+            <div>
+              <label className="block text-xs font-bold text-slate-300 mb-1 flex items-center gap-1.5">
+                <Lock className="w-3.5 h-3.5 text-sky-400" />
+                <span>Senha do Administrador:</span>
               </label>
               <div className="relative">
                 <input
@@ -267,14 +366,14 @@ export const AdminPasswordModal: React.FC<AdminPasswordModalProps> = ({
                     setLoginError('');
                   }}
                   placeholder="••••••••"
-                  autoFocus
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-9 pr-3 py-2.5 text-sm text-white focus:outline-none focus:border-sky-500"
+                  required
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-9 pr-3 py-2.5 text-xs sm:text-sm text-white focus:outline-none focus:border-sky-500"
                 />
-                <Lock className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
+                <Key className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
               </div>
 
               {loginError && (
-                <p className="text-rose-400 text-xs mt-2 flex items-start gap-1.5 font-medium leading-tight bg-rose-950/40 p-2.5 rounded-lg border border-rose-800">
+                <p className="text-rose-400 text-xs mt-2 flex items-start gap-1.5 font-medium leading-tight bg-rose-950/60 p-2.5 rounded-lg border border-rose-800 animate-in fade-in">
                   <ShieldAlert className="w-4 h-4 shrink-0 text-rose-400 mt-0.5" />
                   <span>{loginError}</span>
                 </p>
@@ -283,10 +382,10 @@ export const AdminPasswordModal: React.FC<AdminPasswordModalProps> = ({
 
             <button
               type="submit"
-              className="w-full bg-blue-600 hover:bg-blue-500 text-white font-extrabold py-2.5 rounded-xl text-sm shadow-md transition-colors flex items-center justify-center gap-2"
+              className="w-full bg-blue-600 hover:bg-blue-500 text-white font-extrabold py-2.5 rounded-xl text-sm shadow-md transition-all flex items-center justify-center gap-2 active:scale-95"
             >
-              <span>Entrar com Senha</span>
-              <ArrowRight className="w-4 h-4" />
+              <LogIn className="w-4 h-4" />
+              <span>Entrar com E-mail e Senha</span>
             </button>
 
             <div className="flex flex-col gap-1.5 text-center pt-2 text-xs">

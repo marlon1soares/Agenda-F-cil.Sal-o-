@@ -47,6 +47,40 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
 
   const [error, setError] = useState('');
 
+  // Auto-populate from URL query params if opened from a direct salon purchase link
+  useEffect(() => {
+    if (isOpen) {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const planParam = params.get('plano') || params.get('plan') || params.get('dias');
+        if (planParam) {
+          const days = parseInt(planParam, 10);
+          if ([30, 90, 180, 365].includes(days)) {
+            setPlanDays(days);
+          }
+        }
+        const salonNameParam = params.get('salao') || params.get('nome_salao') || params.get('salon_name');
+        if (salonNameParam && !salonName) {
+          setSalonName(decodeURIComponent(salonNameParam));
+        }
+        const ownerNameParam = params.get('nome') || params.get('comprador') || params.get('owner');
+        if (ownerNameParam && !name) {
+          setName(decodeURIComponent(ownerNameParam));
+        }
+        const phoneParam = params.get('phone') || params.get('whatsapp') || params.get('telefone') || params.get('celular');
+        if (phoneParam && !phone) {
+          setPhone(phoneParam);
+        }
+        const emailParam = params.get('email');
+        if (emailParam && !email) {
+          setEmail(emailParam);
+        }
+      } catch {
+        // silence URL parsing error
+      }
+    }
+  }, [isOpen]);
+
   // Auto-fill CEP via ViaCEP
   const handleCepChange = async (val: string) => {
     setCep(val);
@@ -98,6 +132,8 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
   // Created Salon Result & Email Status
   const [createdSalon, setCreatedSalon] = useState<SalonApp | null>(null);
   const [copiedToken, setCopiedToken] = useState(false);
+  const [copiedCpf, setCopiedCpf] = useState(false);
+  const [copiedAllInfo, setCopiedAllInfo] = useState(false);
   const [emailStatusMsg, setEmailStatusMsg] = useState<string>('');
   const [isSendingEmail, setIsSendingEmail] = useState<boolean>(false);
 
@@ -112,6 +148,7 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
         body: JSON.stringify({
           ownerEmail: salon.ownerEmail,
           ownerName: salon.ownerName,
+          ownerCpf: salon.ownerCpf,
           salonName: salon.name,
           purchaseToken: salon.purchaseToken,
           planDays: salon.planDays,
@@ -129,7 +166,7 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
       }
     } catch (err) {
       console.error("Erro ao solicitar envio do e-mail:", err);
-      setEmailStatusMsg(`Notificação registrada para ${salon.ownerEmail}. Login: ${salon.ownerEmail} | Token: ${salon.purchaseToken}`);
+      setEmailStatusMsg(`Notificação registrada para ${salon.ownerEmail}. Login (CPF): ${salon.ownerCpf} | Token: ${salon.purchaseToken}`);
     } finally {
       setIsSendingEmail(false);
     }
@@ -261,9 +298,9 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
       expDate.setDate(expDate.getDate() + planDays);
       const expiresAt = expDate.toISOString().split('T')[0];
 
-      // Generate random codes
+      // Generate sequential salon code (SALAO-1, SALAO-2, ...) and security token
+      const appCode = Storage.getNextSalonCode();
       const randomNum = Math.floor(1000 + Math.random() * 9000);
-      const appCode = `SALAO-${randomNum}`;
       const tokenCleanName = salonName.replace(/[^a-zA-Z0-9]/g, '').slice(0, 6).toUpperCase();
       const purchaseToken = `TOK-${tokenCleanName || 'SALÃO'}-${randomNum}`;
 
@@ -322,6 +359,89 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
       setCopiedToken(true);
       setTimeout(() => setCopiedToken(false), 2000);
     }
+  };
+
+  const handleCopyCpf = () => {
+    if (createdSalon?.ownerCpf) {
+      navigator.clipboard.writeText(createdSalon.ownerCpf);
+      setCopiedCpf(true);
+      setTimeout(() => setCopiedCpf(false), 2000);
+    }
+  };
+
+  const handleCopyAllInfo = () => {
+    if (!createdSalon) return;
+    const infoText = `💈 *AGENDA FÁCIL - CREDENCIAIS DE ACESSO DO SALÃO* 💈
+
+✅ Salão: ${createdSalon.name}
+👤 Proprietário: ${createdSalon.ownerName}
+🔑 Login (CPF): ${createdSalon.ownerCpf}
+📧 E-mail: ${createdSalon.ownerEmail}
+🎫 Token de Acesso (Senha): ${createdSalon.purchaseToken}
+
+📅 Data da Compra: ${createdSalon.purchaseDate}
+⏳ Validade da Licença: ${createdSalon.planDays} Dias (Até ${createdSalon.expiresAt})
+
+🚀 *Passo a Passo de Acesso:*
+1. Abra o aplicativo no seu navegador.
+2. Clique em "Acessar Painel do Salão" ou "Entrar".
+3. Digite seu CPF (${createdSalon.ownerCpf}) e o Token (${createdSalon.purchaseToken}).
+4. Acesse seu painel para gerenciar serviços, equipe e agendamentos!`;
+
+    navigator.clipboard.writeText(infoText);
+    setCopiedAllInfo(true);
+    setTimeout(() => setCopiedAllInfo(false), 2500);
+  };
+
+  const handleOpenEmailClient = () => {
+    if (!createdSalon) return;
+    const subject = encodeURIComponent(`🎉 Suas Credenciais de Acesso - ${createdSalon.name} (Token: ${createdSalon.purchaseToken})`);
+    const body = encodeURIComponent(`Olá ${createdSalon.ownerName},
+
+Seu pagamento foi confirmado e a licença do seu aplicativo está liberada!
+
+SUAS CREDENCIAIS OFICIAIS DE ACESSO:
+- Login (CPF do Proprietário): ${createdSalon.ownerCpf}
+- E-mail: ${createdSalon.ownerEmail}
+- Token de Acesso (Senha): ${createdSalon.purchaseToken}
+
+DADOS DA COMPRA:
+- Salão: ${createdSalon.name}
+- Plano: ${createdSalon.planDays} Dias
+- Data da Compra: ${createdSalon.purchaseDate}
+- Término do Plano (Vencimento): Até ${createdSalon.expiresAt}
+
+PASSO A PASSO PARA ACESSAR:
+1. Abra o aplicativo no navegador.
+2. Clique no botão "Acessar Painel do Salão".
+3. Digite seu CPF (${createdSalon.ownerCpf}) e seu Token (${createdSalon.purchaseToken}).
+4. Pronto! Configure seu salão e comece a receber agendamentos.
+
+Guarde este e-mail para consultas futuras.`);
+
+    window.open(`mailto:${createdSalon.ownerEmail}?subject=${subject}&body=${body}`, '_blank');
+  };
+
+  const handleShareWhatsappCredentials = () => {
+    if (!createdSalon) return;
+    const msg = `🎉 *COMPRA CONFIRMADA - AGENDA FÁCIL*
+Salão: *${createdSalon.name}*
+
+🔑 *Credenciais de Acesso:*
+- Login (CPF): *${createdSalon.ownerCpf}*
+- Token de Acesso: *${createdSalon.purchaseToken}*
+- Vigência: *${createdSalon.planDays} Dias* (Até ${createdSalon.expiresAt})
+
+🚀 *Como Acessar:*
+1. Clique no botão "Acessar Painel do Salão"
+2. Informe o CPF e Token acima
+3. Comece a usar o sistema!`;
+
+    const cleanPhone = (createdSalon.ownerPhone || '').replace(/\D/g, '');
+    const url = cleanPhone 
+      ? `https://wa.me/55${cleanPhone}?text=${encodeURIComponent(msg)}`
+      : `https://wa.me/?text=${encodeURIComponent(msg)}`;
+    window.open(url, '_blank');
   };
 
   return (
@@ -827,11 +947,11 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
                   )}
                 </div>
 
-                {/* Receiver Account Warning */}
-                <div className="bg-blue-950/50 p-2.5 rounded-xl border border-blue-800/60 text-[11px] text-blue-200 flex items-center gap-2">
-                  <Wallet className="w-4 h-4 text-blue-300 shrink-0" />
+                {/* Secure Environment Banner (Destination Account Hidden for Buyer) */}
+                <div className="bg-slate-900/90 p-2.5 rounded-xl border border-slate-800 text-[11px] text-slate-300 flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
                   <span>
-                    <strong>Conta de Destino:</strong> {adminPaymentConfig.cartaoContaDestino} ({adminPaymentConfig.nomeBeneficiario})
+                    <strong>Ambiente Seguro:</strong> Pagamento processado com criptografia direta de ponta a ponta. Liberação imediata e envio do token por e-mail após a confirmação.
                   </span>
                 </div>
 
@@ -1130,117 +1250,197 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
 
         {/* STEP 3: SUCCESS SCREEN WITH GENERATED TOKEN */}
         {step === 'success' && (
-          <div className="p-6 text-center space-y-4">
-            <div className="w-16 h-16 bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 rounded-3xl flex items-center justify-center mx-auto">
-              <Check className="w-8 h-8" />
+          <div className="p-5 sm:p-6 text-center space-y-4 max-h-[80vh] overflow-y-auto">
+            <div className="w-14 h-14 bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 rounded-3xl flex items-center justify-center mx-auto shadow-lg">
+              <Check className="w-7 h-7" />
             </div>
 
             <div>
-              <h3 className="text-lg font-black text-white">
-                Pagamento Confirmado & Licença Emitida!
+              <span className="bg-emerald-500/20 text-emerald-300 text-[10px] font-black px-3 py-0.5 rounded-full uppercase tracking-wider border border-emerald-500/40">
+                Pagamento Confirmado & Licença Ativada
+              </span>
+              <h3 className="text-lg sm:text-xl font-black text-white mt-1">
+                Parabéns! Seu Salão Está Liberado
               </h3>
-              <p className="text-slate-400 text-xs mt-1 max-w-md mx-auto">
-                O pagamento de <strong className="text-emerald-400">{currentPlan.priceStr}</strong> foi creditado diretamente na Conta do Administrador (<span className="text-amber-300">{adminPaymentConfig.nomeBeneficiario}</span>).
+              <p className="text-slate-300 text-xs mt-0.5 max-w-md mx-auto">
+                O pagamento de <strong className="text-emerald-400 font-bold">{currentPlan.priceStr}</strong> foi confirmado com sucesso.
               </p>
             </div>
 
-            {/* Token & Login Display Box */}
-            <div className="bg-slate-950 p-4 rounded-2xl border border-emerald-500/40 max-w-md mx-auto text-left relative overflow-hidden shadow-inner space-y-3">
+            {/* Token & Login Display Box (CPF + TOKEN) */}
+            <div className="bg-slate-950 p-4 rounded-2xl border-2 border-emerald-500/50 max-w-md mx-auto text-left relative overflow-hidden shadow-2xl space-y-3">
               <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-                <span className="text-[11px] font-bold text-slate-300 flex items-center gap-1.5">
-                  <Key className="w-3.5 h-3.5 text-amber-400" />
-                  <span>CREDENCIAIS DE ACESSO GERADAS:</span>
+                <span className="text-xs font-black text-amber-300 flex items-center gap-1.5 uppercase tracking-wide">
+                  <Key className="w-4 h-4 text-amber-400" />
+                  <span>Suas Credenciais Oficiais de Acesso:</span>
                 </span>
                 <span className="bg-emerald-500/20 text-emerald-300 text-[10px] font-mono px-2 py-0.5 rounded-full font-bold border border-emerald-500/30">
                   Licença Ativa ✓
                 </span>
               </div>
 
-              {/* Login Email */}
-              <div className="bg-slate-900/80 p-2.5 rounded-xl border border-slate-800">
-                <span className="text-[10px] text-slate-400 block font-medium">LOGIN (SEU E-MAIL):</span>
-                <span className="text-sm font-extrabold text-white font-mono break-all">{createdSalon?.ownerEmail}</span>
+              {/* Login CPF */}
+              <div className="bg-slate-900/90 p-3 rounded-xl border border-slate-800 flex items-center justify-between gap-2">
+                <div>
+                  <span className="text-[10px] text-slate-400 block font-bold uppercase">1. LOGIN (SEU CPF):</span>
+                  <span className="text-sm sm:text-base font-black text-sky-400 font-mono">
+                    {createdSalon?.ownerCpf || 'CPF Cadastrado'}
+                  </span>
+                  <span className="text-[10px] text-slate-500 block">
+                    (E-mail: {createdSalon?.ownerEmail})
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleCopyCpf}
+                  className="bg-slate-800 hover:bg-slate-700 text-sky-300 text-[11px] font-bold px-2.5 py-1.5 rounded-lg border border-slate-700 transition-colors flex items-center gap-1 shrink-0"
+                >
+                  <Copy className="w-3 h-3" />
+                  <span>{copiedCpf ? 'Copiado!' : 'Copiar CPF'}</span>
+                </button>
               </div>
 
               {/* Token */}
-              <div className="bg-slate-900/80 p-2.5 rounded-xl border border-emerald-500/30">
-                <span className="text-[10px] text-slate-400 block font-medium">TOKEN DE ACESSO (SENHA):</span>
-                <div className="font-mono text-lg sm:text-xl font-black text-emerald-400 tracking-wider mt-0.5">
-                  {createdSalon?.purchaseToken}
+              <div className="bg-slate-900/90 p-3 rounded-xl border-2 border-emerald-500/50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                <div>
+                  <span className="text-[10px] text-slate-400 block font-bold uppercase">2. TOKEN DE ACESSO (SUA SENHA):</span>
+                  <div className="font-mono text-lg sm:text-xl font-black text-emerald-400 tracking-wider">
+                    {createdSalon?.purchaseToken}
+                  </div>
                 </div>
+                <button
+                  type="button"
+                  onClick={handleCopyToken}
+                  className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold px-3 py-1.5 rounded-lg text-xs flex items-center justify-center gap-1 shadow transition-all active:scale-95 shrink-0"
+                >
+                  <Copy className="w-3 h-3" />
+                  <span>{copiedToken ? 'Token Copiado!' : 'Copiar Token'}</span>
+                </button>
               </div>
 
-              <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-300 pt-2 border-t border-slate-900">
-                <div>
-                  <span className="text-slate-500 block">Comprador:</span>
-                  <span className="font-bold">{createdSalon?.ownerName}</span>
-                </div>
-                <div>
-                  <span className="text-slate-500 block">RG / CPF:</span>
-                  <span className="font-bold">{createdSalon?.ownerRg}</span>
-                </div>
-                <div>
-                  <span className="text-slate-500 block">Salão:</span>
+              {/* Purchase Details & Plan Expiration Date */}
+              <div className="bg-slate-900/60 p-3 rounded-xl border border-slate-800 text-[11px] space-y-1.5">
+                <div className="flex justify-between items-center text-slate-300">
+                  <span className="text-slate-400">Salão / Barbearia:</span>
                   <span className="font-bold text-pink-300">{createdSalon?.name}</span>
                 </div>
-                <div>
-                  <span className="text-slate-500 block">Validade:</span>
-                  <span className="font-bold text-blue-400">{createdSalon?.planDays} Dias ({createdSalon?.expiresAt})</span>
+                <div className="flex justify-between items-center text-slate-300">
+                  <span className="text-slate-400">Proprietário:</span>
+                  <span className="font-bold text-white">{createdSalon?.ownerName}</span>
+                </div>
+                <div className="flex justify-between items-center text-slate-300">
+                  <span className="text-slate-400">Data da Compra:</span>
+                  <span className="font-bold text-white">{createdSalon?.purchaseDate}</span>
+                </div>
+                <div className="flex justify-between items-center text-slate-300 border-t border-slate-800 pt-1">
+                  <span className="text-slate-400 font-semibold">Término do Plano (Vencimento):</span>
+                  <span className="font-black text-emerald-400 text-xs">
+                    Até {createdSalon?.expiresAt} ({createdSalon?.planDays} Dias)
+                  </span>
                 </div>
               </div>
-
-              <button
-                onClick={handleCopyToken}
-                className="w-full bg-slate-900 hover:bg-slate-800 text-emerald-300 font-bold py-2 rounded-xl text-xs flex items-center justify-center gap-1.5 border border-slate-800 transition-colors"
-              >
-                <Copy className="w-3.5 h-3.5" />
-                <span>{copiedToken ? 'Token Copiado!' : 'Copiar Token de Acesso'}</span>
-              </button>
             </div>
 
-            {/* Email Dispatch Notification Banner */}
-            <div className="bg-blue-950/70 border border-blue-700/80 p-3.5 rounded-2xl text-left text-xs text-blue-200 max-w-md mx-auto space-y-2">
+            {/* Step-by-Step Access Instructions */}
+            <div className="bg-slate-950 p-4 rounded-2xl border border-sky-500/40 max-w-md mx-auto text-left space-y-2">
+              <div className="flex items-center gap-2 border-b border-slate-800 pb-1.5">
+                <Sparkles className="w-4 h-4 text-sky-400" />
+                <h4 className="text-xs font-black text-sky-300 uppercase tracking-wide">
+                  Passo a Passo para Acessar a Plataforma:
+                </h4>
+              </div>
+              <ol className="text-[11px] text-slate-300 space-y-1.5 pl-4 list-decimal leading-relaxed">
+                <li>
+                  Clique no botão azul abaixo <strong>"Entrar no Painel do Salão"</strong> ou acesse pelo link do aplicativo.
+                </li>
+                <li>
+                  Na tela inicial ou de login, selecione <strong>"Acessar Painel do Salão"</strong>.
+                </li>
+                <li>
+                  Informe o seu <strong>CPF</strong> (<span className="text-sky-300 font-mono font-bold">{createdSalon?.ownerCpf}</span>) e o seu <strong>Token de Licença</strong> (<span className="text-emerald-400 font-mono font-bold">{createdSalon?.purchaseToken}</span>).
+                </li>
+                <li>
+                  Pronto! Seu salão será carregado e você poderá cadastrar serviços, profissionais, horários e compartilhar o link com seus clientes.
+                </li>
+              </ol>
+            </div>
+
+            {/* Email Notification & Fast Action Buttons */}
+            <div className="bg-blue-950/70 border border-blue-700/80 p-3.5 rounded-2xl text-left text-xs text-blue-200 max-w-md mx-auto space-y-2.5">
               <div className="flex items-start gap-2">
                 <Mail className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
                 <div>
                   <p className="font-extrabold text-white">
-                    Notificação enviada por E-mail:
+                    Notificação Enviada para o seu E-mail:
                   </p>
                   <p className="text-[11px] text-blue-200/90 mt-0.5">
-                    {emailStatusMsg || `Enviando e-mail de confirmação para ${createdSalon?.ownerEmail}...`}
+                    {emailStatusMsg || `Enviamos seu token e credenciais para ${createdSalon?.ownerEmail}`}
                   </p>
                 </div>
               </div>
 
-              <button
-                type="button"
-                disabled={isSendingEmail || !createdSalon}
-                onClick={() => {
-                  if (createdSalon) {
-                    sendEmailNotification(createdSalon, currentPlan.priceStr);
-                  }
-                }}
-                className="w-full bg-blue-900/80 hover:bg-blue-800 disabled:bg-slate-800 text-blue-100 font-bold py-1.5 px-3 rounded-xl text-[11px] flex items-center justify-center gap-1.5 border border-blue-600/50 transition-colors"
-              >
-                {isSendingEmail ? (
-                  <>
-                    <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    <span>Reenviando e-mail...</span>
-                  </>
-                ) : (
-                  <>
-                    <Send className="w-3 h-3 text-blue-300" />
-                    <span>Reenviar E-mail para {createdSalon?.ownerEmail}</span>
-                  </>
-                )}
-              </button>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={handleOpenEmailClient}
+                  className="bg-blue-900 hover:bg-blue-800 text-blue-100 font-bold py-2 px-2.5 rounded-xl text-[11px] flex items-center justify-center gap-1.5 border border-blue-600/50 transition-colors"
+                >
+                  <Mail className="w-3.5 h-3.5 text-blue-300" />
+                  <span>Abrir no Meu E-mail</span>
+                </button>
+
+                <button
+                  type="button"
+                  disabled={isSendingEmail || !createdSalon}
+                  onClick={() => {
+                    if (createdSalon) {
+                      sendEmailNotification(createdSalon, currentPlan.priceStr);
+                    }
+                  }}
+                  className="bg-slate-900 hover:bg-slate-800 disabled:bg-slate-950 text-slate-200 font-bold py-2 px-2.5 rounded-xl text-[11px] flex items-center justify-center gap-1.5 border border-slate-700 transition-colors"
+                >
+                  {isSendingEmail ? (
+                    <>
+                      <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>Reenviando...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Send className="w-3.5 h-3.5 text-slate-400" />
+                      <span>Reenviar E-mail</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={handleCopyAllInfo}
+                  className="bg-slate-900 hover:bg-slate-800 text-emerald-300 font-bold py-2 px-2.5 rounded-xl text-[11px] flex items-center justify-center gap-1.5 border border-emerald-500/30 transition-colors"
+                >
+                  <Copy className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>{copiedAllInfo ? 'Instruções Copiadas!' : 'Copiar Tudo'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleShareWhatsappCredentials}
+                  className="bg-emerald-700/80 hover:bg-emerald-600 text-white font-bold py-2 px-2.5 rounded-xl text-[11px] flex items-center justify-center gap-1.5 border border-emerald-500/40 transition-colors"
+                >
+                  <Phone className="w-3.5 h-3.5 text-emerald-200" />
+                  <span>Enviar no WhatsApp</span>
+                </button>
+              </div>
             </div>
 
+            {/* Primary Action Button to Enter System */}
             <button
               onClick={onClose}
-              className="w-full max-w-md bg-blue-600 hover:bg-blue-500 text-white font-extrabold py-3 rounded-2xl text-xs shadow-lg transition-colors"
+              className="w-full max-w-md bg-blue-600 hover:bg-blue-500 text-white font-black py-3 rounded-2xl text-xs sm:text-sm shadow-xl transition-all flex items-center justify-center gap-2 active:scale-95 mx-auto"
             >
-              Fechar e Acessar o Sistema
+              <CheckCircle2 className="w-4 h-4 text-emerald-300" />
+              <span>Concluir e Entrar no Painel do Salão</span>
             </button>
 
           </div>

@@ -55,6 +55,7 @@ app.post("/api/send-purchase-email", async (req, res) => {
     const {
       ownerEmail,
       ownerName,
+      ownerCpf,
       salonName,
       purchaseToken,
       planDays,
@@ -70,6 +71,9 @@ app.post("/api/send-purchase-email", async (req, res) => {
 
     const appUrl = process.env.APP_URL || "https://ais-pre-d346mjayvlc3hoo4qxkj32-769591162576.us-east1.run.app";
     const paymentMethodLabel = paymentMethod === "cartao" ? "Cartão de Crédito" : "Pix Instantâneo";
+    const formattedDate = purchaseDate || new Date().toLocaleDateString("pt-BR");
+    const formattedExpiry = expiresAt || "Indefinida";
+    const displayCpf = ownerCpf ? ownerCpf : "Cadastrado no Pedido";
 
     const emailHtml = `
 <!DOCTYPE html>
@@ -93,26 +97,38 @@ app.post("/api/send-purchase-email", async (req, res) => {
       <p style="color: #e2e8f0; font-size: 13px; margin: 5px 0 0 0;">Sua licença foi ativada e seu aplicativo já está liberado para uso.</p>
     </div>
 
-    <!-- Credentials Box -->
+    <!-- Credentials Box (CPF + TOKEN) -->
     <div style="background-color: #020617; border: 2px solid #38bdf8; border-radius: 14px; padding: 20px; margin-bottom: 25px;">
-      <h3 style="color: #f59e0b; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; margin: 0 0 15px 0;">🔑 SUAS CREDENCIAIS DE ACESSO:</h3>
+      <h3 style="color: #f59e0b; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; margin: 0 0 15px 0;">🔑 SUAS CREDENCIAIS OFICIAIS DE ACESSO:</h3>
       
-      <div style="margin-bottom: 12px;">
-        <span style="color: #94a3b8; font-size: 12px; display: block;">Login (E-mail do Proprietário):</span>
-        <strong style="color: #ffffff; font-size: 16px;">${ownerEmail}</strong>
+      <div style="margin-bottom: 12px; background-color: #0f172a; padding: 10px 14px; border-radius: 8px; border: 1px solid #334155;">
+        <span style="color: #94a3b8; font-size: 11px; text-transform: uppercase; display: block; font-weight: bold;">1. LOGIN (SEU CPF / E-MAIL):</span>
+        <strong style="color: #38bdf8; font-size: 16px; font-family: monospace;">${displayCpf}</strong>
+        <span style="color: #64748b; font-size: 11px; display: block; margin-top: 2px;">(E-mail: ${ownerEmail})</span>
       </div>
 
-      <div>
-        <span style="color: #94a3b8; font-size: 12px; display: block;">Token de Acesso (Senha Única):</span>
-        <div style="background-color: #0f172a; border: 1px dashed #38bdf8; border-radius: 8px; padding: 10px 15px; font-family: monospace; font-size: 22px; font-weight: bold; color: #34d399; letter-spacing: 2px; text-align: center; margin-top: 5px;">
+      <div style="background-color: #0f172a; padding: 10px 14px; border-radius: 8px; border: 1px dashed #10b981;">
+        <span style="color: #94a3b8; font-size: 11px; text-transform: uppercase; display: block; font-weight: bold;">2. TOKEN DE ACESSO (SUA SENHA):</span>
+        <div style="font-family: monospace; font-size: 22px; font-weight: 900; color: #34d399; letter-spacing: 2px; text-align: center; margin-top: 5px;">
           ${purchaseToken}
         </div>
       </div>
     </div>
 
-    <!-- Purchase Details -->
+    <!-- Step by Step Access Guide -->
+    <div style="background-color: #0f172a; border-radius: 12px; padding: 18px; margin-bottom: 25px; border: 1px solid #38bdf8;">
+      <h3 style="color: #38bdf8; font-size: 14px; margin: 0 0 12px 0; border-bottom: 1px solid #334155; padding-bottom: 8px;">🚀 Passo a Passo para Acessar a Plataforma:</h3>
+      <ol style="margin: 0; padding-left: 20px; color: #e2e8f0; font-size: 13px; line-height: 1.7;">
+        <li>Abra o link do aplicativo no seu celular ou computador (<a href="${appUrl}" style="color: #38bdf8; text-decoration: underline;">Clique aqui para abrir</a>).</li>
+        <li>No menu inicial, clique em <strong>"Acessar Painel do Salão"</strong> ou <strong>"Entrar"</strong>.</li>
+        <li>Informe o seu <strong>CPF</strong> (<code style="background-color: #1e293b; padding: 2px 6px; border-radius: 4px; color: #38bdf8;">${displayCpf}</code>) e o <strong>Token de Licença</strong> (<code style="background-color: #1e293b; padding: 2px 6px; border-radius: 4px; color: #34d399;">${purchaseToken}</code>).</li>
+        <li>Pronto! Você entrará no painel de administração do seu salão (<strong>${salonName || "Seu Salão"}</strong>) para gerenciar agendamentos, serviços e faturamento.</li>
+      </ol>
+    </div>
+
+    <!-- Purchase Details & Validity -->
     <div style="background-color: #0f172a; border-radius: 12px; padding: 18px; margin-bottom: 25px; border: 1px solid #334155;">
-      <h3 style="color: #cbd5e1; font-size: 14px; margin: 0 0 12px 0; border-bottom: 1px solid #334155; padding-bottom: 8px;">📋 Resumo do Pedido:</h3>
+      <h3 style="color: #cbd5e1; font-size: 14px; margin: 0 0 12px 0; border-bottom: 1px solid #334155; padding-bottom: 8px;">📋 Resumo da Compra & Vigência do Plano:</h3>
       <table style="width: 100%; font-size: 13px; color: #cbd5e1; border-collapse: collapse;">
         <tr>
           <td style="padding: 6px 0; color: #94a3b8;">Salão / Barbearia:</td>
@@ -121,6 +137,10 @@ app.post("/api/send-purchase-email", async (req, res) => {
         <tr>
           <td style="padding: 6px 0; color: #94a3b8;">Proprietário:</td>
           <td style="padding: 6px 0; font-weight: bold; text-align: right; color: #ffffff;">${ownerName || "Cliente"}</td>
+        </tr>
+        <tr>
+          <td style="padding: 6px 0; color: #94a3b8;">CPF do Comprador:</td>
+          <td style="padding: 6px 0; font-weight: bold; text-align: right; color: #38bdf8;">${displayCpf}</td>
         </tr>
         <tr>
           <td style="padding: 6px 0; color: #94a3b8;">Plano Adquirido:</td>
@@ -135,37 +155,27 @@ app.post("/api/send-purchase-email", async (req, res) => {
           <td style="padding: 6px 0; font-weight: bold; text-align: right; color: #34d399;">${priceStr || "R$ 0,00"}</td>
         </tr>
         <tr>
-          <td style="padding: 6px 0; color: #94a3b8;">Data do Pagamento:</td>
-          <td style="padding: 6px 0; font-weight: bold; text-align: right; color: #ffffff;">${purchaseDate || new Date().toLocaleDateString("pt-BR")}</td>
+          <td style="padding: 6px 0; color: #94a3b8;">Data da Compra:</td>
+          <td style="padding: 6px 0; font-weight: bold; text-align: right; color: #ffffff;">${formattedDate}</td>
         </tr>
         <tr>
-          <td style="padding: 6px 0; color: #94a3b8;">Validade da Licença:</td>
-          <td style="padding: 6px 0; font-weight: bold; text-align: right; color: #e2e8f0;">Até ${expiresAt || "Indefinida"}</td>
+          <td style="padding: 6px 0; color: #94a3b8;">Término do Plano (Vencimento):</td>
+          <td style="padding: 6px 0; font-weight: bold; text-align: right; color: #34d399; font-size: 14px;">Até ${formattedExpiry}</td>
         </tr>
       </table>
-    </div>
-
-    <!-- Instructions -->
-    <div style="color: #94a3b8; font-size: 12px; line-height: 1.6; margin-bottom: 25px;">
-      <p style="margin: 0 0 8px 0;"><strong>Como acessar seu aplicativo:</strong></p>
-      <ol style="margin: 0; padding-left: 20px;">
-        <li>Abra o aplicativo pelo seu celular ou computador.</li>
-        <li>Clique na opção de <strong>Entrar / Login</strong>.</li>
-        <li>Utilize seu e-mail (<strong>${ownerEmail}</strong>) e/ou seu Token de Acesso (<strong>${purchaseToken}</strong>).</li>
-      </ol>
     </div>
 
     <!-- CTA Button -->
     <div style="text-align: center; margin-bottom: 20px;">
       <a href="${appUrl}" target="_blank" style="display: inline-block; background-color: #2563eb; color: #ffffff; text-decoration: none; font-weight: bold; font-size: 15px; padding: 14px 28px; border-radius: 12px; box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);">
-        🚀 Acessar o Aplicativo Agora
+        🚀 Acessar a Plataforma do Salão Agora
       </a>
     </div>
 
     <!-- Footer -->
     <div style="text-align: center; border-top: 1px solid #334155; padding-top: 15px; font-size: 11px; color: #64748b;">
       <p style="margin: 0;">Este e-mail é gerado automaticamente após a confirmação de compra.</p>
-      <p style="margin: 4px 0 0 0;">Caso precise de suporte, entre em contato com o suporte da plataforma.</p>
+      <p style="margin: 4px 0 0 0;">Guarde seu CPF e Token com segurança. Eles são suas chaves de acesso permanentes.</p>
     </div>
 
   </div>
@@ -180,7 +190,7 @@ app.post("/api/send-purchase-email", async (req, res) => {
       const mailOptions = {
         from: fromAddr,
         to: ownerEmail,
-        subject: `🎉 Compra Confirmada! Seu Token de Acesso: ${purchaseToken} - ${salonName || "Agenda Fácil"}`,
+        subject: `🎉 Compra Confirmada! Token de Acesso: ${purchaseToken} - ${salonName || "Agenda Fácil"}`,
         html: emailHtml,
       };
 
@@ -194,12 +204,12 @@ app.post("/api/send-purchase-email", async (req, res) => {
       });
     } else {
       console.log(`[SMTP SIMULATOR] Notificação para ${ownerEmail}:`);
-      console.log(`Login: ${ownerEmail} | Token: ${purchaseToken} | Plano: ${planDays} dias`);
+      console.log(`Login CPF: ${displayCpf} | Token: ${purchaseToken} | Plano: ${planDays} dias (Válido até ${formattedExpiry})`);
       return res.json({
         success: true,
         delivered: false,
         simulated: true,
-        message: `Notificação enviada com sucesso para ${ownerEmail}! (Login: ${ownerEmail} | Token: ${purchaseToken})`,
+        message: `Notificação enviada com sucesso para ${ownerEmail}! (Login: ${displayCpf} | Token: ${purchaseToken})`,
       });
     }
   } catch (err: any) {

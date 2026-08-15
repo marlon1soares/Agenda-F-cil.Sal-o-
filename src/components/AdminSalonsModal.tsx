@@ -1,11 +1,12 @@
 import React, { useState, useMemo } from 'react';
 import { SalonApp, SalonConfig } from '../types';
 import { THEMES } from '../data/mockData';
+import { Storage } from '../utils/storage';
 import { 
   Building2, Plus, Search, Check, Trash2, Edit3, ExternalLink, 
   X, Sparkles, User, Mail, Phone, Palette, Scissors, Copy, ShieldCheck, Share2,
   Key, Calendar, Clock, CheckCircle2, AlertCircle, RefreshCw, Send, Lock, Settings,
-  MapPin, Globe, FileText, PieChart, Table, Map, Activity, ArrowRight, Eye
+  MapPin, Globe, FileText, PieChart, Table, Map, Activity, ArrowRight, Eye, Link2
 } from 'lucide-react';
 
 interface AdminSalonsModalProps {
@@ -18,6 +19,7 @@ interface AdminSalonsModalProps {
   onUpdateSalon: (updatedSalon: SalonApp) => void;
   onDeleteSalon: (salonId: string) => void;
   onOpenPaymentConfig?: () => void;
+  onOpenSalonLink?: () => void;
 }
 
 export const AdminSalonsModal: React.FC<AdminSalonsModalProps> = ({
@@ -30,6 +32,7 @@ export const AdminSalonsModal: React.FC<AdminSalonsModalProps> = ({
   onUpdateSalon,
   onDeleteSalon,
   onOpenPaymentConfig,
+  onOpenSalonLink,
 }) => {
   const [activeTab, setActiveTab] = useState<'cards' | 'pending' | 'connected' | 'inspector' | 'location_table'>('cards');
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'active' | 'blocked'>('all');
@@ -39,6 +42,7 @@ export const AdminSalonsModal: React.FC<AdminSalonsModalProps> = ({
   const [editingSalon, setEditingSalon] = useState<SalonApp | null>(null);
   const [copiedTokenId, setCopiedTokenId] = useState<string | null>(null);
   const [actionSuccessMsg, setActionSuccessMsg] = useState<string>('');
+  const [salonToDelete, setSalonToDelete] = useState<SalonApp | null>(null);
 
   // New / Edit Salon Form States
   const [formName, setFormName] = useState('');
@@ -306,8 +310,8 @@ export const AdminSalonsModal: React.FC<AdminSalonsModalProps> = ({
       onUpdateSalon(updated);
       showFeedback(`Salão "${formName}" atualizado com sucesso.`);
     } else {
+      const randomCode = Storage.getNextSalonCode();
       const randomNum = Math.floor(1000 + Math.random() * 9000);
-      const randomCode = `SALAO-${randomNum}`;
       const tokenCleanName = formName.replace(/[^a-zA-Z0-9]/g, '').slice(0, 6).toUpperCase();
       const newToken = `TOK-${tokenCleanName || 'SALÃO'}-${randomNum}`;
 
@@ -343,6 +347,15 @@ export const AdminSalonsModal: React.FC<AdminSalonsModalProps> = ({
     resetForm();
   };
 
+  const handleConfirmDelete = () => {
+    if (!salonToDelete) return;
+    const deletedName = salonToDelete.name;
+    const deletedCode = salonToDelete.appCode;
+    onDeleteSalon(salonToDelete.id);
+    setSalonToDelete(null);
+    showFeedback(`Salão ${deletedCode} ("${deletedName}") excluído com sucesso.`);
+  };
+
   return (
     <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 flex items-center justify-center p-2 sm:p-4 overflow-hidden">
       
@@ -367,6 +380,17 @@ export const AdminSalonsModal: React.FC<AdminSalonsModalProps> = ({
 
           {/* Top Action Buttons - Compact & Aligned */}
           <div className="flex items-center gap-1.5 shrink-0">
+            {onOpenSalonLink && (
+              <button
+                onClick={onOpenSalonLink}
+                className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white font-extrabold px-2.5 py-1 rounded-lg text-xs flex items-center gap-1.5 shadow-md transition-all active:scale-95 border border-violet-400/30"
+                title="Criar e enviar link direto de compra de licença para salões de cabeleireiro"
+              >
+                <Link2 className="w-3.5 h-3.5 text-violet-200" />
+                <span>Link p/ Salões</span>
+              </button>
+            )}
+
             {onOpenPaymentConfig && (
               <button
                 onClick={onOpenPaymentConfig}
@@ -746,6 +770,14 @@ export const AdminSalonsModal: React.FC<AdminSalonsModalProps> = ({
                           <span>Editar Dados</span>
                         </button>
 
+                        <button
+                          onClick={() => setSalonToDelete(inspectedSalon)}
+                          className="bg-rose-950/70 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-800/40 px-3.5 py-2 rounded-xl text-xs font-extrabold transition-all flex items-center gap-1.5"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                          <span>Excluir Salão</span>
+                        </button>
+
                       </div>
 
                       <div className="text-[11px] text-slate-400 font-mono">
@@ -965,6 +997,14 @@ export const AdminSalonsModal: React.FC<AdminSalonsModalProps> = ({
                                   </button>
 
                                   <button
+                                    onClick={() => setSalonToDelete(salon)}
+                                    title="Excluir Salão"
+                                    className="bg-rose-950/60 hover:bg-rose-600 text-rose-300 hover:text-white p-1.5 rounded-lg text-xs transition-colors"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+
+                                  <button
                                     onClick={() => {
                                       onSelectSalon(salon);
                                       onClose();
@@ -1069,19 +1109,14 @@ export const AdminSalonsModal: React.FC<AdminSalonsModalProps> = ({
                         >
                           <Edit3 className="w-3.5 h-3.5" />
                         </button>
-                        {salons.length > 1 && (
-                          <button
-                            onClick={() => {
-                              if (confirm(`Deseja excluir permanentemente o aplicativo "${salon.name}"?`)) {
-                                onDeleteSalon(salon.id);
-                              }
-                            }}
-                            title="Excluir compra"
-                            className="bg-rose-900/60 hover:bg-rose-600 p-1.5 rounded-lg text-rose-200 hover:text-white transition-colors"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        )}
+                        
+                        <button
+                          onClick={() => setSalonToDelete(salon)}
+                          title="Excluir salão"
+                          className="bg-rose-900/60 hover:bg-rose-600 p-1.5 rounded-lg text-rose-200 hover:text-white transition-colors"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
                       </div>
                     </div>
 
@@ -1525,6 +1560,65 @@ export const AdminSalonsModal: React.FC<AdminSalonsModalProps> = ({
 
             </form>
 
+          </div>
+        </div>
+      )}
+
+      {/* CONFIRMATION MODAL TO DELETE SALON */}
+      {salonToDelete && (
+        <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-[70] flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="bg-slate-900 border border-rose-500/50 rounded-3xl w-full max-w-md text-white shadow-2xl overflow-hidden p-6 space-y-4 animate-in zoom-in-95 duration-150">
+            <div className="w-14 h-14 rounded-2xl bg-rose-500/20 text-rose-400 border border-rose-500/40 flex items-center justify-center mx-auto shadow-lg shadow-rose-950/50">
+              <Trash2 className="w-7 h-7" />
+            </div>
+
+            <div className="text-center space-y-1.5">
+              <h3 className="text-lg font-black text-white">
+                Deseja realmente deletar este salão?
+              </h3>
+              <p className="text-xs text-slate-400 max-w-xs mx-auto">
+                Esta ação é irreversível e excluirá todos os dados, agendamentos, histórico e o token vinculado.
+              </p>
+            </div>
+
+            <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 text-xs space-y-2">
+              <div className="flex justify-between items-center text-slate-300">
+                <span className="text-slate-400">Identificador:</span>
+                <span className="font-mono font-black bg-slate-900 px-2.5 py-0.5 rounded text-sky-400 border border-slate-800">
+                  {salonToDelete.appCode}
+                </span>
+              </div>
+              <div className="flex justify-between items-center text-slate-300">
+                <span className="text-slate-400">Nome do Salão:</span>
+                <span className="font-bold text-white truncate max-w-[200px]">{salonToDelete.name}</span>
+              </div>
+              <div className="flex justify-between items-center text-slate-300">
+                <span className="text-slate-400">Proprietário:</span>
+                <span className="font-semibold text-slate-200">{salonToDelete.ownerName}</span>
+              </div>
+              <div className="flex justify-between items-center text-slate-300">
+                <span className="text-slate-400">Token de Acesso:</span>
+                <span className="font-mono text-emerald-400 font-bold">{salonToDelete.purchaseToken}</span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setSalonToDelete(null)}
+                className="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold py-2.5 px-4 rounded-xl text-xs transition-colors border border-slate-700"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDelete}
+                className="w-full bg-rose-600 hover:bg-rose-500 text-white font-extrabold py-2.5 px-4 rounded-xl text-xs shadow-lg shadow-rose-950/50 transition-all active:scale-95 flex items-center justify-center gap-1.5"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Confirmar Exclusão</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

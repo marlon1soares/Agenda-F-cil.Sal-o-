@@ -15,6 +15,7 @@ interface NavbarProps {
   onOpenBuyApp?: () => void;
   onOpenAdminPaymentConfig?: () => void;
   onOpenClientLink?: () => void;
+  onOpenSalonLink?: () => void;
   isExpanded: boolean;
   onToggleExpand: () => void;
   isMinimized: boolean;
@@ -31,6 +32,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenBuyApp,
   onOpenAdminPaymentConfig,
   onOpenClientLink,
+  onOpenSalonLink,
   isExpanded,
   onToggleExpand,
   isMinimized,
@@ -234,6 +236,17 @@ export const Navbar: React.FC<NavbarProps> = ({
                 >
                   <Link2 className="w-3.5 h-3.5 text-rose-200" />
                   <span>Criar Link p/ Clientes</span>
+                </button>
+              )}
+
+              {userRole === 'admin' && onOpenSalonLink && (
+                <button
+                  onClick={onOpenSalonLink}
+                  title="Criar e enviar link de compra de licença para proprietários de salões de cabeleireiro e barbearias"
+                  className="bg-gradient-to-r from-violet-600 via-purple-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-extrabold text-xs px-3 py-1.5 rounded-xl shadow-md flex items-center gap-1.5 transition-all active:scale-95 border border-violet-400/40 shrink-0"
+                >
+                  <Link2 className="w-3.5 h-3.5 text-violet-200" />
+                  <span>Criar Link p/ Salão</span>
                 </button>
               )}
 
