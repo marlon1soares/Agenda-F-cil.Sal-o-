@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { SalonApp, ServiceItem, Professional, Appointment, ClientRecord } from '../types';
 import { Storage } from '../utils/storage';
-import { DEFAULT_TIMESLOTS } from '../data/mockData';
+import { DEFAULT_TIMESLOTS, DEFAULT_SALON_APPS, DEFAULT_CONFIG } from '../data/mockData';
 import { generatePixEMVPayload, generateQrCodeDataUrl } from '../utils/pix';
 import { 
   Scissors, Calendar, Clock, User, Phone, CheckCircle2, Building2,
@@ -11,7 +11,7 @@ import {
 
 interface ClientePortalViewProps {
   salons?: SalonApp[];
-  activeSalon: SalonApp;
+  activeSalon?: SalonApp;
   onSelectSalon?: (salon: SalonApp) => void;
   appointments?: Record<string, Record<string, Appointment>>;
   timeAdjustments?: Record<string, number>;
@@ -20,51 +20,69 @@ interface ClientePortalViewProps {
 }
 
 export const ClientePortalView: React.FC<ClientePortalViewProps> = ({
+  salons = DEFAULT_SALON_APPS,
   activeSalon,
   appointments = {},
   timeAdjustments = {},
   onAppointmentBooked,
   onOpenCatalog,
 }) => {
+  // Guaranteed non-null salon and configuration objects
+  const safeSalon: SalonApp = activeSalon || (salons && salons.length > 0 ? salons[0] : DEFAULT_SALON_APPS[0]);
+  const safeConfig = safeSalon.config || DEFAULT_CONFIG;
+
   const [selectedService, setSelectedService] = useState<ServiceItem | null>(null);
   const [selectedProf, setSelectedProf] = useState<Professional | null>(null);
   const [selectedDate, setSelectedDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
   const [selectedTime, setSelectedTime] = useState<string>('10:00');
-  const [clientName, setClientName] = useState(() => localStorage.getItem('salao_cliente_name') || '');
-  const [clientPhone, setClientPhone] = useState(() => localStorage.getItem('salao_cliente_phone') || '');
+  const [clientName, setClientName] = useState(() => {
+    try { return localStorage.getItem('salao_cliente_name') || ''; } catch { return ''; }
+  });
+  const [clientPhone, setClientPhone] = useState(() => {
+    try { return localStorage.getItem('salao_cliente_phone') || ''; } catch { return ''; }
+  });
   const [clientNotes, setClientNotes] = useState('');
   const [isSuccess, setIsSuccess] = useState(false);
   const [lastAppointment, setLastAppointment] = useState<Appointment | null>(null);
 
   // Sync / Detect phone & name from URL params or stored clients
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const phoneParam = params.get('phone') || params.get('celular') || params.get('tel');
-    const nameParam = params.get('name') || params.get('nome');
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const phoneParam = params.get('phone') || params.get('celular') || params.get('tel');
+      const nameParam = params.get('name') || params.get('nome');
 
-    const effectivePhone = phoneParam ? phoneParam.replace(/\D/g, '') : (localStorage.getItem('salao_cliente_phone') || '');
-    let effectiveName = nameParam || localStorage.getItem('salao_cliente_name') || '';
+      let savedPhone = '';
+      let savedName = '';
+      try {
+        savedPhone = localStorage.getItem('salao_cliente_phone') || '';
+        savedName = localStorage.getItem('salao_cliente_name') || '';
+      } catch {}
 
-    if (effectivePhone) {
-      setClientPhone(effectivePhone);
-      localStorage.setItem('salao_cliente_phone', effectivePhone);
+      const effectivePhone = phoneParam ? phoneParam.replace(/\D/g, '') : savedPhone;
+      let effectiveName = nameParam || savedName;
 
-      // Check if client name is already recorded in salon's clients database
-      if (!effectiveName) {
-        const clients = Storage.getClients();
-        const found = clients.find(c => c.phone.replace(/\D/g, '') === effectivePhone);
-        if (found && found.name) {
-          effectiveName = found.name;
-          setClientName(found.name);
-          localStorage.setItem('salao_cliente_name', found.name);
+      if (effectivePhone) {
+        setClientPhone(effectivePhone);
+        try { localStorage.setItem('salao_cliente_phone', effectivePhone); } catch {}
+
+        // Check if client name is already recorded in salon's clients database
+        if (!effectiveName) {
+          const clients = Storage.getClients();
+          const found = clients.find(c => c.phone.replace(/\D/g, '') === effectivePhone);
+          if (found && found.name) {
+            effectiveName = found.name;
+            setClientName(found.name);
+            try { localStorage.setItem('salao_cliente_name', found.name); } catch {}
+          }
         }
       }
-    }
 
-    if (effectiveName) {
-      setClientName(effectiveName);
-      localStorage.setItem('salao_cliente_name', effectiveName);
-    }
+      if (effectiveName) {
+        setClientName(effectiveName);
+        try { localStorage.setItem('salao_cliente_name', effectiveName); } catch {}
+      }
+    } catch {}
   }, []);
 
   // Payment states for Client
@@ -87,7 +105,8 @@ export const ClientePortalView: React.FC<ClientePortalViewProps> = ({
 
   // Salon Services and Professionals
   const services: ServiceItem[] = Storage.getServices();
-  const profs: Professional[] = activeSalon.config.profs.map((p, idx) => ({
+  const profsList = safeConfig.profs || [];
+  const profs: Professional[] = profsList.map((p, idx) => ({
     id: p.id || `prof-${idx}`,
     name: p.nome,
     role: 'Especialista',
@@ -204,7 +223,7 @@ export const ClientePortalView: React.FC<ClientePortalViewProps> = ({
                   Salão:
                 </span>
                 <span className="text-white font-black text-xs block leading-tight">
-                  {activeSalon.config.nomeSalao}
+                  {safeConfig.nomeSalao}
                 </span>
               </div>
             </div>
@@ -493,7 +512,7 @@ export const ClientePortalView: React.FC<ClientePortalViewProps> = ({
               Agendamento Confirmado com Sucesso!
             </h3>
             <p className="text-slate-300 text-xs mt-1">
-              Seu horário foi registrado em tempo real no aplicativo do salão <strong className="text-rose-300">{activeSalon.config.nomeSalao}</strong>.
+              Seu horário foi registrado em tempo real no aplicativo do salão <strong className="text-rose-300">{safeConfig.nomeSalao}</strong>.
             </p>
           </div>
 
@@ -501,7 +520,7 @@ export const ClientePortalView: React.FC<ClientePortalViewProps> = ({
           <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800 text-left text-xs space-y-2.5">
             <div className="flex justify-between items-center border-b border-slate-800 pb-2">
               <span className="font-bold text-slate-400">Salão:</span>
-              <span className="font-black text-rose-300 text-sm">{activeSalon.config.nomeSalao} ({activeSalon.appCode})</span>
+              <span className="font-black text-rose-300 text-sm">{safeConfig.nomeSalao} ({safeSalon.appCode})</span>
             </div>
 
             <div className="grid grid-cols-2 gap-3 text-slate-200">
@@ -548,7 +567,7 @@ export const ClientePortalView: React.FC<ClientePortalViewProps> = ({
                   <button
                     type="button"
                     onClick={() => {
-                      const pixKey = activeSalon.config.chavePix || 'marlon1soares28@gmail.com';
+                      const pixKey = safeConfig.chavePix || 'marlon1soares28@gmail.com';
                       navigator.clipboard.writeText(pixKey);
                       setCopiedPix(true);
                       setTimeout(() => setCopiedPix(false), 2500);
@@ -569,9 +588,9 @@ export const ClientePortalView: React.FC<ClientePortalViewProps> = ({
                   <button
                     type="button"
                     onClick={async () => {
-                      const pixKey = activeSalon.config.chavePix || 'marlon1soares28@gmail.com';
-                      const beneficiary = activeSalon.config.titularPix || activeSalon.config.nomeSalao;
-                      const city = activeSalon.config.cidadePix || 'SAO PAULO';
+                      const pixKey = safeConfig.chavePix || 'marlon1soares28@gmail.com';
+                      const beneficiary = safeConfig.titularPix || safeConfig.nomeSalao;
+                      const city = safeConfig.cidadePix || 'SAO PAULO';
                       const amount = lastAppointment?.price;
                       const payload = generatePixEMVPayload(pixKey, beneficiary, city, amount);
                       setPixPayload(payload);
@@ -587,12 +606,12 @@ export const ClientePortalView: React.FC<ClientePortalViewProps> = ({
               </div>
 
               <div className="font-mono text-xs font-bold text-purple-200 break-all">
-                {activeSalon.config.chavePix || 'marlon1soares28@gmail.com'}
+                {safeConfig.chavePix || 'marlon1soares28@gmail.com'}
               </div>
 
-              {activeSalon.config.titularPix && (
+              {safeConfig.titularPix && (
                 <div className="text-[10px] text-slate-400">
-                  Titular: <strong className="text-white">{activeSalon.config.titularPix}</strong>
+                  Titular: <strong className="text-white">{safeConfig.titularPix}</strong>
                 </div>
               )}
             </div>
@@ -602,17 +621,17 @@ export const ClientePortalView: React.FC<ClientePortalViewProps> = ({
               <span className="text-[11px] font-extrabold text-sky-300 flex items-center gap-1">
                 <Building2 className="w-3.5 h-3.5 text-sky-400" /> Pagamento com Cartão de Crédito / Débito:
               </span>
-              {activeSalon.config.bancoCartao || activeSalon.config.contaCartao || activeSalon.config.linkCartao ? (
+              {safeConfig.bancoCartao || safeConfig.contaCartao || safeConfig.linkCartao ? (
                 <div className="text-[11px] text-slate-300 space-y-0.5">
-                  <div>Banco: <strong className="text-white">{activeSalon.config.bancoCartao || 'Banco Cadastrado'}</strong></div>
-                  <div>Agência: <strong className="font-mono text-white">{activeSalon.config.agenciaCartao || '0001'}</strong> • Conta: <strong className="font-mono text-white">{activeSalon.config.contaCartao || '-'}</strong> ({activeSalon.config.tipoContaCartao || 'Corrente'})</div>
-                  {activeSalon.config.titularCartao && (
-                    <div>Titular da Conta: <strong className="text-white">{activeSalon.config.titularCartao}</strong></div>
+                  <div>Banco: <strong className="text-white">{safeConfig.bancoCartao || 'Banco Cadastrado'}</strong></div>
+                  <div>Agência: <strong className="font-mono text-white">{safeConfig.agenciaCartao || '0001'}</strong> • Conta: <strong className="font-mono text-white">{safeConfig.contaCartao || '-'}</strong> ({safeConfig.tipoContaCartao || 'Corrente'})</div>
+                  {safeConfig.titularCartao && (
+                    <div>Titular da Conta: <strong className="text-white">{safeConfig.titularCartao}</strong></div>
                   )}
-                  {activeSalon.config.linkCartao && (
+                  {safeConfig.linkCartao && (
                     <div className="pt-1.5">
                       <a
-                        href={activeSalon.config.linkCartao}
+                        href={safeConfig.linkCartao}
                         target="_blank"
                         rel="noreferrer"
                         className="w-full bg-sky-600 hover:bg-sky-500 text-white font-bold text-[11px] py-1.5 rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-md"
@@ -652,7 +671,7 @@ export const ClientePortalView: React.FC<ClientePortalViewProps> = ({
                 </div>
 
                 <div className="text-[10px] font-mono text-purple-200 bg-slate-950 p-2 rounded-xl border border-slate-800 break-all">
-                  {activeSalon.config.chavePix || 'marlon1soares28@gmail.com'}
+                  {safeConfig.chavePix || 'marlon1soares28@gmail.com'}
                 </div>
 
                 <button
@@ -677,7 +696,7 @@ export const ClientePortalView: React.FC<ClientePortalViewProps> = ({
               <span>Link Permanente & Reutilizável</span>
             </span>
             <p className="text-[10px] text-slate-300 leading-tight">
-              Este link é exclusivo do seu celular ({clientPhone || 'seu número'}). Salve esta página nos favoritos do seu navegador para agendar seus próximos horários no <strong>{activeSalon.config.nomeSalao}</strong> sempre que precisar, sem precisar solicitar um novo link!
+              Este link é exclusivo do seu celular ({clientPhone || 'seu número'}). Salve esta página nos favoritos do seu navegador para agendar seus próximos horários no <strong>{safeConfig.nomeSalao}</strong> sempre que precisar, sem precisar solicitar um novo link!
             </p>
           </div>
 

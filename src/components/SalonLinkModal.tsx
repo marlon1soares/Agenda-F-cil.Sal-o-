@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { AdminPaymentConfig } from '../types';
 import { Storage } from '../utils/storage';
 import { formatBRL, getCalculatedLicensePlans } from '../utils/pricing';
+import { getPublicAppUrl } from '../utils/url';
 import { 
   X, Link2, Copy, Check, Share2, MessageSquare, ExternalLink, 
   Sparkles, Building2, ShieldCheck, CheckCircle2, ShoppingCart,
@@ -45,13 +46,13 @@ export const SalonLinkModal: React.FC<SalonLinkModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
-      const stored = localStorage.getItem('savedSalonPurchaseLinks');
-      if (stored) {
-        try {
+      try {
+        const stored = localStorage.getItem('savedSalonPurchaseLinks');
+        if (stored) {
           setSavedLinks(JSON.parse(stored));
-        } catch {
-          setSavedLinks([]);
         }
+      } catch {
+        setSavedLinks([]);
       }
     }
   }, [isOpen]);
@@ -62,7 +63,7 @@ export const SalonLinkModal: React.FC<SalonLinkModalProps> = ({
   const cleanPhone = targetPhone.replace(/\D/g, '');
 
   // Build the public link for the salon to purchase license
-  const publicOrigin = (window.location.origin + window.location.pathname).replace('ais-dev-', 'ais-pre-');
+  const publicOrigin = getPublicAppUrl();
   
   let salonPurchaseUrl = `${publicOrigin}?action=comprar-licenca`;
   if (selectedPlanDays && selectedPlanDays !== 30) {
@@ -119,7 +120,9 @@ export const SalonLinkModal: React.FC<SalonLinkModalProps> = ({
 
     const updated = [newEntry, ...savedLinks.filter(l => l.url !== url)].slice(0, 8);
     setSavedLinks(updated);
-    localStorage.setItem('savedSalonPurchaseLinks', JSON.stringify(updated));
+    try {
+      localStorage.setItem('savedSalonPurchaseLinks', JSON.stringify(updated));
+    } catch {}
   };
 
   return (

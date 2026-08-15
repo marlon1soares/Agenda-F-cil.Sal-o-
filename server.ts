@@ -4,6 +4,7 @@ import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
 import nodemailer from "nodemailer";
+import { syncStore } from "./server/syncStore";
 
 dotenv.config();
 
@@ -47,6 +48,40 @@ const getTransporter = () => {
 // API Health Check
 app.get("/api/health", (_req, res) => {
   res.json({ status: "ok", envKeySet: !!process.env.GEMINI_API_KEY });
+});
+
+// Real-Time Synchronization SSE Stream for all devices (Admin, Salons, Clients)
+app.get("/api/sync/events", (req, res) => {
+  res.writeHead(200, {
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache, no-transform",
+    "Connection": "keep-alive",
+    "Access-Control-Allow-Origin": "*",
+  });
+  if (typeof (res as any).flushHeaders === "function") {
+    (res as any).flushHeaders();
+  }
+  syncStore.addSseClient(res);
+});
+
+// Get Authoritative State for all Salons, Appointments, Transactions
+app.get("/api/sync/state", (_req, res) => {
+  const state = syncStore.getState();
+  res.json({ success: true, state, timestamp: state.lastUpdated });
+});
+
+// Post Authoritative State Updates (Broadcasting immediately to all other connected clients)
+app.post("/api/sync/state", (req, res) => {
+  try {
+    const { updates, clientId } = req.body;
+    if (!updates || typeof updates !== "object") {
+      return res.status(400).json({ error: "updates object is required." });
+    }
+    const state = syncStore.updateState(updates, clientId);
+    res.json({ success: true, state, timestamp: state.lastUpdated });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || "Failed to update sync state." });
+  }
 });
 
 // Send Purchase Confirmation & Access Token Email

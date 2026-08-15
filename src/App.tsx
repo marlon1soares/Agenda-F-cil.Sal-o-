@@ -19,27 +19,57 @@ import { SalonAuthModal } from './components/SalonAuthModal';
 
 import { Transaction, Appointment, SalonConfig, UserRole, Professional, ServiceItem, ClientRecord, SalonApp } from './types';
 import { Storage } from './utils/storage';
+import { syncEngine } from './utils/syncEngine';
+import { DEFAULT_SALON_APPS, DEFAULT_CONFIG } from './data/mockData';
 import { LayoutDashboard, CreditCard, Calendar, Users, Scissors, UserCheck } from 'lucide-react';
 
 export function App() {
-  const [userRole, setUserRole] = useState<UserRole>('admin');
+  // Synchronous URL Parameter Detection for instantaneous role and modal setup
+  const [userRole, setUserRole] = useState<UserRole>(() => {
+    try {
+      if (typeof window !== 'undefined') {
+        const params = new URLSearchParams(window.location.search);
+        const role = params.get('role');
+        const salon = params.get('salon');
+        if (role === 'cliente' || salon) return 'cliente';
+        if (role === 'salao') return 'salao';
+        if (role === 'admin') return 'admin';
+      }
+    } catch {}
+    return 'admin';
+  });
+
   const [activeTab, setActiveTab] = useState<'dashboard' | 'caixa' | 'agenda' | 'profissionais' | 'servicos' | 'clientes'>('dashboard');
 
   // Multi-Salon State
-  const [salons, setSalons] = useState<SalonApp[]>(Storage.getSalons());
-  const [activeSalonId, setActiveSalonId] = useState<string>(() => {
+  const [salons, setSalons] = useState<SalonApp[]>(() => {
     const list = Storage.getSalons();
-    return list.length > 0 ? list[0].id : 'salon-parcas';
+    return list && list.length > 0 ? list : DEFAULT_SALON_APPS;
+  });
+
+  const [activeSalonId, setActiveSalonId] = useState<string>(() => {
+    try {
+      if (typeof window !== 'undefined') {
+        const params = new URLSearchParams(window.location.search);
+        const salonParam = params.get('salon');
+        if (salonParam) {
+          const found = Storage.getSalonBySlugOrCode(salonParam);
+          if (found) return found.id;
+        }
+      }
+    } catch {}
+    const list = Storage.getSalons();
+    return list && list.length > 0 ? list[0].id : DEFAULT_SALON_APPS[0].id;
   });
 
   // Salon Data States
-  const [config, setConfig] = useState<SalonConfig>(Storage.getConfig());
-  const [transactions, setTransactions] = useState<Transaction[]>(Storage.getTransactions());
-  const [appointments, setAppointments] = useState<Record<string, Record<string, Appointment>>>(Storage.getAppointments());
-  const [timeAdjustments, setTimeAdjustments] = useState<Record<string, number>>(Storage.getTimeAdjustments());
-  const [professionals, setProfessionals] = useState<Professional[]>(Storage.getProfessionals());
-  const [services, setServices] = useState<ServiceItem[]>(Storage.getServices());
-  const [clients, setClients] = useState<ClientRecord[]>(Storage.getClients());
+  const [config, setConfig] = useState<SalonConfig>(() => Storage.getConfig() || DEFAULT_CONFIG);
+  const [transactions, setTransactions] = useState<Transaction[]>(() => Storage.getTransactions());
+  const [appointments, setAppointments] = useState<Record<string, Record<string, Appointment>>>(() => Storage.getAppointments());
+  const [timeAdjustments, setTimeAdjustments] = useState<Record<string, number>>(() => Storage.getTimeAdjustments());
+  const [professionals, setProfessionals] = useState<Professional[]>(() => Storage.getProfessionals());
+  const [services, setServices] = useState<ServiceItem[]>(() => Storage.getServices());
+  const [clients, setClients] = useState<ClientRecord[]>(() => Storage.getClients());
 
   // Window State
   const [isExpanded, setIsExpanded] = useState(false);
@@ -52,57 +82,104 @@ export function App() {
   const [isSalonAuthOpen, setIsSalonAuthOpen] = useState(false);
   const [isAdminSalonsOpen, setIsAdminSalonsOpen] = useState(false);
   const [isAdminPaymentOpen, setIsAdminPaymentOpen] = useState(false);
-  const [isBuyAppOpen, setIsBuyAppOpen] = useState(false);
+  const [isBuyAppOpen, setIsBuyAppOpen] = useState<boolean>(() => {
+    try {
+      if (typeof window !== 'undefined') {
+        const params = new URLSearchParams(window.location.search);
+        const actionParam = params.get('action');
+        const comprarParam = params.get('comprar') || params.get('compra') || params.get('licenca') || params.get('buy');
+        return (
+          actionParam === 'comprar-licenca' ||
+          actionParam === 'comprar' ||
+          actionParam === 'comprar_licenca' ||
+          comprarParam === 'true' ||
+          comprarParam === '1'
+        );
+      }
+    } catch {}
+    return false;
+  });
   const [isClientLinkOpen, setIsClientLinkOpen] = useState(false);
   const [isSalonLinkOpen, setIsSalonLinkOpen] = useState(false);
 
-  // Detect URL parameters for Direct Links (e.g. Salon Purchase Link ?action=comprar-licenca or Client Link ?role=cliente&salon=...)
+  // Initialize Real-time synchronization and detect URL parameters
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const actionParam = params.get('action');
-    const comprarParam = params.get('comprar') || params.get('compra') || params.get('licenca') || params.get('buy');
-    const roleParam = params.get('role');
-    const salonParam = params.get('salon');
-    const phoneParam = params.get('phone') || params.get('celular') || params.get('tel');
-    const nameParam = params.get('name') || params.get('nome');
+    // 1. Start Real-time synchronization engine (Server-Sent Events)
+    syncEngine.init();
 
-    // If salon license purchase link is accessed, open the purchase license modal immediately
-    if (
-      actionParam === 'comprar-licenca' ||
-      actionParam === 'comprar' ||
-      actionParam === 'comprar_licenca' ||
-      comprarParam === 'true' ||
-      comprarParam === '1'
-    ) {
-      setIsBuyAppOpen(true);
-    }
+    const resolveUrlParams = () => {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const actionParam = params.get('action');
+        const comprarParam = params.get('comprar') || params.get('compra') || params.get('licenca') || params.get('buy');
+        const roleParam = params.get('role');
+        const salonParam = params.get('salon');
+        const phoneParam = params.get('phone') || params.get('celular') || params.get('tel');
+        const nameParam = params.get('name') || params.get('nome');
 
-    if (phoneParam) {
-      localStorage.setItem('salao_cliente_phone', phoneParam.replace(/\D/g, ''));
-    }
-    if (nameParam) {
-      localStorage.setItem('salao_cliente_name', nameParam);
-    }
+        // If salon license purchase link is accessed, open the purchase license modal immediately
+        if (
+          actionParam === 'comprar-licenca' ||
+          actionParam === 'comprar' ||
+          actionParam === 'comprar_licenca' ||
+          comprarParam === 'true' ||
+          comprarParam === '1'
+        ) {
+          setIsBuyAppOpen(true);
+        }
 
-    if (roleParam === 'cliente') {
-      setUserRole('cliente');
-    }
+        if (phoneParam) {
+          try { localStorage.setItem('salao_cliente_phone', phoneParam.replace(/\D/g, '')); } catch {}
+        }
+        if (nameParam) {
+          try { localStorage.setItem('salao_cliente_name', nameParam); } catch {}
+        }
 
-    if (salonParam) {
-      const targetSalon = Storage.getSalonBySlugOrCode(salonParam);
-      if (targetSalon) {
-        setActiveSalonId(targetSalon.id);
-        setConfig(targetSalon.config);
-        Storage.saveConfig(targetSalon.config);
-        setUserRole('cliente');
+        if (roleParam === 'cliente' || salonParam) {
+          setUserRole('cliente');
+        }
+
+        if (salonParam) {
+          const targetSalon = Storage.getSalonBySlugOrCode(salonParam);
+          if (targetSalon) {
+            setActiveSalonId(targetSalon.id);
+            setConfig(targetSalon.config);
+            Storage.saveConfig(targetSalon.config);
+            setUserRole('cliente');
+          }
+        }
+      } catch (err) {
+        console.warn('URL parsing error:', err);
       }
-    }
+    };
+
+    // Immediate local resolution
+    resolveUrlParams();
+
+    // Re-resolve after fetching authoritative server state
+    syncEngine.fetchServerState().then((serverState) => {
+      if (serverState) {
+        if (serverState.salons && serverState.salons.length > 0) {
+          setSalons(serverState.salons);
+        }
+        if (serverState.config) setConfig(serverState.config);
+        if (serverState.appointments) setAppointments(serverState.appointments);
+        if (serverState.transactions) setTransactions(serverState.transactions);
+        if (serverState.timeAdjustments) setTimeAdjustments(serverState.timeAdjustments);
+        if (serverState.professionals) setProfessionals(serverState.professionals);
+        if (serverState.services) setServices(serverState.services);
+        if (serverState.clients) setClients(serverState.clients);
+
+        resolveUrlParams();
+      }
+    });
   }, []);
 
   // Sync state event listener
   useEffect(() => {
     const handleSync = () => {
-      setSalons(Storage.getSalons());
+      const currentSalons = Storage.getSalons();
+      setSalons(currentSalons);
       setConfig(Storage.getConfig());
       setTransactions(Storage.getTransactions());
       setAppointments(Storage.getAppointments());
@@ -110,6 +187,12 @@ export function App() {
       setProfessionals(Storage.getProfessionals());
       setServices(Storage.getServices());
       setClients(Storage.getClients());
+
+      // If active salon changed, re-sync its config
+      const active = currentSalons.find(s => s.id === activeSalonId);
+      if (active) {
+        setConfig(active.config);
+      }
     };
 
     window.addEventListener('salao_sync_data', handleSync);
@@ -118,7 +201,7 @@ export function App() {
       window.removeEventListener('salao_sync_data', handleSync);
       window.removeEventListener('storage', handleSync);
     };
-  }, []);
+  }, [activeSalonId]);
 
   // Multi-salon handlers
   const handleSelectSalon = (salon: SalonApp) => {

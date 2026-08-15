@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { SalonApp, ClientRecord } from '../types';
 import { getSalonSlug, Storage } from '../utils/storage';
+import { getPublicAppUrl } from '../utils/url';
 import { 
   X, Link2, Copy, Check, Share2, MessageSquare, ExternalLink, 
   Sparkles, UserCheck, ShieldCheck, Scissors, CheckCircle2,
@@ -42,16 +43,16 @@ export const ClientLinkModal: React.FC<ClientLinkModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       setExistingClients(Storage.getClients());
-      const stored = localStorage.getItem(`savedClientLinks_${activeSalon.id}`);
-      if (stored) {
-        try {
+      try {
+        const stored = localStorage.getItem(`savedClientLinks_${activeSalon?.id || 'default'}`);
+        if (stored) {
           setSavedLinks(JSON.parse(stored));
-        } catch {
-          setSavedLinks([]);
         }
+      } catch {
+        setSavedLinks([]);
       }
     }
-  }, [isOpen, activeSalon.id]);
+  }, [isOpen, activeSalon?.id]);
 
   if (!isOpen) return null;
 
@@ -63,7 +64,7 @@ export const ClientLinkModal: React.FC<ClientLinkModalProps> = ({
 
   // Build client link for this specific salon and client's phone
   const salonSlug = getSalonSlug(activeSalon.config.nomeSalao || activeSalon.name);
-  const publicOrigin = (window.location.origin + window.location.pathname).replace('ais-dev-', 'ais-pre-');
+  const publicOrigin = getPublicAppUrl();
   
   let clientUrl = `${publicOrigin}?role=cliente&salon=${salonSlug}`;
   if (cleanPhone) {
@@ -111,7 +112,9 @@ export const ClientLinkModal: React.FC<ClientLinkModalProps> = ({
 
     const updated = [newEntry, ...savedLinks.filter(l => l.phone !== phone || !phone)].slice(0, 8);
     setSavedLinks(updated);
-    localStorage.setItem(`savedClientLinks_${activeSalon.id}`, JSON.stringify(updated));
+    try {
+      localStorage.setItem(`savedClientLinks_${activeSalon?.id || 'default'}`, JSON.stringify(updated));
+    } catch {}
   };
 
   const handleSelectExistingClient = (c: ClientRecord) => {

@@ -1,5 +1,6 @@
 import { SalonConfig, Transaction, Appointment, Professional, ServiceItem, ClientRecord, CatalogMedia, CatalogFolder, AdminCredentials, SalonApp, AdminPaymentConfig } from '../types';
 import { DEFAULT_CONFIG, DEFAULT_PROFESSIONALS, DEFAULT_SERVICES, DEFAULT_CLIENTS, INITIAL_TRANSACTIONS, INITIAL_APPOINTMENTS, INITIAL_CATALOG, DEFAULT_SALON_APPS } from '../data/mockData';
+import { syncEngine } from './syncEngine';
 
 // IndexedDB for media storage (Photos & Videos without size limits)
 const DB_NAME = 'SalaoFlutuanteDB';
@@ -60,69 +61,112 @@ export function getSalonSlug(name: string): string {
     .replace(/^-+|-+$/g, '');
 }
 
+// Safe storage helpers for Apple iOS Safari / Android WebViews (prevents incognito SecurityError crashes)
+function safeGetItem(key: string): string | null {
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      return window.localStorage.getItem(key);
+    }
+  } catch (e) {
+    // ignore
+  }
+  return null;
+}
+
+function safeSetItem(key: string, value: string): void {
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.setItem(key, value);
+    }
+  } catch (e) {
+    // ignore
+  }
+}
+
 // LocalStorage Persistence Wrappers
 export const Storage = {
   getConfig(): SalonConfig {
-    const saved = localStorage.getItem('salaoConfig');
+    const saved = safeGetItem('salaoConfig');
     return saved ? JSON.parse(saved) : DEFAULT_CONFIG;
   },
   saveConfig(config: SalonConfig) {
-    localStorage.setItem('salaoConfig', JSON.stringify(config));
-    window.dispatchEvent(new CustomEvent('salao_sync_data', { detail: { key: 'salaoConfig' } }));
+    safeSetItem('salaoConfig', JSON.stringify(config));
+    syncEngine.pushUpdate({ config });
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('salao_sync_data', { detail: { key: 'salaoConfig' } }));
+    }
   },
 
   getTransactions(): Transaction[] {
-    const saved = localStorage.getItem('salaoLancamentos');
+    const saved = safeGetItem('salaoLancamentos');
     return saved ? JSON.parse(saved) : INITIAL_TRANSACTIONS;
   },
   saveTransactions(transactions: Transaction[]) {
-    localStorage.setItem('salaoLancamentos', JSON.stringify(transactions));
-    window.dispatchEvent(new CustomEvent('salao_sync_data', { detail: { key: 'salaoLancamentos' } }));
+    safeSetItem('salaoLancamentos', JSON.stringify(transactions));
+    syncEngine.pushUpdate({ transactions });
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('salao_sync_data', { detail: { key: 'salaoLancamentos' } }));
+    }
   },
 
   getAppointments(): Record<string, Record<string, Appointment>> {
-    const saved = localStorage.getItem('salaoAgenda');
+    const saved = safeGetItem('salaoAgenda');
     return saved ? JSON.parse(saved) : INITIAL_APPOINTMENTS;
   },
   saveAppointments(agenda: Record<string, Record<string, Appointment>>) {
-    localStorage.setItem('salaoAgenda', JSON.stringify(agenda));
-    window.dispatchEvent(new CustomEvent('salao_sync_data', { detail: { key: 'salaoAgenda' } }));
+    safeSetItem('salaoAgenda', JSON.stringify(agenda));
+    syncEngine.pushUpdate({ appointments: agenda });
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('salao_sync_data', { detail: { key: 'salaoAgenda' } }));
+    }
   },
 
   getTimeAdjustments(): Record<string, number> {
-    const saved = localStorage.getItem('salaoAjustesHorarios');
+    const saved = safeGetItem('salaoAjustesHorarios');
     return saved ? JSON.parse(saved) : {};
   },
   saveTimeAdjustments(adjustments: Record<string, number>) {
-    localStorage.setItem('salaoAjustesHorarios', JSON.stringify(adjustments));
-    window.dispatchEvent(new CustomEvent('salao_sync_data', { detail: { key: 'salaoAjustesHorarios' } }));
+    safeSetItem('salaoAjustesHorarios', JSON.stringify(adjustments));
+    syncEngine.pushUpdate({ timeAdjustments: adjustments });
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('salao_sync_data', { detail: { key: 'salaoAjustesHorarios' } }));
+    }
   },
 
   getProfessionals(): Professional[] {
-    const saved = localStorage.getItem('salaoProfissionais');
+    const saved = safeGetItem('salaoProfissionais');
     return saved ? JSON.parse(saved) : DEFAULT_PROFESSIONALS;
   },
   saveProfessionals(profs: Professional[]) {
-    localStorage.setItem('salaoProfissionais', JSON.stringify(profs));
-    window.dispatchEvent(new CustomEvent('salao_sync_data', { detail: { key: 'salaoProfissionais' } }));
+    safeSetItem('salaoProfissionais', JSON.stringify(profs));
+    syncEngine.pushUpdate({ professionals: profs });
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('salao_sync_data', { detail: { key: 'salaoProfissionais' } }));
+    }
   },
 
   getServices(): ServiceItem[] {
-    const saved = localStorage.getItem('salaoServicos');
+    const saved = safeGetItem('salaoServicos');
     return saved ? JSON.parse(saved) : DEFAULT_SERVICES;
   },
   saveServices(services: ServiceItem[]) {
-    localStorage.setItem('salaoServicos', JSON.stringify(services));
-    window.dispatchEvent(new CustomEvent('salao_sync_data', { detail: { key: 'salaoServicos' } }));
+    safeSetItem('salaoServicos', JSON.stringify(services));
+    syncEngine.pushUpdate({ services });
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('salao_sync_data', { detail: { key: 'salaoServicos' } }));
+    }
   },
 
   getClients(): ClientRecord[] {
-    const saved = localStorage.getItem('salaoClientes');
+    const saved = safeGetItem('salaoClientes');
     return saved ? JSON.parse(saved) : DEFAULT_CLIENTS;
   },
   saveClients(clients: ClientRecord[]) {
-    localStorage.setItem('salaoClientes', JSON.stringify(clients));
-    window.dispatchEvent(new CustomEvent('salao_sync_data', { detail: { key: 'salaoClientes' } }));
+    safeSetItem('salaoClientes', JSON.stringify(clients));
+    syncEngine.pushUpdate({ clients });
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('salao_sync_data', { detail: { key: 'salaoClientes' } }));
+    }
   },
 
   async getCatalog(): Promise<Record<CatalogFolder, CatalogMedia[]>> {
@@ -136,20 +180,22 @@ export const Storage = {
   },
 
   getCatalogFolderList(): { key: string; title: string; icon: string }[] | null {
-    const saved = localStorage.getItem('salaoCatalogFolders');
+    const saved = safeGetItem('salaoCatalogFolders');
     return saved ? JSON.parse(saved) : null;
   },
   saveCatalogFolderList(folders: { key: string; title: string; icon: string }[]) {
-    localStorage.setItem('salaoCatalogFolders', JSON.stringify(folders));
-    window.dispatchEvent(new CustomEvent('salao_sync_data', { detail: { key: 'salaoCatalogFolders' } }));
+    safeSetItem('salaoCatalogFolders', JSON.stringify(folders));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('salao_sync_data', { detail: { key: 'salaoCatalogFolders' } }));
+    }
   },
 
   getAdminCredentials(): AdminCredentials {
-    const saved = localStorage.getItem('salaoAdminCredentials');
+    const saved = safeGetItem('salaoAdminCredentials');
     return saved ? JSON.parse(saved) : { email: 'admin@salao.com', phone: '(11) 99999-9999', password: '123456' };
   },
   getAdminCredentialsList(): AdminCredentials[] {
-    const savedList = localStorage.getItem('salaoAdminCredentialsList');
+    const savedList = safeGetItem('salaoAdminCredentialsList');
     const defaultList: AdminCredentials[] = [
       { email: 'admin@salao.com', phone: '(11) 99999-9999', password: '123456', registeredAt: new Date().toISOString() }
     ];
@@ -168,7 +214,7 @@ export const Storage = {
     return list;
   },
   saveAdminCredentials(creds: AdminCredentials) {
-    localStorage.setItem('salaoAdminCredentials', JSON.stringify(creds));
+    safeSetItem('salaoAdminCredentials', JSON.stringify(creds));
     const list = this.getAdminCredentialsList();
     const cleanEmail = creds.email.toLowerCase().trim();
     const existingIndex = list.findIndex(c => c.email.toLowerCase().trim() === cleanEmail);
@@ -177,12 +223,14 @@ export const Storage = {
     } else {
       list.push(creds);
     }
-    localStorage.setItem('salaoAdminCredentialsList', JSON.stringify(list));
-    window.dispatchEvent(new CustomEvent('salao_sync_data', { detail: { key: 'salaoAdminCredentials' } }));
+    safeSetItem('salaoAdminCredentialsList', JSON.stringify(list));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('salao_sync_data', { detail: { key: 'salaoAdminCredentials' } }));
+    }
   },
 
   getAdminPaymentConfig(): AdminPaymentConfig {
-    const saved = localStorage.getItem('salaoAdminPaymentConfig');
+    const saved = safeGetItem('salaoAdminPaymentConfig');
     const defaults: AdminPaymentConfig = {
       chavePix: 'marlon1soares28@gmail.com',
       nomeBeneficiario: 'Agenda+Fácil.Salão Oficial',
@@ -220,12 +268,15 @@ export const Storage = {
     }
   },
   saveAdminPaymentConfig(config: AdminPaymentConfig) {
-    localStorage.setItem('salaoAdminPaymentConfig', JSON.stringify(config));
-    window.dispatchEvent(new CustomEvent('salao_sync_data', { detail: { key: 'salaoAdminPaymentConfig' } }));
+    safeSetItem('salaoAdminPaymentConfig', JSON.stringify(config));
+    syncEngine.pushUpdate({ adminPaymentConfig: config });
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('salao_sync_data', { detail: { key: 'salaoAdminPaymentConfig' } }));
+    }
   },
 
   getSalons(): SalonApp[] {
-    const saved = localStorage.getItem('salaoAppsList');
+    const saved = safeGetItem('salaoAppsList');
     let list: SalonApp[] = saved ? JSON.parse(saved) : DEFAULT_SALON_APPS;
     
     // Normalize any legacy SALAO-100X codes to SALAO-X (e.g. SALAO-1, SALAO-2, ...)
@@ -245,13 +296,16 @@ export const Storage = {
     });
 
     if (changed && saved) {
-      localStorage.setItem('salaoAppsList', JSON.stringify(list));
+      safeSetItem('salaoAppsList', JSON.stringify(list));
     }
     return list;
   },
   saveSalons(salons: SalonApp[]) {
-    localStorage.setItem('salaoAppsList', JSON.stringify(salons));
-    window.dispatchEvent(new CustomEvent('salao_sync_data', { detail: { key: 'salaoAppsList' } }));
+    safeSetItem('salaoAppsList', JSON.stringify(salons));
+    syncEngine.pushUpdate({ salons });
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('salao_sync_data', { detail: { key: 'salaoAppsList' } }));
+    }
   },
   getNextSalonCode(): string {
     const list = this.getSalons();
