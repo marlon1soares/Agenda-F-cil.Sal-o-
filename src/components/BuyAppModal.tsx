@@ -3,6 +3,7 @@ import { SalonApp, SalonConfig, AdminPaymentConfig, UserRole } from '../types';
 import { Storage } from '../utils/storage';
 import { generatePixEMVPayload, generateQrCodeDataUrl } from '../utils/pix';
 import { getCalculatedLicensePlans, getLicensePlanByDays, formatBRL } from '../utils/pricing';
+import { getUrlParam, getPublicAppUrl } from '../utils/url';
 import { 
   ShoppingCart, Check, Sparkles, Mail, User, ShieldCheck, Phone, 
   FileText, Building2, Key, Copy, Clock, Send, CreditCard, QrCode, 
@@ -51,27 +52,26 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       try {
-        const params = new URLSearchParams(window.location.search);
-        const planParam = params.get('plano') || params.get('plan') || params.get('dias');
+        const planParam = getUrlParam('plano') || getUrlParam('plan') || getUrlParam('dias');
         if (planParam) {
           const days = parseInt(planParam, 10);
           if ([30, 90, 180, 365].includes(days)) {
             setPlanDays(days);
           }
         }
-        const salonNameParam = params.get('salao') || params.get('nome_salao') || params.get('salon_name');
+        const salonNameParam = getUrlParam('salao') || getUrlParam('nome_salao') || getUrlParam('salon_name');
         if (salonNameParam && !salonName) {
           setSalonName(decodeURIComponent(salonNameParam));
         }
-        const ownerNameParam = params.get('nome') || params.get('comprador') || params.get('owner');
+        const ownerNameParam = getUrlParam('nome') || getUrlParam('comprador') || getUrlParam('owner');
         if (ownerNameParam && !name) {
           setName(decodeURIComponent(ownerNameParam));
         }
-        const phoneParam = params.get('phone') || params.get('whatsapp') || params.get('telefone') || params.get('celular');
+        const phoneParam = getUrlParam('phone') || getUrlParam('whatsapp') || getUrlParam('telefone') || getUrlParam('celular');
         if (phoneParam && !phone) {
           setPhone(phoneParam);
         }
-        const emailParam = params.get('email');
+        const emailParam = getUrlParam('email');
         if (emailParam && !email) {
           setEmail(emailParam);
         }
@@ -156,6 +156,7 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
           paymentMethod: paymentMethod,
           expiresAt: salon.expiresAt,
           purchaseDate: salon.purchaseDate,
+          appUrl: getPublicAppUrl(),
         })
       });
       const data = await response.json();

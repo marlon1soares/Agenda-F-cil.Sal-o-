@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { AdminPaymentConfig } from '../types';
 import { Storage } from '../utils/storage';
 import { formatBRL, getCalculatedLicensePlans } from '../utils/pricing';
-import { getPublicAppUrl } from '../utils/url';
+import { getPublicAppUrl, buildAppUrl } from '../utils/url';
 import { 
   X, Link2, Copy, Check, Share2, MessageSquare, ExternalLink, 
   Sparkles, Building2, ShieldCheck, CheckCircle2, ShoppingCart,
@@ -63,21 +63,13 @@ export const SalonLinkModal: React.FC<SalonLinkModalProps> = ({
   const cleanPhone = targetPhone.replace(/\D/g, '');
 
   // Build the public link for the salon to purchase license
-  const publicOrigin = getPublicAppUrl();
-  
-  let salonPurchaseUrl = `${publicOrigin}?action=comprar-licenca`;
-  if (selectedPlanDays && selectedPlanDays !== 30) {
-    salonPurchaseUrl += `&plano=${selectedPlanDays}`;
-  }
-  if (targetSalonName.trim()) {
-    salonPurchaseUrl += `&salao=${encodeURIComponent(targetSalonName.trim())}`;
-  }
-  if (targetOwnerName.trim()) {
-    salonPurchaseUrl += `&nome=${encodeURIComponent(targetOwnerName.trim())}`;
-  }
-  if (cleanPhone) {
-    salonPurchaseUrl += `&phone=${cleanPhone}`;
-  }
+  const salonPurchaseUrl = buildAppUrl({
+    action: 'comprar-licenca',
+    plano: selectedPlanDays && selectedPlanDays !== 30 ? selectedPlanDays : undefined,
+    salao: targetSalonName.trim() || undefined,
+    nome: targetOwnerName.trim() || undefined,
+    phone: cleanPhone || undefined,
+  });
 
   // Pre-configured WhatsApp message for salon owner
   const defaultWhatsappMsg = `Olá${targetOwnerName.trim() ? `, *${targetOwnerName.trim()}*` : ''}! 💈✂️\n\n` +

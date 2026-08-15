@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { SalonApp, ClientRecord } from '../types';
 import { getSalonSlug, Storage } from '../utils/storage';
-import { getPublicAppUrl } from '../utils/url';
+import { getPublicAppUrl, buildAppUrl } from '../utils/url';
 import { 
   X, Link2, Copy, Check, Share2, MessageSquare, ExternalLink, 
   Sparkles, UserCheck, ShieldCheck, Scissors, CheckCircle2,
@@ -64,15 +64,12 @@ export const ClientLinkModal: React.FC<ClientLinkModalProps> = ({
 
   // Build client link for this specific salon and client's phone
   const salonSlug = getSalonSlug(activeSalon.config.nomeSalao || activeSalon.name);
-  const publicOrigin = getPublicAppUrl();
-  
-  let clientUrl = `${publicOrigin}?role=cliente&salon=${salonSlug}`;
-  if (cleanPhone) {
-    clientUrl += `&phone=${cleanPhone}`;
-  }
-  if (clientName.trim()) {
-    clientUrl += `&name=${encodeURIComponent(clientName.trim())}`;
-  }
+  const clientUrl = buildAppUrl({
+    role: 'cliente',
+    salon: salonSlug,
+    phone: cleanPhone || undefined,
+    name: clientName.trim() || undefined,
+  });
 
   // Pre-configured WhatsApp message for client
   const defaultWhatsappMsg = `Olá${clientName.trim() ? `, *${clientName.trim()}*` : ''}! 💈✂️\n\n` +

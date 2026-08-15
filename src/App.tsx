@@ -21,20 +21,18 @@ import { Transaction, Appointment, SalonConfig, UserRole, Professional, ServiceI
 import { Storage } from './utils/storage';
 import { syncEngine } from './utils/syncEngine';
 import { DEFAULT_SALON_APPS, DEFAULT_CONFIG } from './data/mockData';
+import { getUrlParam, hasUrlAction } from './utils/url';
 import { LayoutDashboard, CreditCard, Calendar, Users, Scissors, UserCheck } from 'lucide-react';
 
 export function App() {
   // Synchronous URL Parameter Detection for instantaneous role and modal setup
   const [userRole, setUserRole] = useState<UserRole>(() => {
     try {
-      if (typeof window !== 'undefined') {
-        const params = new URLSearchParams(window.location.search);
-        const role = params.get('role');
-        const salon = params.get('salon');
-        if (role === 'cliente' || salon) return 'cliente';
-        if (role === 'salao') return 'salao';
-        if (role === 'admin') return 'admin';
-      }
+      const role = getUrlParam('role');
+      const salon = getUrlParam('salon');
+      if (role === 'cliente' || salon) return 'cliente';
+      if (role === 'salao') return 'salao';
+      if (role === 'admin') return 'admin';
     } catch {}
     return 'admin';
   });
@@ -49,13 +47,10 @@ export function App() {
 
   const [activeSalonId, setActiveSalonId] = useState<string>(() => {
     try {
-      if (typeof window !== 'undefined') {
-        const params = new URLSearchParams(window.location.search);
-        const salonParam = params.get('salon');
-        if (salonParam) {
-          const found = Storage.getSalonBySlugOrCode(salonParam);
-          if (found) return found.id;
-        }
+      const salonParam = getUrlParam('salon');
+      if (salonParam) {
+        const found = Storage.getSalonBySlugOrCode(salonParam);
+        if (found) return found.id;
       }
     } catch {}
     const list = Storage.getSalons();
@@ -84,18 +79,7 @@ export function App() {
   const [isAdminPaymentOpen, setIsAdminPaymentOpen] = useState(false);
   const [isBuyAppOpen, setIsBuyAppOpen] = useState<boolean>(() => {
     try {
-      if (typeof window !== 'undefined') {
-        const params = new URLSearchParams(window.location.search);
-        const actionParam = params.get('action');
-        const comprarParam = params.get('comprar') || params.get('compra') || params.get('licenca') || params.get('buy');
-        return (
-          actionParam === 'comprar-licenca' ||
-          actionParam === 'comprar' ||
-          actionParam === 'comprar_licenca' ||
-          comprarParam === 'true' ||
-          comprarParam === '1'
-        );
-      }
+      return hasUrlAction('comprar-licenca', 'comprar', 'comprar_licenca', 'licenca', 'buy', 'compra');
     } catch {}
     return false;
   });
@@ -109,24 +93,15 @@ export function App() {
 
     const resolveUrlParams = () => {
       try {
-        const params = new URLSearchParams(window.location.search);
-        const actionParam = params.get('action');
-        const comprarParam = params.get('comprar') || params.get('compra') || params.get('licenca') || params.get('buy');
-        const roleParam = params.get('role');
-        const salonParam = params.get('salon');
-        const phoneParam = params.get('phone') || params.get('celular') || params.get('tel');
-        const nameParam = params.get('name') || params.get('nome');
-
-        // If salon license purchase link is accessed, open the purchase license modal immediately
-        if (
-          actionParam === 'comprar-licenca' ||
-          actionParam === 'comprar' ||
-          actionParam === 'comprar_licenca' ||
-          comprarParam === 'true' ||
-          comprarParam === '1'
-        ) {
+        const isBuying = hasUrlAction('comprar-licenca', 'comprar', 'comprar_licenca', 'licenca', 'buy', 'compra');
+        if (isBuying) {
           setIsBuyAppOpen(true);
         }
+
+        const roleParam = getUrlParam('role');
+        const salonParam = getUrlParam('salon');
+        const phoneParam = getUrlParam('phone') || getUrlParam('celular') || getUrlParam('tel');
+        const nameParam = getUrlParam('name') || getUrlParam('nome');
 
         if (phoneParam) {
           try { localStorage.setItem('salao_cliente_phone', phoneParam.replace(/\D/g, '')); } catch {}
@@ -137,6 +112,10 @@ export function App() {
 
         if (roleParam === 'cliente' || salonParam) {
           setUserRole('cliente');
+        } else if (roleParam === 'salao') {
+          setUserRole('salao');
+        } else if (roleParam === 'admin') {
+          setUserRole('admin');
         }
 
         if (salonParam) {

@@ -3,6 +3,7 @@ import { SalonApp, ServiceItem, Professional, Appointment, ClientRecord } from '
 import { Storage } from '../utils/storage';
 import { DEFAULT_TIMESLOTS, DEFAULT_SALON_APPS, DEFAULT_CONFIG } from '../data/mockData';
 import { generatePixEMVPayload, generateQrCodeDataUrl } from '../utils/pix';
+import { getUrlParam } from '../utils/url';
 import { 
   Scissors, Calendar, Clock, User, Phone, CheckCircle2, Building2,
   Sparkles, ArrowRight, ShieldCheck, Heart, MapPin, Share2, Award, ChevronRight, Lock, Image as ImageIcon,
@@ -48,9 +49,8 @@ export const ClientePortalView: React.FC<ClientePortalViewProps> = ({
   // Sync / Detect phone & name from URL params or stored clients
   useEffect(() => {
     try {
-      const params = new URLSearchParams(window.location.search);
-      const phoneParam = params.get('phone') || params.get('celular') || params.get('tel');
-      const nameParam = params.get('name') || params.get('nome');
+      const phoneParam = getUrlParam('phone') || getUrlParam('celular') || getUrlParam('tel');
+      const nameParam = getUrlParam('name') || getUrlParam('nome');
 
       let savedPhone = '';
       let savedName = '';
