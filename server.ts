@@ -105,7 +105,7 @@ app.post("/api/send-purchase-email", async (req, res) => {
       return res.status(400).json({ error: "ownerEmail and purchaseToken are required." });
     }
 
-    const appUrl = clientAppUrl || req.headers.origin || process.env.APP_URL || "https://ais-pre-d346mjayvlc3hoo4qxkj32-769591162576.us-east1.run.app";
+    const appUrl = clientAppUrl || (req.headers.origin && !req.headers.origin.includes('ais-dev-') && !req.headers.origin.includes('run.app') ? req.headers.origin : process.env.APP_URL || "https://agenda-f-cil-sal-o.vercel.app");
     const paymentMethodLabel = paymentMethod === "cartao" ? "Cartão de Crédito" : "Pix Instantâneo";
     const formattedDate = purchaseDate || new Date().toLocaleDateString("pt-BR");
     const formattedExpiry = expiresAt || "Indefinida";

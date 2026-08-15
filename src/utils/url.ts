@@ -1,18 +1,51 @@
+export const DEFAULT_PRODUCTION_URL = 'https://agenda-f-cil-sal-o.vercel.app';
+
 /**
  * Returns the public clean application base URL for sharing with clients, salons and admins.
- * Works seamlessly across Dev preview, Cloud Run, Vercel, Localhost, or custom production domains.
+ * Automatically resolves to the production Vercel URL (https://agenda-f-cil-sal-o.vercel.app)
+ * when running inside dev/preview environments or when configured, ensuring shared links
+ * can be opened by anyone on WhatsApp, Instagram, or external devices without 404 errors.
  */
-export function getPublicAppUrl(): string {
-  if (typeof window === 'undefined') return '';
-  const origin = window.location.origin;
-  const pathname = window.location.pathname || '/';
+export function getPublicAppUrl(useLocalOriginIfAvailable = false): string {
+  if (typeof window === 'undefined') return DEFAULT_PRODUCTION_URL + '/';
 
-  // Ensure clean base URL without query strings or hashes
-  let base = origin + pathname;
-  if (!base.endsWith('/')) {
-    base += '/';
+  if (useLocalOriginIfAvailable) {
+    const origin = window.location.origin;
+    const pathname = window.location.pathname || '/';
+    let base = origin + pathname;
+    if (!base.endsWith('/')) base += '/';
+    return base;
   }
-  return base;
+
+  // 1. Check if custom production URL was explicitly set by user/admin
+  try {
+    const custom = localStorage.getItem('salaoCustomProductionUrl');
+    if (custom && custom.trim().startsWith('http')) {
+      let trimmed = custom.trim();
+      if (!trimmed.endsWith('/')) trimmed += '/';
+      return trimmed;
+    }
+    const paymentConfig = localStorage.getItem('salaoAdminPaymentConfig');
+    if (paymentConfig) {
+      const parsed = JSON.parse(paymentConfig);
+      if (parsed.productionUrl && typeof parsed.productionUrl === 'string' && parsed.productionUrl.trim().startsWith('http')) {
+        let trimmed = parsed.productionUrl.trim();
+        if (!trimmed.endsWith('/')) trimmed += '/';
+        return trimmed;
+      }
+    }
+  } catch {}
+
+  // 2. If running directly on a custom production domain or Vercel
+  const origin = window.location.origin;
+  if (origin.includes('vercel.app')) {
+    let base = origin + (window.location.pathname || '/');
+    if (!base.endsWith('/')) base += '/';
+    return base;
+  }
+
+  // 3. If running in AI Studio sandbox, Cloud Run preview, or localhost, default to the official Vercel app
+  return DEFAULT_PRODUCTION_URL + '/';
 }
 
 /**

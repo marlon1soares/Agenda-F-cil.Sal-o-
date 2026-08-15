@@ -181,6 +181,7 @@ export interface AdminPaymentConfig {
   bancoOuProcessador: string;
   cartaoContaDestino: string;
   instrucoesPagamento?: string;
+  productionUrl?: string; // e.g. https://agenda-f-cil-sal-o.vercel.app
   precoPlano30Dias?: number; // 30 Dias (padrão: 30.00)
   precoPlano90Dias?: number; // 3 Meses (padrão: 75.00)
   precoPlano180Dias?: number; // 6 Meses (padrão: 135.00)

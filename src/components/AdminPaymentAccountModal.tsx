@@ -296,6 +296,28 @@ export const AdminPaymentAccountModal: React.FC<AdminPaymentAccountModalProps> =
               </p>
             </div>
 
+            {/* Public App URL / Vercel Domain */}
+            <div className="space-y-1">
+              <label className="block font-bold text-slate-300 text-[11px] flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-sky-400" />
+                <span>Domínio Público do Aplicativo (Vercel / Site Oficial):</span>
+              </label>
+              <input
+                type="url"
+                value={config.productionUrl || 'https://agenda-f-cil-sal-o.vercel.app'}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setConfig({ ...config, productionUrl: val });
+                  localStorage.setItem('salaoCustomProductionUrl', val);
+                }}
+                placeholder="https://agenda-f-cil-sal-o.vercel.app"
+                className="w-full bg-slate-900 border border-sky-500/50 rounded-xl px-3 py-2 text-white font-mono focus:outline-none focus:border-sky-400 text-xs"
+              />
+              <p className="text-[10px] text-sky-300/80">
+                Garante que todos os links gerados para salões e clientes usem o domínio oficial da Vercel (sem erro 404).
+              </p>
+            </div>
+
             {/* Beneficiary Name */}
             <div className="space-y-1">
               <label className="block font-bold text-slate-300 text-[11px] flex items-center gap-1.5">

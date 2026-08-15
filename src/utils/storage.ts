@@ -237,6 +237,7 @@ export const Storage = {
       bancoOuProcessador: 'Mercado Pago / Pix Instantâneo',
       cartaoContaDestino: 'Conta Principal - Marlon Soares (MP-883921)',
       instrucoesPagamento: 'O valor do cartão ou Pix é creditado diretamente na conta cadastrada pelo Administrador.',
+      productionUrl: 'https://agenda-f-cil-sal-o.vercel.app',
       precoPlano30Dias: 30.00,
       precoPlano90Dias: 75.00,
       precoPlano180Dias: 135.00,
