@@ -91,17 +91,55 @@ export function getUrlParam(key: string): string | null {
 }
 
 /**
- * Checks if a specific action or boolean flag is present in URL
+ * Checks if a specific action or boolean flag is present in URL.
+ * Checks ?action=val, ?acao=val, ?act=val, ?modal=..., ?tab=..., ?role=..., direct boolean flags like ?comprar-licenca,
+ * as well as window.location.hash and window.location.pathname.
  */
 export function hasUrlAction(...actionNames: string[]): boolean {
-  for (const name of actionNames) {
-    const val = getUrlParam(name);
-    if (val !== null && val !== undefined) {
-      if (val === 'true' || val === '1' || val === '' || actionNames.includes(val)) {
+  if (typeof window === 'undefined') return false;
+
+  try {
+    const rawSearch = window.location.search.toLowerCase();
+    const rawHash = window.location.hash.toLowerCase();
+    const rawPath = window.location.pathname.toLowerCase();
+
+    // 1. Direct sub-string check in search or hash
+    for (const name of actionNames) {
+      const lowerName = name.toLowerCase();
+      if (rawSearch.includes(lowerName) || rawHash.includes(lowerName) || rawPath.includes(lowerName)) {
         return true;
       }
     }
+
+    // 2. Check standard URLSearchParams
+    const searchParams = new URLSearchParams(window.location.search);
+    const actionKeys = ['action', 'acao', 'act', 'modal', 'tab', 'open', 'view', 'page', 'role', 'p', 'comprar'];
+    for (const key of actionKeys) {
+      const val = searchParams.get(key);
+      if (val) {
+        const lower = val.toLowerCase().trim();
+        if (actionNames.some(a => a.toLowerCase() === lower || lower.includes(a.toLowerCase()) || a.toLowerCase().includes(lower))) {
+          return true;
+        }
+      }
+    }
+
+    // 3. Check direct parameter flags
+    for (const name of actionNames) {
+      if (searchParams.has(name)) {
+        return true;
+      }
+      const val = getUrlParam(name);
+      if (val !== null && val !== undefined) {
+        if (val === 'true' || val === '1' || val === '' || actionNames.some(a => a.toLowerCase() === val.toLowerCase())) {
+          return true;
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('Error in hasUrlAction:', err);
   }
+
   return false;
 }
 

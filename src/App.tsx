@@ -93,7 +93,7 @@ export function App() {
 
     const resolveUrlParams = () => {
       try {
-        const isBuying = hasUrlAction('comprar-licenca', 'comprar', 'comprar_licenca', 'licenca', 'buy', 'compra');
+        const isBuying = hasUrlAction('comprar-licenca', 'comprar', 'comprar_licenca', 'licenca', 'buy', 'compra', 'contratar');
         if (isBuying) {
           setIsBuyAppOpen(true);
         }
@@ -135,6 +135,10 @@ export function App() {
     // Immediate local resolution
     resolveUrlParams();
 
+    // Listen to browser navigation / URL changes
+    window.addEventListener('popstate', resolveUrlParams);
+    window.addEventListener('hashchange', resolveUrlParams);
+
     // Re-resolve after fetching authoritative server state
     syncEngine.fetchServerState().then((serverState) => {
       if (serverState) {
@@ -152,6 +156,11 @@ export function App() {
         resolveUrlParams();
       }
     });
+
+    return () => {
+      window.removeEventListener('popstate', resolveUrlParams);
+      window.removeEventListener('hashchange', resolveUrlParams);
+    };
   }, []);
 
   // Sync state event listener

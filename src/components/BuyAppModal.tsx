@@ -51,6 +51,8 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
   // Auto-populate from URL query params if opened from a direct salon purchase link
   useEffect(() => {
     if (isOpen) {
+      setStep('form');
+      setError('');
       try {
         const planParam = getUrlParam('plano') || getUrlParam('plan') || getUrlParam('dias');
         if (planParam) {
@@ -446,7 +448,7 @@ Salão: *${createdSalon.name}*
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-50 overflow-y-auto p-2 sm:p-6 flex min-h-full items-start sm:items-center justify-center">
+    <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-[70] overflow-y-auto p-2 sm:p-6 flex min-h-full items-start sm:items-center justify-center">
       <div className="bg-slate-900 border border-slate-700 rounded-3xl w-full max-w-xl text-white shadow-2xl relative my-3 sm:my-auto overflow-hidden animate-in fade-in zoom-in-95 duration-200">
         
         {/* Header Bar */}

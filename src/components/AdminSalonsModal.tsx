@@ -383,11 +383,11 @@ export const AdminSalonsModal: React.FC<AdminSalonsModalProps> = ({
             {onOpenSalonLink && (
               <button
                 onClick={onOpenSalonLink}
-                className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white font-extrabold px-2.5 py-1 rounded-lg text-xs flex items-center gap-1.5 shadow-md transition-all active:scale-95 border border-violet-400/30"
-                title="Criar e enviar link direto de compra de licença para salões de cabeleireiro"
+                className="bg-gradient-to-r from-violet-600 via-purple-600 to-indigo-600 hover:from-violet-500 hover:to-purple-500 text-white font-extrabold px-3.5 py-1.5 rounded-full text-xs flex items-center gap-1.5 shadow-lg shadow-purple-950/50 transition-all active:scale-95 border border-purple-400/50"
+                title="Criar e enviar link direto de compra de licença para o proprietário do salão (WhatsApp ou Copiar)"
               >
-                <Link2 className="w-3.5 h-3.5 text-violet-200" />
-                <span>Link p/ Salões</span>
+                <Link2 className="w-3.5 h-3.5 text-white" />
+                <span className="tracking-tight">Criar Link p/ Salão</span>
               </button>
             )}
 
