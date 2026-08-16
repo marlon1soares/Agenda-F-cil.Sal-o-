@@ -652,7 +652,6 @@ export function App() {
         isOpen={isBuyAppOpen}
         onClose={() => setIsBuyAppOpen(false)}
         userRole={userRole}
-        onOpenAdminPaymentConfig={() => setIsAdminPaymentOpen(true)}
         activeSalon={activeSalon}
         onUpdateSalon={handleUpdateSalon}
         onPurchaseComplete={(newOrUpdatedSalon) => {
@@ -671,7 +670,6 @@ export function App() {
         isOpen={isSalonLinkOpen}
         onClose={() => setIsSalonLinkOpen(false)}
         onOpenBuyApp={() => setIsBuyAppOpen(true)}
-        onOpenAdminPaymentConfig={() => setIsAdminPaymentOpen(true)}
       />
 
       {/* Client Direct Link & WhatsApp Generator Modal */}

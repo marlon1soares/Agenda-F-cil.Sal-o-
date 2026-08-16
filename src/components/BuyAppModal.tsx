@@ -17,7 +17,6 @@ interface BuyAppModalProps {
   onClose: () => void;
   onPurchaseComplete: (newSalon: SalonApp) => void;
   userRole?: UserRole;
-  onOpenAdminPaymentConfig?: () => void;
   activeSalon?: SalonApp | null;
   onUpdateSalon?: (updatedSalon: SalonApp) => void;
 }
@@ -27,7 +26,6 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
   onClose,
   onPurchaseComplete,
   userRole = 'salao',
-  onOpenAdminPaymentConfig,
   activeSalon = null,
   onUpdateSalon,
 }) => {
@@ -168,12 +166,10 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
   const [cardCvv, setCardCvv] = useState('');
   const [cardInstallments, setCardInstallments] = useState('1');
 
-  // Admin Account Settings State (Editable by Admin)
-  const [showAdminAccountSetup, setShowAdminAccountSetup] = useState(false);
+  // Admin Account Settings Config (Read-Only from Storage for Checkout Display)
   const [adminPaymentConfig, setAdminPaymentConfig] = useState<AdminPaymentConfig>(() => 
     Storage.getAdminPaymentConfig()
   );
-  const [saveSuccessMsg, setSaveSuccessMsg] = useState('');
 
   // Created Salon Result & Email Status
   const [createdSalon, setCreatedSalon] = useState<SalonApp | null>(null);
@@ -383,26 +379,6 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
 
     // IF PAID PLAN IS SELECTED (30, 90, 180, 365 Days)
     setStep('payment');
-  };
-
-  // Save Admin Account Settings
-  const handleSaveAdminPaymentConfig = (e: React.FormEvent) => {
-    e.preventDefault();
-    Storage.saveAdminPaymentConfig(adminPaymentConfig);
-    setSaveSuccessMsg('Dados da Conta do Administrador salvos com sucesso!');
-    setTimeout(() => setSaveSuccessMsg(''), 3000);
-
-    if (adminPaymentConfig.chavePix) {
-      const priceVal = getPlanPriceDetails(planDays).numVal;
-      const payload = generatePixEMVPayload(
-        adminPaymentConfig.chavePix,
-        adminPaymentConfig.nomeBeneficiario || 'AGENDA FACIL',
-        'SAO PAULO',
-        priceVal
-      );
-      setPixEmvPayload(payload);
-      generateQrCodeDataUrl(payload).then((url) => setPixQrDataUrl(url));
-    }
   };
 
   // Copy Pix Key
@@ -640,14 +616,7 @@ Salão: *${createdSalon.name}*
       <div className="bg-slate-900 border border-slate-700 rounded-3xl w-full max-w-xl text-white shadow-2xl relative my-3 sm:my-auto overflow-hidden animate-in fade-in zoom-in-95 duration-200">
         
         {/* Header Bar */}
-        <div 
-          onDoubleClick={() => {
-            if (userRole === 'admin' && onOpenAdminPaymentConfig) {
-              onOpenAdminPaymentConfig();
-            }
-          }}
-          className="bg-gradient-to-r from-blue-700 via-indigo-700 to-purple-800 p-5 sm:p-6 text-white flex justify-between items-start select-none"
-        >
+        <div className="bg-gradient-to-r from-blue-700 via-indigo-700 to-purple-800 p-5 sm:p-6 text-white flex justify-between items-start select-none">
           <div>
             <div className="flex items-center gap-2 mb-1 flex-wrap">
               <span className="bg-yellow-400/20 text-yellow-300 border border-yellow-300/40 font-extrabold text-[10px] px-2.5 py-0.5 rounded-full uppercase tracking-wider">
@@ -693,25 +662,9 @@ Salão: *${createdSalon.name}*
                   <Clock className="w-3.5 h-3.5 text-teal-400" />
                   <span>Escolha o Prazo da Licença:</span>
                 </label>
-                {userRole === 'admin' ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (onOpenAdminPaymentConfig) onOpenAdminPaymentConfig();
-                    }}
-                    onDoubleClick={() => {
-                      if (onOpenAdminPaymentConfig) onOpenAdminPaymentConfig();
-                    }}
-                    className="text-[10px] bg-amber-500/20 hover:bg-amber-500/35 text-amber-300 font-extrabold px-2.5 py-0.5 rounded-full border border-amber-500/40 transition-colors flex items-center gap-1 cursor-pointer active:scale-95 shadow-sm"
-                    title="Exclusivo Administrador: 2 cliques para configurar os valores de 30 dias, 3 meses, 6 meses e 1 ano"
-                  >
-                    💡 2 Cliques para Configurar Valores
-                  </button>
-                ) : (
-                  <span className="text-[10px] bg-emerald-500/20 text-emerald-300 font-extrabold px-2 py-0.5 rounded-full border border-emerald-500/30">
-                    Desconto nos planos longos
-                  </span>
-                )}
+                <span className="text-[10px] bg-emerald-500/20 text-emerald-300 font-extrabold px-2.5 py-0.5 rounded-full border border-emerald-500/30">
+                  Economia nos planos estendidos
+                </span>
               </div>
 
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
@@ -729,16 +682,9 @@ Salão: *${createdSalon.name}*
                           setCardInstallments('1');
                         }
                       }}
-                      onDoubleClick={() => {
-                        if (userRole === 'admin' && onOpenAdminPaymentConfig) {
-                          onOpenAdminPaymentConfig();
-                        }
-                      }}
                       title={
                         isDisabledTrial
                           ? 'Período de teste gratuito de 15 dias já foi utilizado por este salão.'
-                          : userRole === 'admin'
-                          ? `${p.label} - ${p.priceStr} (2 cliques para configurar este ou outros valores)`
                           : `${p.label} - ${p.priceStr}`
                       }
                       className={`p-2.5 rounded-2xl border text-center transition-all flex flex-col items-center justify-between select-none ${

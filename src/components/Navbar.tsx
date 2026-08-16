@@ -261,26 +261,30 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </button>
               )}
 
-              {onOpenBuyApp && (
+              {userRole === 'admin' && onOpenBuyApp && (
                 <button
                   type="button"
                   onClick={onOpenBuyApp}
                   onDoubleClick={() => {
-                    if (userRole === 'admin' && onOpenAdminPaymentConfig) {
+                    if (onOpenAdminPaymentConfig) {
                       onOpenAdminPaymentConfig();
                     }
                   }}
-                  title={
-                    userRole === 'admin'
-                      ? `[ADMIN] 1 Clique: Abrir Comprar Aplicativo | 2 Cliques Rápidos: Configurar Valores (30d, 3m, 6m, 1a)`
-                      : `Comprar licença do aplicativo a partir de ${formatBRL(Storage.getAdminPaymentConfig().precoPlano30Dias || 30)}/mês`
-                  }
-                  className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-xs px-3 py-1.5 rounded-xl shadow-md flex items-center gap-1.5 transition-all active:scale-95 border border-emerald-400/40 select-none group"
+                  title="[Exclusivo Administrador] 1 Clique: Abrir Teste de Compra | 2 Cliques: Configurar Valores (30d, 3m, 6m, 1a)"
+                  className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-xs px-3 py-1.5 rounded-xl shadow-md flex items-center gap-1.5 transition-all active:scale-95 border border-emerald-400/40 select-none group cursor-pointer"
                 >
                   <ShoppingCart className="w-3.5 h-3.5 text-yellow-300 group-hover:scale-110 transition-transform" />
                   <span>Comprar Aplicativo</span>
-                  <span className="bg-yellow-400/20 text-yellow-300 font-bold text-[10px] px-1.5 py-0.5 rounded-md border border-yellow-300/30 hidden sm:inline">
-                    {formatBRL(Storage.getAdminPaymentConfig().precoPlano30Dias || 30)}/mês
+                  <span
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (onOpenAdminPaymentConfig) onOpenAdminPaymentConfig();
+                    }}
+                    title="💡 2 Cliques para Configurar Valores (Clique aqui ou 2 cliques no botão para alterar preços)"
+                    className="bg-yellow-400/25 hover:bg-yellow-400/40 text-yellow-300 font-black text-[10px] px-2 py-0.5 rounded-md border border-yellow-300/40 inline-flex items-center gap-1 cursor-pointer transition-colors"
+                  >
+                    <span>{formatBRL(Storage.getAdminPaymentConfig().precoPlano30Dias || 30)}/mês</span>
+                    <span className="text-[9px] font-extrabold text-amber-200 hidden sm:inline">💡 2 Cliques</span>
                   </span>
                 </button>
               )}

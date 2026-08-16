@@ -6,7 +6,6 @@ interface SalonLinkModalProps {
   isOpen: boolean;
   onClose: () => void;
   onOpenBuyApp: () => void;
-  onOpenAdminPaymentConfig?: () => void;
 }
 
 export const SalonLinkModal: React.FC<SalonLinkModalProps> = ({
