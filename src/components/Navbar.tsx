@@ -3,7 +3,7 @@ import { SalonConfig, UserRole, ThemeConfig } from '../types';
 import { THEMES } from '../data/mockData';
 import { Storage } from '../utils/storage';
 import { formatBRL } from '../utils/pricing';
-import { Crown, Scissors, User, Minimize2, Maximize2, Settings, Image as ImageIcon, Sparkles, FolderOpen, ChevronDown, Building2, ShoppingCart, Link2 } from 'lucide-react';
+import { Crown, Scissors, User, Minimize2, Maximize2, Settings, Image as ImageIcon, Sparkles, FolderOpen, ChevronDown, Building2, ShoppingCart, Link2, Key } from 'lucide-react';
 
 interface NavbarProps {
   config: SalonConfig;
@@ -16,6 +16,7 @@ interface NavbarProps {
   onOpenAdminPaymentConfig?: () => void;
   onOpenClientLink?: () => void;
   onOpenSalonLink?: () => void;
+  onOpenSalonAccessLink?: () => void;
   isExpanded: boolean;
   onToggleExpand: () => void;
   isMinimized: boolean;
@@ -33,6 +34,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenAdminPaymentConfig,
   onOpenClientLink,
   onOpenSalonLink,
+  onOpenSalonAccessLink,
   isExpanded,
   onToggleExpand,
   isMinimized,
@@ -250,11 +252,22 @@ export const Navbar: React.FC<NavbarProps> = ({
               {userRole === 'admin' && onOpenSalonLink && (
                 <button
                   onClick={onOpenSalonLink}
-                  title="Criar e enviar link de compra de licença para proprietários de salões de cabeleireiro e barbearias"
-                  className="bg-gradient-to-r from-violet-600 via-purple-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-extrabold text-xs px-3 py-1.5 rounded-xl shadow-md flex items-center gap-1.5 transition-all active:scale-95 border border-violet-400/40 shrink-0"
+                  title="Criar e enviar link de compra de licença para proprietários de salões e barbearias"
+                  className="bg-gradient-to-r from-violet-600 via-purple-600 to-indigo-600 hover:from-violet-500 hover:to-purple-500 text-white font-extrabold text-xs px-3 py-1.5 rounded-xl shadow-md flex items-center gap-1.5 transition-all active:scale-95 border border-violet-400/40 shrink-0 cursor-pointer"
                 >
                   <Link2 className="w-3.5 h-3.5 text-violet-200" />
-                  <span>Criar Link p/ Salão</span>
+                  <span>Criar link de compra/Salão</span>
+                </button>
+              )}
+
+              {userRole === 'admin' && onOpenSalonAccessLink && (
+                <button
+                  onClick={onOpenSalonAccessLink}
+                  title="Criar e enviar link de acesso direto com CPF e Token para o proprietário do salão"
+                  className="bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs px-3.5 py-1.5 rounded-full shadow-md flex items-center gap-1.5 transition-all active:scale-95 border border-emerald-400/40 shrink-0 cursor-pointer"
+                >
+                  <Key className="w-3.5 h-3.5 text-emerald-100" />
+                  <span>Criar link para salão/acesso</span>
                 </button>
               )}
 

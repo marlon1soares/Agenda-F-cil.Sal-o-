@@ -15,6 +15,7 @@ import { ClientePortalView } from './components/ClientePortalView';
 import { AdminPaymentAccountModal } from './components/AdminPaymentAccountModal';
 import { ClientLinkModal } from './components/ClientLinkModal';
 import { SalonLinkModal } from './components/SalonLinkModal';
+import { SalonAccessLinkModal } from './components/SalonAccessLinkModal';
 import { SalonAuthModal } from './components/SalonAuthModal';
 
 import { Transaction, Appointment, SalonConfig, UserRole, Professional, ServiceItem, ClientRecord, SalonApp } from './types';
@@ -93,7 +94,12 @@ export function App() {
   const [isCatalogOpen, setIsCatalogOpen] = useState(false);
   const [isConfigOpen, setIsConfigOpen] = useState(false);
   const [isAdminAuthOpen, setIsAdminAuthOpen] = useState(false);
-  const [isSalonAuthOpen, setIsSalonAuthOpen] = useState(false);
+  const [isSalonAuthOpen, setIsSalonAuthOpen] = useState<boolean>(() => {
+    try {
+      return hasUrlAction('acesso-salao', 'acesso', 'login-salao', 'acessar-salao');
+    } catch {}
+    return false;
+  });
   const [isAdminSalonsOpen, setIsAdminSalonsOpen] = useState(false);
   const [isAdminPaymentOpen, setIsAdminPaymentOpen] = useState(false);
   const [isBuyAppOpen, setIsBuyAppOpen] = useState<boolean>(() => {
@@ -104,6 +110,7 @@ export function App() {
   });
   const [isClientLinkOpen, setIsClientLinkOpen] = useState(false);
   const [isSalonLinkOpen, setIsSalonLinkOpen] = useState(false);
+  const [isSalonAccessLinkOpen, setIsSalonAccessLinkOpen] = useState(false);
 
   // Initialize Real-time synchronization and detect URL parameters
   useEffect(() => {
@@ -115,6 +122,12 @@ export function App() {
         const isBuying = hasUrlAction('comprar-licenca', 'comprar', 'comprar_licenca', 'licenca', 'buy', 'compra', 'contratar');
         if (isBuying) {
           setIsBuyAppOpen(true);
+        }
+
+        const isAccessLink = hasUrlAction('acesso-salao', 'acesso', 'login-salao', 'acessar-salao');
+        if (isAccessLink) {
+          setIsSalonAuthOpen(true);
+          setUserRole('salao');
         }
 
         const roleParam = getUrlParam('role');
@@ -480,6 +493,7 @@ export function App() {
           onOpenAdminPaymentConfig={() => setIsAdminPaymentOpen(true)}
           onOpenClientLink={() => setIsClientLinkOpen(true)}
           onOpenSalonLink={() => setIsSalonLinkOpen(true)}
+          onOpenSalonAccessLink={() => setIsSalonAuthOpen(true)}
           isExpanded={isExpanded}
           onToggleExpand={() => setIsExpanded(!isExpanded)}
           isMinimized={isMinimized}
@@ -509,10 +523,19 @@ export function App() {
                     <button
                       onClick={() => setIsSalonLinkOpen(true)}
                       className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white font-extrabold text-xs px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 shadow-sm border border-violet-400/30 active:scale-95"
-                      title="Gerar e enviar link de compra de licença para donos de salão"
+                      title="Gerar e enviar link de compra/salão para donos de salão"
                     >
-                      <Link2 className="w-3.5 h-3.5 text-violet-200" />
-                      <span>Enviar Link p/ Salão</span>
+                      <ShoppingCart className="w-3.5 h-3.5 text-violet-200" />
+                      <span>Criar link de compra/Salão</span>
+                    </button>
+
+                    <button
+                      onClick={() => setIsSalonAuthOpen(true)}
+                      className="bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs px-3.5 py-1.5 rounded-full transition-all flex items-center gap-1.5 shadow-sm border border-emerald-400/40 active:scale-95 cursor-pointer"
+                      title="Abrir tela e criar link de acesso ao salão com CPF e Token"
+                    >
+                      <Key className="w-3.5 h-3.5 text-white" />
+                      <span>Criar link para salão/acesso</span>
                     </button>
 
                     <button
@@ -939,6 +962,7 @@ export function App() {
         onDeleteSalon={handleDeleteSalon}
         onOpenPaymentConfig={() => setIsAdminPaymentOpen(true)}
         onOpenSalonLink={() => setIsSalonLinkOpen(true)}
+        onOpenSalonAccessLink={() => setIsSalonAuthOpen(true)}
         onOpenAdminAuth={() => setIsAdminAuthOpen(true)}
       />
 
@@ -955,6 +979,7 @@ export function App() {
         userRole={userRole}
         activeSalon={activeSalon}
         onUpdateSalon={handleUpdateSalon}
+        onOpenSalonAuth={() => setIsSalonAuthOpen(true)}
         onPurchaseComplete={(newOrUpdatedSalon) => {
           const currentList = Storage.getSalons();
           const exists = currentList.some(s => s.id === newOrUpdatedSalon.id);
@@ -971,6 +996,13 @@ export function App() {
         isOpen={isSalonLinkOpen}
         onClose={() => setIsSalonLinkOpen(false)}
         onOpenBuyApp={() => setIsBuyAppOpen(true)}
+      />
+
+      {/* Salon Direct Access Link Generator Modal for Admins */}
+      <SalonAccessLinkModal
+        isOpen={isSalonAccessLinkOpen}
+        onClose={() => setIsSalonAccessLinkOpen(false)}
+        onOpenSalonAuth={() => setIsSalonAuthOpen(true)}
       />
 
       {/* Client Direct Link & WhatsApp Generator Modal */}

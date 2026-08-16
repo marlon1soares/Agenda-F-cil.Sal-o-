@@ -4,12 +4,12 @@ import { Storage } from '../utils/storage';
 import { generatePixEMVPayload, generateQrCodeDataUrl } from '../utils/pix';
 import { getCalculatedLicensePlans, getLicensePlanByDays, formatBRL } from '../utils/pricing';
 import { checkTrialEligibility } from '../utils/license';
-import { getUrlParam, getPublicAppUrl } from '../utils/url';
+import { getUrlParam, getPublicAppUrl, buildAppUrl } from '../utils/url';
 import { 
   ShoppingCart, Check, Sparkles, Mail, User, ShieldCheck, Phone, 
   FileText, Building2, Key, Copy, Clock, Send, CreditCard, QrCode, 
   ArrowLeft, Settings, Lock, CheckCircle2, DollarSign, Wallet, MapPin, Map, Hash, Search,
-  Maximize2, X, RefreshCw, AlertTriangle, CheckCircle
+  Maximize2, X, RefreshCw, AlertTriangle, CheckCircle, Link2, ExternalLink
 } from 'lucide-react';
 
 interface BuyAppModalProps {
@@ -19,6 +19,7 @@ interface BuyAppModalProps {
   userRole?: UserRole;
   activeSalon?: SalonApp | null;
   onUpdateSalon?: (updatedSalon: SalonApp) => void;
+  onOpenSalonAuth?: () => void;
 }
 
 export const BuyAppModal: React.FC<BuyAppModalProps> = ({
@@ -28,6 +29,7 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
   userRole = 'salao',
   activeSalon = null,
   onUpdateSalon,
+  onOpenSalonAuth,
 }) => {
   const [step, setStep] = useState<'form' | 'payment' | 'success'>('form');
   
@@ -158,13 +160,13 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
   const [pixEmvPayload, setPixEmvPayload] = useState<string>('');
   const [copiedPixEmv, setCopiedPixEmv] = useState(false);
   const [isZoomingQr, setIsZoomingQr] = useState(false);
-  
+
   // Credit Card Form State
   const [cardNumber, setCardNumber] = useState('');
   const [cardHolder, setCardHolder] = useState('');
   const [cardExpiry, setCardExpiry] = useState('');
   const [cardCvv, setCardCvv] = useState('');
-  const [cardInstallments, setCardInstallments] = useState('1');
+  const [cardInstallments, setCardInstallments] = useState(1);
 
   // Admin Account Settings Config (Read-Only from Storage for Checkout Display)
   const [adminPaymentConfig, setAdminPaymentConfig] = useState<AdminPaymentConfig>(() => 
@@ -175,6 +177,7 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
   const [createdSalon, setCreatedSalon] = useState<SalonApp | null>(null);
   const [copiedToken, setCopiedToken] = useState(false);
   const [copiedCpf, setCopiedCpf] = useState(false);
+  const [copiedAccessLink, setCopiedAccessLink] = useState(false);
   const [copiedAllInfo, setCopiedAllInfo] = useState(false);
   const [emailStatusMsg, setEmailStatusMsg] = useState<string>('');
   const [isSendingEmail, setIsSendingEmail] = useState<boolean>(false);
@@ -520,6 +523,14 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
     }, 1500);
   };
 
+  const salonAccessUrl = buildAppUrl({ action: 'acesso-salao' });
+
+  const handleCopyAccessLink = () => {
+    navigator.clipboard.writeText(salonAccessUrl);
+    setCopiedAccessLink(true);
+    setTimeout(() => setCopiedAccessLink(false), 2000);
+  };
+
   const handleCopyToken = () => {
     if (createdSalon) {
       navigator.clipboard.writeText(createdSalon.purchaseToken);
@@ -546,14 +557,16 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
 📧 E-mail: ${createdSalon.ownerEmail}
 🎫 Token de Acesso (Senha): ${createdSalon.purchaseToken}
 
+🔗 *Link de Acesso Direto:*
+👉 ${salonAccessUrl}
+
 📅 Data da Compra: ${createdSalon.purchaseDate}
 ⏳ Validade da Licença: ${createdSalon.planDays} Dias (Até ${createdSalon.expiresAt})
 
 🚀 *Passo a Passo de Acesso:*
-1. Abra o aplicativo no seu navegador.
-2. Clique em "Acessar Painel do Salão" ou "Entrar".
-3. Digite seu CPF (${createdSalon.ownerCpf}) e o Token (${createdSalon.purchaseToken}).
-4. Acesse seu painel para gerenciar serviços, equipe e agendamentos!`;
+1. Abra o Link de Acesso: ${salonAccessUrl}
+2. Digite seu CPF (${createdSalon.ownerCpf}) e o Token (${createdSalon.purchaseToken}).
+3. Pronto! Acesse seu painel para gerenciar serviços, equipe e agendamentos!`;
 
     navigator.clipboard.writeText(infoText);
     setCopiedAllInfo(true);
@@ -568,6 +581,7 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
 Seu pagamento foi confirmado e a licença do seu aplicativo está liberada!
 
 SUAS CREDENCIAIS OFICIAIS DE ACESSO:
+- Link de Acesso: ${salonAccessUrl}
 - Login (CPF do Proprietário): ${createdSalon.ownerCpf}
 - E-mail: ${createdSalon.ownerEmail}
 - Token de Acesso (Senha): ${createdSalon.purchaseToken}
@@ -579,10 +593,9 @@ DADOS DA COMPRA:
 - Término do Plano (Vencimento): Até ${createdSalon.expiresAt}
 
 PASSO A PASSO PARA ACESSAR:
-1. Abra o aplicativo no navegador.
-2. Clique no botão "Acessar Painel do Salão".
-3. Digite seu CPF (${createdSalon.ownerCpf}) e seu Token (${createdSalon.purchaseToken}).
-4. Pronto! Configure seu salão e comece a receber agendamentos.
+1. Abra o link: ${salonAccessUrl}
+2. Digite seu CPF (${createdSalon.ownerCpf}) e seu Token (${createdSalon.purchaseToken}).
+3. Pronto! Configure seu salão e comece a receber agendamentos.
 
 Guarde este e-mail para consultas futuras.`);
 
@@ -594,15 +607,18 @@ Guarde este e-mail para consultas futuras.`);
     const msg = `🎉 *COMPRA CONFIRMADA - AGENDA FÁCIL*
 Salão: *${createdSalon.name}*
 
+🔗 *Link de Acesso:*
+👉 ${salonAccessUrl}
+
 🔑 *Credenciais de Acesso:*
 - Login (CPF): *${createdSalon.ownerCpf}*
 - Token de Acesso: *${createdSalon.purchaseToken}*
 - Vigência: *${createdSalon.planDays} Dias* (Até ${createdSalon.expiresAt})
 
 🚀 *Como Acessar:*
-1. Clique no botão "Acessar Painel do Salão"
-2. Informe o CPF e Token acima
-3. Comece a usar o sistema!`;
+1. Abra o link de acesso acima
+2. Informe o CPF e Token de Licença
+3. Comece a usar o sistema imediatamente!`;
 
     const cleanPhone = (createdSalon.ownerPhone || '').replace(/\D/g, '');
     const url = cleanPhone 
@@ -1282,7 +1298,7 @@ Salão: *${createdSalon.name}*
               )}
             </div>
 
-            {/* Token & Login Display Box (CPF + TOKEN) */}
+            {/* Token & Login Display Box (CPF + TOKEN + ACCESS LINK) */}
             <div className="bg-slate-950 p-4 rounded-2xl border-2 border-emerald-500/50 max-w-md mx-auto text-left relative overflow-hidden shadow-2xl space-y-3">
               <div className="flex items-center justify-between border-b border-slate-800 pb-2">
                 <span className="text-xs font-black text-amber-300 flex items-center gap-1.5 uppercase tracking-wide">
@@ -1292,6 +1308,40 @@ Salão: *${createdSalon.name}*
                 <span className="bg-emerald-500/20 text-emerald-300 text-[10px] font-mono px-2 py-0.5 rounded-full font-bold border border-emerald-500/30">
                   Licença Ativa ✓
                 </span>
+              </div>
+
+              {/* Link de Acesso Direto */}
+              <div className="bg-gradient-to-r from-teal-950/80 to-emerald-950/80 p-3 rounded-xl border border-teal-500/50 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] text-teal-300 font-black uppercase flex items-center gap-1">
+                    <Link2 className="w-3.5 h-3.5 text-teal-400" />
+                    <span>LINK DE ACESSO AO SEU SALÃO:</span>
+                  </span>
+                  {copiedAccessLink && (
+                    <span className="text-[10px] font-bold text-emerald-400 flex items-center gap-1 animate-pulse">
+                      <Check className="w-3 h-3" /> Copiado!
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="text"
+                    readOnly
+                    value={salonAccessUrl}
+                    className="w-full bg-slate-900/90 border border-teal-600/40 rounded-lg px-2.5 py-1.5 text-xs text-teal-100 font-mono select-all"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleCopyAccessLink}
+                    className="bg-teal-600 hover:bg-teal-500 text-white font-black text-xs px-2.5 py-1.5 rounded-lg flex items-center gap-1 shrink-0 transition-all active:scale-95 cursor-pointer shadow"
+                  >
+                    <Copy className="w-3 h-3" />
+                    <span>{copiedAccessLink ? 'Copiado!' : 'Copiar'}</span>
+                  </button>
+                </div>
+                <p className="text-[10px] text-teal-200/90">
+                  💡 Guarde este link para entrar no seu salão sempre que quiser.
+                </p>
               </div>
 
               {/* Login CPF */}
@@ -1308,7 +1358,7 @@ Salão: *${createdSalon.name}*
                 <button
                   type="button"
                   onClick={handleCopyCpf}
-                  className="bg-slate-800 hover:bg-slate-700 text-sky-300 text-[11px] font-bold px-2.5 py-1.5 rounded-lg border border-slate-700 transition-colors flex items-center gap-1 shrink-0"
+                  className="bg-slate-800 hover:bg-slate-700 text-sky-300 text-[11px] font-bold px-2.5 py-1.5 rounded-lg border border-slate-700 transition-colors flex items-center gap-1 shrink-0 cursor-pointer"
                 >
                   <Copy className="w-3 h-3" />
                   <span>{copiedCpf ? 'Copiado!' : 'Copiar CPF'}</span>
@@ -1326,7 +1376,7 @@ Salão: *${createdSalon.name}*
                 <button
                   type="button"
                   onClick={handleCopyToken}
-                  className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold px-3 py-1.5 rounded-lg text-xs flex items-center justify-center gap-1 shadow transition-all active:scale-95 shrink-0"
+                  className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold px-3 py-1.5 rounded-lg text-xs flex items-center justify-center gap-1 shadow transition-all active:scale-95 shrink-0 cursor-pointer"
                 >
                   <Copy className="w-3 h-3" />
                   <span>{copiedToken ? 'Token Copiado!' : 'Copiar Token'}</span>
@@ -1451,11 +1501,16 @@ Salão: *${createdSalon.name}*
 
             {/* Primary Action Button to Enter System */}
             <button
-              onClick={onClose}
-              className="w-full max-w-md bg-blue-600 hover:bg-blue-500 text-white font-black py-3 rounded-2xl text-xs sm:text-sm shadow-xl transition-all flex items-center justify-center gap-2 active:scale-95 mx-auto"
+              onClick={() => {
+                onClose();
+                if (onOpenSalonAuth) {
+                  onOpenSalonAuth();
+                }
+              }}
+              className="w-full max-w-md bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3.5 rounded-2xl text-xs sm:text-sm shadow-xl shadow-emerald-950/50 transition-all flex items-center justify-center gap-2 active:scale-95 mx-auto cursor-pointer"
             >
-              <CheckCircle2 className="w-4 h-4 text-emerald-300" />
-              <span>Concluir e Entrar no Painel do Salão</span>
+              <CheckCircle2 className="w-4 h-4 text-white" />
+              <span>Entrar no Painel do Salão (CPF + Token)</span>
             </button>
 
           </div>
