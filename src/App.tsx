@@ -24,12 +24,24 @@ import { DEFAULT_SALON_APPS, DEFAULT_CONFIG } from './data/mockData';
 import { getUrlParam, hasUrlAction } from './utils/url';
 import { getSalonLicenseInfo } from './utils/license';
 import { BlockedLicenseBanner } from './components/BlockedLicenseBanner';
-import { LayoutDashboard, CreditCard, Calendar, Users, Scissors, UserCheck } from 'lucide-react';
+import { LayoutDashboard, CreditCard, Calendar, Users, Scissors, UserCheck, LogOut, RotateCcw, ShieldCheck } from 'lucide-react';
 
 export function App() {
+  // Check if opened via dedicated direct purchase / activation link
+  const isDirectPurchaseUrl = (() => {
+    try {
+      return hasUrlAction('comprar-licenca', 'comprar', 'comprar_licenca', 'licenca', 'buy', 'compra', 'contratar');
+    } catch {}
+    return false;
+  })();
+
+  const [isPageClosed, setIsPageClosed] = useState(false);
+
   // Synchronous URL Parameter Detection for instantaneous role and modal setup
   const [userRole, setUserRole] = useState<UserRole>(() => {
     try {
+      const isBuying = hasUrlAction('comprar-licenca', 'comprar', 'comprar_licenca', 'licenca', 'buy', 'compra', 'contratar');
+      if (isBuying) return 'salao';
       const role = getUrlParam('role');
       const salon = getUrlParam('salon');
       if (role === 'cliente' || salon) return 'cliente';
@@ -341,6 +353,91 @@ export function App() {
   // Active Salon & License Status
   const activeSalon = salons.find(s => s.id === activeSalonId) || salons[0];
   const licenseInfo = getSalonLicenseInfo(activeSalon);
+
+  // Standalone Direct Purchase Mode (when link with ?action=comprar-licenca is opened)
+  if (isDirectPurchaseUrl) {
+    if (isPageClosed || !isBuyAppOpen) {
+      return (
+        <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 text-slate-100 font-sans select-none">
+          <div className="bg-slate-900 border border-slate-800 p-6 sm:p-8 rounded-3xl max-w-md w-full text-center shadow-2xl space-y-6">
+            <div className="w-16 h-16 bg-slate-800/80 rounded-2xl border border-slate-700/80 mx-auto flex items-center justify-center text-rose-400 shadow-inner">
+              <LogOut className="w-8 h-8" />
+            </div>
+
+            <div className="space-y-2">
+              <span className="bg-rose-500/15 text-rose-300 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wider border border-rose-500/30">
+                Página Finalizada
+              </span>
+              <h2 className="text-xl font-black text-white">
+                Sessão de Compra Encerrada
+              </h2>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Você saiu do formulário de aquisição de licença. Para sua segurança e privacidade, o sistema foi finalizado e você já pode fechar esta aba no seu navegador.
+              </p>
+            </div>
+
+            <div className="pt-2 space-y-2.5">
+              <button
+                type="button"
+                onClick={() => {
+                  try {
+                    window.close();
+                    window.open('', '_self', '');
+                    window.close();
+                  } catch {}
+                }}
+                className="w-full bg-rose-600 hover:bg-rose-500 text-white font-extrabold py-3.5 px-4 rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg transition-all active:scale-95 cursor-pointer"
+              >
+                <LogOut className="w-4 h-4" />
+                <span>Fechar Esta Aba / Janela</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsPageClosed(false);
+                  setIsBuyAppOpen(true);
+                }}
+                className="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 font-bold py-3 px-4 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Reabrir Tela de Contratação / 15 Dias Grátis</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="min-h-screen bg-slate-950 font-sans text-slate-800 p-2 sm:p-6 flex items-center justify-center">
+        <BuyAppModal
+          isOpen={isBuyAppOpen}
+          onClose={() => {
+            try {
+              window.close();
+              window.open('', '_self', '');
+              window.close();
+            } catch {}
+            setIsBuyAppOpen(false);
+            setIsPageClosed(true);
+          }}
+          userRole="salao"
+          activeSalon={activeSalon}
+          onUpdateSalon={handleUpdateSalon}
+          onPurchaseComplete={(newOrUpdatedSalon) => {
+            const currentList = Storage.getSalons();
+            const exists = currentList.some(s => s.id === newOrUpdatedSalon.id);
+            if (exists) {
+              handleUpdateSalon(newOrUpdatedSalon);
+            } else {
+              handleCreateSalon(newOrUpdatedSalon);
+            }
+          }}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className={`min-h-screen bg-slate-950 font-sans text-slate-800 transition-all flex flex-col ${isExpanded ? 'p-0' : 'p-2 sm:p-6'}`}>

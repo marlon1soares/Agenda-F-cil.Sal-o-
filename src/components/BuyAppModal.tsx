@@ -638,10 +638,19 @@ Salão: *${createdSalon.name}*
           </div>
 
           <button
-            onClick={onClose}
-            className="text-white/80 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors"
+            type="button"
+            onClick={() => {
+              try {
+                window.close();
+                window.open('', '_self', '');
+                window.close();
+              } catch (e) {}
+              onClose();
+            }}
+            title="Fechar / Sair da Página"
+            className="text-white/80 hover:text-white p-1.5 rounded-xl hover:bg-white/15 transition-all cursor-pointer active:scale-95 flex items-center justify-center"
           >
-            ✕
+            <X className="w-5 h-5" />
           </button>
         </div>
 
