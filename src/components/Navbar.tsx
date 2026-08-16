@@ -265,7 +265,16 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <button
                   type="button"
                   onClick={onOpenBuyApp}
-                  title={`Comprar licença do aplicativo a partir de ${formatBRL(Storage.getAdminPaymentConfig().precoPlano30Dias || 30)}/mês`}
+                  onDoubleClick={() => {
+                    if (userRole === 'admin' && onOpenAdminPaymentConfig) {
+                      onOpenAdminPaymentConfig();
+                    }
+                  }}
+                  title={
+                    userRole === 'admin'
+                      ? `[ADMIN] 1 Clique: Abrir Comprar Aplicativo | 2 Cliques Rápidos: Configurar Valores (30d, 3m, 6m, 1a)`
+                      : `Comprar licença do aplicativo a partir de ${formatBRL(Storage.getAdminPaymentConfig().precoPlano30Dias || 30)}/mês`
+                  }
                   className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-xs px-3 py-1.5 rounded-xl shadow-md flex items-center gap-1.5 transition-all active:scale-95 border border-emerald-400/40 select-none group"
                 >
                   <ShoppingCart className="w-3.5 h-3.5 text-yellow-300 group-hover:scale-110 transition-transform" />

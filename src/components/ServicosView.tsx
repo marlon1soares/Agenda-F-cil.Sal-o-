@@ -103,7 +103,7 @@ export const ServicosView: React.FC<ServicosViewProps> = ({
                     {srv.durationMinutes} min
                   </td>
                   <td className="p-3 text-center font-extrabold text-emerald-600 text-sm">
-                    R$ {srv.price.toFixed(2)}
+                    R$ {(Number(srv.price) || 0).toFixed(2)}
                   </td>
                   <td className="p-3 text-center">
                     <button

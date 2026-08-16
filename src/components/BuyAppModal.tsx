@@ -3,12 +3,13 @@ import { SalonApp, SalonConfig, AdminPaymentConfig, UserRole } from '../types';
 import { Storage } from '../utils/storage';
 import { generatePixEMVPayload, generateQrCodeDataUrl } from '../utils/pix';
 import { getCalculatedLicensePlans, getLicensePlanByDays, formatBRL } from '../utils/pricing';
+import { checkTrialEligibility } from '../utils/license';
 import { getUrlParam, getPublicAppUrl } from '../utils/url';
 import { 
   ShoppingCart, Check, Sparkles, Mail, User, ShieldCheck, Phone, 
   FileText, Building2, Key, Copy, Clock, Send, CreditCard, QrCode, 
   ArrowLeft, Settings, Lock, CheckCircle2, DollarSign, Wallet, MapPin, Map, Hash, Search,
-  Maximize2, X, RefreshCw
+  Maximize2, X, RefreshCw, AlertTriangle, CheckCircle
 } from 'lucide-react';
 
 interface BuyAppModalProps {
@@ -17,6 +18,8 @@ interface BuyAppModalProps {
   onPurchaseComplete: (newSalon: SalonApp) => void;
   userRole?: UserRole;
   onOpenAdminPaymentConfig?: () => void;
+  activeSalon?: SalonApp | null;
+  onUpdateSalon?: (updatedSalon: SalonApp) => void;
 }
 
 export const BuyAppModal: React.FC<BuyAppModalProps> = ({
@@ -25,6 +28,8 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
   onPurchaseComplete,
   userRole = 'salao',
   onOpenAdminPaymentConfig,
+  activeSalon = null,
+  onUpdateSalon,
 }) => {
   const [step, setStep] = useState<'form' | 'payment' | 'success'>('form');
   
@@ -35,7 +40,7 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [salonName, setSalonName] = useState('');
-  const [planDays, setPlanDays] = useState<number>(30); // Default 30 days (R$ 19,90)
+  const [planDays, setPlanDays] = useState<number>(15); // Default 15 days free trial for new users
   
   // Address State
   const [cep, setCep] = useState('');
@@ -48,17 +53,56 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
 
   const [error, setError] = useState('');
 
-  // Auto-populate from URL query params if opened from a direct salon purchase link
+  // Check if current salon/context has already used the 15-day trial
+  const isTrialAlreadyUsed = Boolean(
+    activeSalon && (
+      activeSalon.isTrial ||
+      activeSalon.planDays === 15 ||
+      activeSalon.trialStartedAt ||
+      activeSalon.status === 'blocked' ||
+      activeSalon.status === 'expired'
+    )
+  );
+
+  // Auto-populate from URL query params or activeSalon if opened from a direct link / renewal
   useEffect(() => {
     if (isOpen) {
       setStep('form');
       setError('');
+
+      if (activeSalon) {
+        setName(activeSalon.ownerName || '');
+        setRg(activeSalon.ownerRg || '');
+        setCpf(activeSalon.ownerCpf || '');
+        setEmail(activeSalon.ownerEmail || '');
+        setPhone(activeSalon.ownerPhone || '');
+        setSalonName(activeSalon.name || '');
+        setCep(activeSalon.cep || '');
+        setLogradouro(activeSalon.logradouro || '');
+        setNumero(activeSalon.numero || '');
+        setBairro(activeSalon.bairro || '');
+        setCidade(activeSalon.cidade || '');
+        setUf(activeSalon.uf || '');
+
+        if (isTrialAlreadyUsed) {
+          setPlanDays(30);
+        } else {
+          setPlanDays(15);
+        }
+      } else {
+        setPlanDays(15);
+      }
+
       try {
         const planParam = getUrlParam('plano') || getUrlParam('plan') || getUrlParam('dias');
         if (planParam) {
           const days = parseInt(planParam, 10);
-          if ([30, 90, 180, 365].includes(days)) {
-            setPlanDays(days);
+          if ([15, 30, 90, 180, 365].includes(days)) {
+            if (days === 15 && isTrialAlreadyUsed) {
+              setPlanDays(30);
+            } else {
+              setPlanDays(days);
+            }
           }
         }
         const salonNameParam = getUrlParam('salao') || getUrlParam('nome_salao') || getUrlParam('salon_name');
@@ -81,7 +125,7 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
         // silence URL parsing error
       }
     }
-  }, [isOpen]);
+  }, [isOpen, activeSalon]);
 
   // Auto-fill CEP via ViaCEP
   const handleCepChange = async (val: string) => {
@@ -175,13 +219,23 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
     }
   };
 
+  // Plan Price Helper based on Admin's configured prices
+  const availablePlans = getCalculatedLicensePlans(adminPaymentConfig);
+
+  const getPlanPriceDetails = (days: number) => {
+    return getLicensePlanByDays(days, adminPaymentConfig);
+  };
+
+  const currentPlan = getPlanPriceDetails(planDays);
+
   useEffect(() => {
     if (isOpen) {
       const cfg = Storage.getAdminPaymentConfig();
       setAdminPaymentConfig(cfg);
 
       if (cfg.chavePix) {
-        const priceVal = getPlanPriceDetails(planDays).numVal;
+        const plan = getLicensePlanByDays(planDays, cfg);
+        const priceVal = plan?.numVal || 30;
         const payload = generatePixEMVPayload(
           cfg.chavePix,
           cfg.nomeBeneficiario || 'AGENDA FACIL',
@@ -199,16 +253,7 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
 
   if (!isOpen) return null;
 
-  // Plan Price Helper based on Admin's configured prices
-  const availablePlans = getCalculatedLicensePlans(adminPaymentConfig);
-
-  const getPlanPriceDetails = (days: number) => {
-    return getLicensePlanByDays(days, adminPaymentConfig);
-  };
-
-  const currentPlan = getPlanPriceDetails(planDays);
-
-  // Advance from Step 1 (Buyer Form) to Step 2 (Payment Page)
+  // Advance from Step 1 (Buyer Form) to Step 2 (Payment Page) or Activate 15-Day Free Trial
   const handleProceedToPayment = (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -226,7 +271,7 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
       return;
     }
     if (!email.trim() || !email.includes('@')) {
-      setError('Informe um e-mail válido para receber o token.');
+      setError('Informe um e-mail válido para receber o acesso.');
       return;
     }
     if (!phone.trim()) {
@@ -237,11 +282,106 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
       setError('Informe o nome do seu salão de beleza ou barbearia.');
       return;
     }
+    if (!cep.trim()) {
+      setError('Informe o CEP do salão.');
+      return;
+    }
     if (!cidade.trim() || !uf.trim()) {
-      setError('Informe a Cidade e o Estado (UF) para mapeamento da compra.');
+      setError('Informe a Cidade e o Estado (UF) do estabelecimento.');
+      return;
+    }
+    if (!logradouro.trim() || !numero.trim() || !bairro.trim()) {
+      setError('Informe o endereço completo (Rua, Número e Bairro) do estabelecimento.');
       return;
     }
 
+    // IF 15-DAY FREE TRIAL IS SELECTED
+    if (planDays === 15) {
+      const eligibility = checkTrialEligibility(
+        {
+          cpf,
+          rg,
+          phone,
+          email,
+          cep,
+          logradouro,
+          numero
+        },
+        activeSalon?.id
+      );
+
+      if (!eligibility.eligible) {
+        setError(
+          `⚠️ Não foi possível ativar o teste gratuito: ${eligibility.reason}\n\nO período de 15 dias gratuitos é concedido estritamente 1 única vez por proprietário e endereço. Para desbloquear e usar o sistema, selecione um dos planos de licença (30 Dias, 3 Meses, 6 Meses ou 1 Ano).`
+        );
+        return;
+      }
+
+      // Activate Free Trial Immediately (No Payment Required)
+      setIsProcessing(true);
+      setTimeout(() => {
+        const today = new Date();
+        const purchaseDate = today.toISOString().split('T')[0];
+        const expDate = new Date();
+        expDate.setDate(expDate.getDate() + 15);
+        const expiresAt = expDate.toISOString().split('T')[0];
+
+        const appCode = Storage.getNextSalonCode();
+        const randomNum = Math.floor(1000 + Math.random() * 9000);
+        const tokenCleanName = salonName.replace(/[^a-zA-Z0-9]/g, '').slice(0, 6).toUpperCase();
+        const purchaseToken = `TOK-${tokenCleanName || 'SALÃO'}-${randomNum}`;
+
+        const initialConfig: SalonConfig = {
+          nomeSalao: salonName.trim(),
+          logoUrl: '',
+          bgHeaderUrl: '',
+          temaKey: 'azul',
+          corCustom: '#2563eb',
+          profs: [
+            { id: `prof-p1`, nome: name.split(' ')[0] || 'Profissional 1', porc: 70 },
+            { id: `prof-p2`, nome: 'Auxiliar', porc: 30 }
+          ]
+        };
+
+        const newSalon: SalonApp = {
+          id: `salon-${Date.now()}`,
+          name: salonName.trim(),
+          ownerName: name.trim(),
+          ownerEmail: email.trim(),
+          ownerPhone: phone.trim(),
+          ownerRg: rg.trim(),
+          ownerCpf: cpf.trim(),
+          cep: cep.trim(),
+          logradouro: logradouro.trim(),
+          numero: numero.trim(),
+          bairro: bairro.trim(),
+          cidade: cidade.trim(),
+          uf: uf.trim().toUpperCase(),
+          createdAt: purchaseDate,
+          purchaseDate: purchaseDate,
+          expiresAt: expiresAt,
+          planDays: 15,
+          isTrial: true,
+          trialStartedAt: purchaseDate,
+          status: 'trial',
+          appCode: appCode,
+          purchaseToken: purchaseToken,
+          emailSentAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          config: initialConfig
+        };
+
+        setCreatedSalon(newSalon);
+        onPurchaseComplete(newSalon);
+        setIsProcessing(false);
+        setStep('success');
+
+        sendEmailNotification(newSalon, 'Grátis (15 Dias de Teste)');
+      }, 1000);
+
+      return;
+    }
+
+    // IF PAID PLAN IS SELECTED (30, 90, 180, 365 Days)
     setStep('payment');
   };
 
@@ -280,7 +420,7 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
     setTimeout(() => setCopiedPixEmv(false), 2500);
   };
 
-  // Finalize Payment & Create App
+  // Finalize Payment & Activate / Renew App
   const handleFinalizePayment = () => {
     if (paymentMethod === 'cartao') {
       if (!cardNumber.trim() || !cardHolder.trim() || !cardExpiry.trim() || !cardCvv.trim()) {
@@ -296,63 +436,111 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
       const today = new Date();
       const purchaseDate = today.toISOString().split('T')[0];
       
-      // Expiration calculation
+      // Expiration calculation: runs for the full purchased period starting from payment day
       const expDate = new Date();
       expDate.setDate(expDate.getDate() + planDays);
       const expiresAt = expDate.toISOString().split('T')[0];
 
-      // Generate sequential salon code (SALAO-1, SALAO-2, ...) and security token
-      const appCode = Storage.getNextSalonCode();
-      const randomNum = Math.floor(1000 + Math.random() * 9000);
-      const tokenCleanName = salonName.replace(/[^a-zA-Z0-9]/g, '').slice(0, 6).toUpperCase();
-      const purchaseToken = `TOK-${tokenCleanName || 'SALÃO'}-${randomNum}`;
+      const currentSalons = Storage.getSalons();
+      const cleanReqCpf = cpf.replace(/\D/g, '').trim();
 
-      const initialConfig: SalonConfig = {
-        nomeSalao: salonName.trim(),
-        logoUrl: '',
-        bgHeaderUrl: '',
-        temaKey: 'azul',
-        corCustom: '#2563eb',
-        profs: [
-          { id: `prof-p1`, nome: name.split(' ')[0] || 'Profissional 1', porc: 70 },
-          { id: `prof-p2`, nome: 'Auxiliar', porc: 30 }
-        ]
-      };
-
-      const newSalon: SalonApp = {
-        id: `salon-${Date.now()}`,
-        name: salonName.trim(),
-        ownerName: name.trim(),
-        ownerEmail: email.trim(),
-        ownerPhone: phone.trim(),
-        ownerRg: rg.trim(),
-        ownerCpf: cpf.trim(),
-        cep: cep.trim(),
-        logradouro: logradouro.trim(),
-        numero: numero.trim(),
-        bairro: bairro.trim(),
-        cidade: cidade.trim(),
-        uf: uf.trim().toUpperCase(),
-        createdAt: purchaseDate,
-        purchaseDate: purchaseDate,
-        expiresAt: expiresAt,
-        planDays: planDays,
-        status: 'pending_approval',
-        appCode: appCode,
-        purchaseToken: purchaseToken,
-        emailSentAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        config: initialConfig
-      };
+      // Check if we are unblocking/renewing an existing salon
+      const existingSalon = activeSalon || currentSalons.find(s => {
+        const sCpf = (s.ownerCpf || '').replace(/\D/g, '').trim();
+        return sCpf && sCpf === cleanReqCpf;
+      });
 
       const currentPlanDetails = getPlanPriceDetails(planDays);
 
-      setCreatedSalon(newSalon);
-      onPurchaseComplete(newSalon);
-      setIsProcessing(false);
-      setStep('success');
+      if (existingSalon) {
+        // Unblock and activate existing salon with paid period
+        const updatedSalon: SalonApp = {
+          ...existingSalon,
+          name: salonName.trim() || existingSalon.name,
+          ownerName: name.trim() || existingSalon.ownerName,
+          ownerEmail: email.trim() || existingSalon.ownerEmail,
+          ownerPhone: phone.trim() || existingSalon.ownerPhone,
+          ownerRg: rg.trim() || existingSalon.ownerRg,
+          ownerCpf: cpf.trim() || existingSalon.ownerCpf,
+          cep: cep.trim() || existingSalon.cep,
+          logradouro: logradouro.trim() || existingSalon.logradouro,
+          numero: numero.trim() || existingSalon.numero,
+          bairro: bairro.trim() || existingSalon.bairro,
+          cidade: cidade.trim() || existingSalon.cidade,
+          uf: (uf.trim() || existingSalon.uf || 'SP').toUpperCase(),
+          status: 'active',
+          isTrial: false,
+          planDays: planDays,
+          purchaseDate: purchaseDate,
+          expiresAt: expiresAt,
+          emailSentAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        };
 
-      // Dispatch Email Notification with Login & Token
-      sendEmailNotification(newSalon, currentPlanDetails.priceStr);
+        if (onUpdateSalon) {
+          onUpdateSalon(updatedSalon);
+        } else {
+          const updatedList = currentSalons.map(s => s.id === updatedSalon.id ? updatedSalon : s);
+          Storage.saveSalons(updatedList);
+        }
+
+        setCreatedSalon(updatedSalon);
+        onPurchaseComplete(updatedSalon);
+        setIsProcessing(false);
+        setStep('success');
+
+        sendEmailNotification(updatedSalon, currentPlanDetails.priceStr);
+      } else {
+        // Generate sequential salon code (SALAO-1, SALAO-2, ...) and security token
+        const appCode = Storage.getNextSalonCode();
+        const randomNum = Math.floor(1000 + Math.random() * 9000);
+        const tokenCleanName = salonName.replace(/[^a-zA-Z0-9]/g, '').slice(0, 6).toUpperCase();
+        const purchaseToken = `TOK-${tokenCleanName || 'SALÃO'}-${randomNum}`;
+
+        const initialConfig: SalonConfig = {
+          nomeSalao: salonName.trim(),
+          logoUrl: '',
+          bgHeaderUrl: '',
+          temaKey: 'azul',
+          corCustom: '#2563eb',
+          profs: [
+            { id: `prof-p1`, nome: name.split(' ')[0] || 'Profissional 1', porc: 70 },
+            { id: `prof-p2`, nome: 'Auxiliar', porc: 30 }
+          ]
+        };
+
+        const newSalon: SalonApp = {
+          id: `salon-${Date.now()}`,
+          name: salonName.trim(),
+          ownerName: name.trim(),
+          ownerEmail: email.trim(),
+          ownerPhone: phone.trim(),
+          ownerRg: rg.trim(),
+          ownerCpf: cpf.trim(),
+          cep: cep.trim(),
+          logradouro: logradouro.trim(),
+          numero: numero.trim(),
+          bairro: bairro.trim(),
+          cidade: cidade.trim(),
+          uf: uf.trim().toUpperCase(),
+          createdAt: purchaseDate,
+          purchaseDate: purchaseDate,
+          expiresAt: expiresAt,
+          planDays: planDays,
+          isTrial: false,
+          status: 'active',
+          appCode: appCode,
+          purchaseToken: purchaseToken,
+          emailSentAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          config: initialConfig
+        };
+
+        setCreatedSalon(newSalon);
+        onPurchaseComplete(newSalon);
+        setIsProcessing(false);
+        setStep('success');
+
+        sendEmailNotification(newSalon, currentPlanDetails.priceStr);
+      }
     }, 1500);
   };
 
@@ -452,7 +640,14 @@ Salão: *${createdSalon.name}*
       <div className="bg-slate-900 border border-slate-700 rounded-3xl w-full max-w-xl text-white shadow-2xl relative my-3 sm:my-auto overflow-hidden animate-in fade-in zoom-in-95 duration-200">
         
         {/* Header Bar */}
-        <div className="bg-gradient-to-r from-blue-700 via-indigo-700 to-purple-800 p-5 sm:p-6 text-white flex justify-between items-start select-none">
+        <div 
+          onDoubleClick={() => {
+            if (userRole === 'admin' && onOpenAdminPaymentConfig) {
+              onOpenAdminPaymentConfig();
+            }
+          }}
+          className="bg-gradient-to-r from-blue-700 via-indigo-700 to-purple-800 p-5 sm:p-6 text-white flex justify-between items-start select-none"
+        >
           <div>
             <div className="flex items-center gap-2 mb-1 flex-wrap">
               <span className="bg-yellow-400/20 text-yellow-300 border border-yellow-300/40 font-extrabold text-[10px] px-2.5 py-0.5 rounded-full uppercase tracking-wider">
@@ -498,41 +693,87 @@ Salão: *${createdSalon.name}*
                   <Clock className="w-3.5 h-3.5 text-teal-400" />
                   <span>Escolha o Prazo da Licença:</span>
                 </label>
-                <span className="text-[10px] bg-emerald-500/20 text-emerald-300 font-extrabold px-2 py-0.5 rounded-full border border-emerald-500/30">
-                  Desconto nos planos longos
-                </span>
-              </div>
-
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                {availablePlans.map((p) => (
+                {userRole === 'admin' ? (
                   <button
-                    key={p.days}
                     type="button"
                     onClick={() => {
-                      setPlanDays(p.days);
-                      setCardInstallments('1');
+                      if (onOpenAdminPaymentConfig) onOpenAdminPaymentConfig();
                     }}
-                    title={`${p.label} - ${p.priceStr}`}
-                    className={`p-2.5 rounded-2xl border text-center transition-all flex flex-col items-center justify-between select-none ${
-                      planDays === p.days
-                        ? 'bg-blue-600/30 border-blue-500 text-white font-extrabold ring-1 ring-blue-500 shadow-md'
-                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
-                    }`}
+                    onDoubleClick={() => {
+                      if (onOpenAdminPaymentConfig) onOpenAdminPaymentConfig();
+                    }}
+                    className="text-[10px] bg-amber-500/20 hover:bg-amber-500/35 text-amber-300 font-extrabold px-2.5 py-0.5 rounded-full border border-amber-500/40 transition-colors flex items-center gap-1 cursor-pointer active:scale-95 shadow-sm"
+                    title="Exclusivo Administrador: 2 cliques para configurar os valores de 30 dias, 3 meses, 6 meses e 1 ano"
                   >
-                    <div>
-                      <span className="block text-xs font-black">{p.label}</span>
-                      <span className="block text-[11px] font-bold text-emerald-400 mt-0.5">{p.priceStr}</span>
-                      <span className="block text-[9px] text-slate-400 mb-1">{p.detail}</span>
-                    </div>
-                    <span className={`inline-block text-[8px] font-extrabold px-1.5 py-0.5 rounded-full border ${
-                      p.days >= 180
-                        ? 'bg-emerald-950/80 text-emerald-300 border-emerald-500/40'
-                        : 'bg-slate-900 text-amber-300 border-amber-500/30'
-                    }`}>
-                      {p.tag}
-                    </span>
+                    💡 2 Cliques para Configurar Valores
                   </button>
-                ))}
+                ) : (
+                  <span className="text-[10px] bg-emerald-500/20 text-emerald-300 font-extrabold px-2 py-0.5 rounded-full border border-emerald-500/30">
+                    Desconto nos planos longos
+                  </span>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+                {availablePlans.map((p) => {
+                  const isDisabledTrial = p.days === 15 && isTrialAlreadyUsed;
+
+                  return (
+                    <button
+                      key={p.days}
+                      type="button"
+                      disabled={isDisabledTrial}
+                      onClick={() => {
+                        if (!isDisabledTrial) {
+                          setPlanDays(p.days);
+                          setCardInstallments('1');
+                        }
+                      }}
+                      onDoubleClick={() => {
+                        if (userRole === 'admin' && onOpenAdminPaymentConfig) {
+                          onOpenAdminPaymentConfig();
+                        }
+                      }}
+                      title={
+                        isDisabledTrial
+                          ? 'Período de teste gratuito de 15 dias já foi utilizado por este salão.'
+                          : userRole === 'admin'
+                          ? `${p.label} - ${p.priceStr} (2 cliques para configurar este ou outros valores)`
+                          : `${p.label} - ${p.priceStr}`
+                      }
+                      className={`p-2.5 rounded-2xl border text-center transition-all flex flex-col items-center justify-between select-none ${
+                        isDisabledTrial
+                          ? 'bg-slate-950/50 border-slate-800/60 text-slate-600 opacity-60 cursor-not-allowed'
+                          : planDays === p.days
+                          ? p.days === 15
+                            ? 'bg-blue-600/30 border-blue-400 text-white font-extrabold ring-2 ring-blue-400 shadow-md'
+                            : 'bg-emerald-600/30 border-emerald-500 text-white font-extrabold ring-2 ring-emerald-500 shadow-md'
+                          : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
+                      }`}
+                    >
+                      <div>
+                        <span className="block text-xs font-black">{p.label}</span>
+                        <span className={`block text-[11px] font-bold mt-0.5 ${
+                          p.days === 15 ? 'text-sky-400' : 'text-emerald-400'
+                        }`}>
+                          {p.priceStr}
+                        </span>
+                        <span className="block text-[9px] text-slate-400 mb-1">{p.detail}</span>
+                      </div>
+                      <span className={`inline-block text-[8px] font-extrabold px-1.5 py-0.5 rounded-full border ${
+                        isDisabledTrial
+                          ? 'bg-slate-900 text-slate-500 border-slate-800'
+                          : p.days === 15
+                          ? 'bg-sky-950/90 text-sky-300 border-sky-500/40'
+                          : p.days >= 180
+                          ? 'bg-emerald-950/80 text-emerald-300 border-emerald-500/40'
+                          : 'bg-slate-900 text-amber-300 border-amber-500/30'
+                      }`}>
+                        {isDisabledTrial ? 'Já Utilizado' : p.tag}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
@@ -723,14 +964,34 @@ Salão: *${createdSalon.name}*
               />
             </div>
 
-            {/* Submit to Payment */}
-            <button
-              type="submit"
-              className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3 rounded-2xl text-xs sm:text-sm shadow-xl transition-all flex items-center justify-center gap-2 active:scale-95 mt-2"
-            >
-              <span>Avançar para Tela de Pagamento ({currentPlan.priceStr})</span>
-              <Sparkles className="w-4 h-4" />
-            </button>
+            {/* Submit to Payment or Free Trial Activation */}
+            {planDays === 15 ? (
+              <button
+                type="submit"
+                disabled={isProcessing}
+                className="w-full bg-gradient-to-r from-blue-600 via-indigo-600 to-sky-600 hover:from-blue-500 hover:to-indigo-500 text-white font-black py-3.5 px-4 rounded-2xl text-xs sm:text-sm shadow-xl shadow-blue-950/60 border border-blue-400/50 flex items-center justify-center gap-2 transition-all active:scale-95 mt-2 cursor-pointer"
+              >
+                {isProcessing ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span>Ativando seu teste gratuito...</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4 text-amber-300 animate-pulse" />
+                    <span>🚀 Iniciar Teste Gratuito de 15 Dias (Sem Custo)</span>
+                  </>
+                )}
+              </button>
+            ) : (
+              <button
+                type="submit"
+                className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3 rounded-2xl text-xs sm:text-sm shadow-xl transition-all flex items-center justify-center gap-2 active:scale-95 mt-2 cursor-pointer"
+              >
+                <span>Avançar para Tela de Pagamento ({currentPlan.priceStr})</span>
+                <CreditCard className="w-4 h-4 text-yellow-300" />
+              </button>
+            )}
 
           </form>
         )}
@@ -982,11 +1243,11 @@ Salão: *${createdSalon.name}*
                       ) : (
                         <>
                           <option value="1">1x de {currentPlan.priceStr} (À vista - Sem juros)</option>
-                          <option value="2">2x de R$ {(currentPlan.numVal / 2).toFixed(2).replace('.', ',')} (Sem juros)</option>
-                          <option value="3">3x de R$ {(currentPlan.numVal / 3).toFixed(2).replace('.', ',')} (Sem juros)</option>
-                          <option value="4">4x de R$ {((currentPlan.numVal * 1.05) / 4).toFixed(2).replace('.', ',')} (c/ juros)</option>
-                          <option value="5">5x de R$ {((currentPlan.numVal * 1.07) / 5).toFixed(2).replace('.', ',')} (c/ juros)</option>
-                          <option value="6">6x de R$ {((currentPlan.numVal * 1.09) / 6).toFixed(2).replace('.', ',')} (c/ juros)</option>
+                          <option value="2">2x de R$ {((currentPlan.numVal || 0) / 2).toFixed(2).replace('.', ',')} (Sem juros)</option>
+                          <option value="3">3x de R$ {((currentPlan.numVal || 0) / 3).toFixed(2).replace('.', ',')} (Sem juros)</option>
+                          <option value="4">4x de R$ {(((currentPlan.numVal || 0) * 1.05) / 4).toFixed(2).replace('.', ',')} (c/ juros)</option>
+                          <option value="5">5x de R$ {(((currentPlan.numVal || 0) * 1.07) / 5).toFixed(2).replace('.', ',')} (c/ juros)</option>
+                          <option value="6">6x de R$ {(((currentPlan.numVal || 0) * 1.09) / 6).toFixed(2).replace('.', ',')} (c/ juros)</option>
                         </>
                       )}
                     </select>
@@ -1039,15 +1300,31 @@ Salão: *${createdSalon.name}*
             </div>
 
             <div>
-              <span className="bg-emerald-500/20 text-emerald-300 text-[10px] font-black px-3 py-0.5 rounded-full uppercase tracking-wider border border-emerald-500/40">
-                Pagamento Confirmado & Licença Ativada
-              </span>
-              <h3 className="text-lg sm:text-xl font-black text-white mt-1">
-                Parabéns! Seu Salão Está Liberado
-              </h3>
-              <p className="text-slate-300 text-xs mt-0.5 max-w-md mx-auto">
-                O pagamento de <strong className="text-emerald-400 font-bold">{currentPlan.priceStr}</strong> foi confirmado com sucesso.
-              </p>
+              {createdSalon?.isTrial ? (
+                <>
+                  <span className="bg-sky-500/20 text-sky-300 text-[10px] font-black px-3 py-0.5 rounded-full uppercase tracking-wider border border-sky-500/40">
+                    🎉 Teste Gratuito de 15 Dias Ativado!
+                  </span>
+                  <h3 className="text-lg sm:text-xl font-black text-white mt-1">
+                    Parabéns! Seu Salão Está Liberado Gratuitamente
+                  </h3>
+                  <p className="text-slate-300 text-xs mt-0.5 max-w-md mx-auto">
+                    Aproveite os próximos <strong>15 dias de teste grátis</strong> para gerenciar agendamentos, clientes e profissionais. A partir do 16º dia, o sistema solicitará a escolha de um plano para continuar.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <span className="bg-emerald-500/20 text-emerald-300 text-[10px] font-black px-3 py-0.5 rounded-full uppercase tracking-wider border border-emerald-500/40">
+                    Pagamento Confirmado & Licença Ativada
+                  </span>
+                  <h3 className="text-lg sm:text-xl font-black text-white mt-1">
+                    Parabéns! Seu Salão Está Liberado
+                  </h3>
+                  <p className="text-slate-300 text-xs mt-0.5 max-w-md mx-auto">
+                    A licença de <strong>{createdSalon?.planDays} dias</strong> foi ativada com sucesso. O sistema funcionará continuamente até o vencimento.
+                  </p>
+                </>
+              )}
             </div>
 
             {/* Token & Login Display Box (CPF + TOKEN) */}

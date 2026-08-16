@@ -41,10 +41,10 @@ export const AdminPaymentAccountModal: React.FC<AdminPaymentAccountModalProps> =
   const handleRecalculateFrom30 = () => {
     const base = Number(p30Input.replace(',', '.')) || 30;
     const defaults = calculateDefaultPricesFromBase(base);
-    setP30Input(String(defaults.p30.toFixed(2)));
-    setP90Input(String(defaults.p90.toFixed(2)));
-    setP180Input(String(defaults.p180.toFixed(2)));
-    setP365Input(String(defaults.p365.toFixed(2)));
+    setP30Input(String((defaults.p30 || 30).toFixed(2)));
+    setP90Input(String((defaults.p90 || 75).toFixed(2)));
+    setP180Input(String((defaults.p180 || 135).toFixed(2)));
+    setP365Input(String((defaults.p365 || 240).toFixed(2)));
   };
 
   const handleBase30Change = (val: string) => {
@@ -52,9 +52,9 @@ export const AdminPaymentAccountModal: React.FC<AdminPaymentAccountModalProps> =
     const parsed = Number(val.replace(',', '.'));
     if (!isNaN(parsed) && parsed > 0) {
       const defaults = calculateDefaultPricesFromBase(parsed);
-      setP90Input(String(defaults.p90.toFixed(2)));
-      setP180Input(String(defaults.p180.toFixed(2)));
-      setP365Input(String(defaults.p365.toFixed(2)));
+      setP90Input(String((defaults.p90 || 75).toFixed(2)));
+      setP180Input(String((defaults.p180 || 135).toFixed(2)));
+      setP365Input(String((defaults.p365 || 240).toFixed(2)));
     }
   };
 
@@ -84,7 +84,7 @@ export const AdminPaymentAccountModal: React.FC<AdminPaymentAccountModalProps> =
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-[70] flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
+    <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-[80] flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
       <div className="bg-slate-900 border-2 border-amber-500/60 rounded-3xl w-full max-w-xl text-white shadow-2xl relative my-auto overflow-hidden animate-in fade-in zoom-in-95 duration-200">
         
         {/* Header */}

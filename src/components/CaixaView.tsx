@@ -209,7 +209,7 @@ export const CaixaView: React.FC<CaixaViewProps> = ({
                       {tx.paymentMethod}
                     </td>
                     <td className="p-3 text-center font-bold text-slate-900">
-                      R$ {tx.grossAmount.toFixed(2)}
+                      R$ {(Number(tx.grossAmount) || 0).toFixed(2)}
                     </td>
                     <td className="p-3 text-center text-rose-600 font-semibold">
                       {tx.cardFeePercent > 0 ? `${tx.cardFeePercent}%` : '-'}
@@ -221,7 +221,7 @@ export const CaixaView: React.FC<CaixaViewProps> = ({
                       const amount = comm ? comm.amount : (tx.netAmount * (p.porc / 100));
                       return (
                         <td key={p.nome} className="p-3 text-center font-bold text-emerald-600">
-                          R$ {amount.toFixed(2)}
+                          R$ {(Number(amount) || 0).toFixed(2)}
                         </td>
                       );
                     })}
@@ -247,10 +247,10 @@ export const CaixaView: React.FC<CaixaViewProps> = ({
           <div>
             TOTAL DO DIA ({filteredTransactions.length} procedimentos):{' '}
             <span className="text-orange-600 font-extrabold text-sm ml-1">
-              R$ {totalGross.toFixed(2)}
+              R$ {(Number(totalGross) || 0).toFixed(2)}
             </span>
             <span className="text-slate-500 font-normal text-[11px] ml-2">
-              (Líquido: R$ {totalNet.toFixed(2)})
+              (Líquido: R$ {(Number(totalNet) || 0).toFixed(2)})
             </span>
           </div>
 
@@ -259,7 +259,7 @@ export const CaixaView: React.FC<CaixaViewProps> = ({
             {profCommissionTotals.map(p => (
               <div key={p.name} className="bg-white px-2.5 py-1 rounded-lg border border-slate-200 text-[11px]">
                 <span className="text-slate-500">{p.name}: </span>
-                <span className="text-emerald-600 font-extrabold">R$ {p.totalAmount.toFixed(2)}</span>
+                <span className="text-emerald-600 font-extrabold">R$ {(Number(p.totalAmount) || 0).toFixed(2)}</span>
               </div>
             ))}
           </div>

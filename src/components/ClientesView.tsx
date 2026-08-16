@@ -127,7 +127,7 @@ A mensagem deve confirmar um agendamento ou convidá-la para um novo atendimento
 
               <div className="bg-slate-50 p-2 rounded-lg text-center">
                 <span className="text-[10px] text-slate-400 font-bold uppercase">Total Gasto</span>
-                <div className="font-extrabold text-emerald-600">R$ {cli.totalSpent.toFixed(2)}</div>
+                <div className="font-extrabold text-emerald-600">R$ {(Number(cli.totalSpent) || 0).toFixed(2)}</div>
               </div>
 
               <div className="bg-slate-50 p-2 rounded-lg text-center">

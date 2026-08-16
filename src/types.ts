@@ -145,10 +145,12 @@ export interface SalonApp {
   createdAt: string;
   purchaseDate?: string;
   expiresAt?: string;
-  planDays?: number; // Days valid (e.g., 30, 90, 365, 9999 for vitalicio)
-  status: 'pending_approval' | 'active' | 'expired' | 'blocked';
+  planDays?: number; // Days valid (e.g., 15 for trial, 30, 90, 180, 365)
+  isTrial?: boolean; // Indicates if this salon was registered as a 15-day free trial
+  trialStartedAt?: string; // Date when 15 days free trial started
+  status: 'pending_approval' | 'active' | 'trial' | 'expired' | 'blocked';
   appCode: string;
-  purchaseToken: string; // Token generated on purchase, acts as buyer's password
+  purchaseToken: string; // Token generated on purchase or trial, acts as buyer's password
   emailSentAt?: string;
   config: SalonConfig;
 }

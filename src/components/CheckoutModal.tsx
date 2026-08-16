@@ -528,7 +528,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                           </>
                         ) : (
                           <>
-                            <Copy className="w-4 h-4" /> Copiar Código Pix "Copia e Cola" (R$ {subtotal.toFixed(2)})
+                            <Copy className="w-4 h-4" /> Copiar Código Pix "Copia e Cola" (R$ {(Number(subtotal) || 0).toFixed(2)})
                           </>
                         )}
                       </button>

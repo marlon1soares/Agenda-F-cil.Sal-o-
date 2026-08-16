@@ -179,7 +179,7 @@ export const ClientePortalView: React.FC<ClientePortalViewProps> = ({
       `📅 *Data:* ${lastAppointment.date} às ${lastAppointment.timeSlot}\n` +
       `✂️ *Serviço:* ${lastAppointment.serviceName}\n` +
       `👤 *Profissional:* ${lastAppointment.professionalName}\n` +
-      `💰 *Valor:* R$ ${lastAppointment.price.toFixed(2)}\n` +
+      `💰 *Valor:* R$ ${(Number(lastAppointment.price) || 0).toFixed(2)}\n` +
       `🙋‍♂️ *Cliente:* ${lastAppointment.clientName} (${lastAppointment.clientPhone})`;
     
     window.open(`https://api.whatsapp.com/send?phone=55${activeSalon.ownerPhone.replace(/\D/g, '')}&text=${encodeURIComponent(msg)}`, '_blank');
@@ -273,7 +273,7 @@ export const ClientePortalView: React.FC<ClientePortalViewProps> = ({
 
                       <div className="text-right">
                         <span className="text-sm font-black text-emerald-400 block">
-                          R$ {srv.price.toFixed(2)}
+                          R$ {(Number(srv.price) || 0).toFixed(2)}
                         </span>
                         {isSelected && (
                           <span className="bg-rose-500 text-white text-[9px] font-bold px-2 py-0.5 rounded-full inline-block mt-1">
@@ -478,7 +478,7 @@ export const ClientePortalView: React.FC<ClientePortalViewProps> = ({
                   </span>
                   <div className="flex justify-between text-white font-bold">
                     <span>{selectedService.name}</span>
-                    <span className="text-emerald-400">R$ {selectedService.price.toFixed(2)}</span>
+                    <span className="text-emerald-400">R$ {(Number(selectedService.price) || 0).toFixed(2)}</span>
                   </div>
                   <div className="text-slate-400 text-[11px] flex items-center gap-2">
                     <span>📅 {selectedDate} às {selectedTime}</span>
@@ -530,7 +530,7 @@ export const ClientePortalView: React.FC<ClientePortalViewProps> = ({
               </div>
               <div>
                 <span className="text-slate-500 block text-[10px]">Valor:</span>
-                <span className="font-black text-emerald-400">R$ {lastAppointment?.price.toFixed(2)}</span>
+                <span className="font-black text-emerald-400">R$ {(Number(lastAppointment?.price) || 0).toFixed(2)}</span>
               </div>
               <div>
                 <span className="text-slate-500 block text-[10px]">Data e Horário:</span>
@@ -663,7 +663,7 @@ export const ClientePortalView: React.FC<ClientePortalViewProps> = ({
                 </div>
 
                 <div className="text-sm font-black text-emerald-400">
-                  R$ {lastAppointment?.price.toFixed(2)}
+                  R$ {(Number(lastAppointment?.price) || 0).toFixed(2)}
                 </div>
 
                 <div className="bg-white p-3 rounded-2xl inline-block mx-auto border border-purple-400">

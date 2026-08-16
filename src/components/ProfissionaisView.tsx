@@ -132,7 +132,7 @@ export const ProfissionaisView: React.FC<ProfissionaisViewProps> = ({
                 <div className="bg-emerald-50/70 p-2.5 rounded-xl border border-emerald-100">
                   <span className="text-[10px] text-emerald-800 font-bold uppercase">Acumulado Hoje</span>
                   <div className="text-sm font-black text-emerald-700 mt-0.5">
-                    R$ {earningsToday.toFixed(2)}
+                    R$ {(Number(earningsToday) || 0).toFixed(2)}
                   </div>
                 </div>
               </div>

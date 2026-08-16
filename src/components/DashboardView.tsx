@@ -76,9 +76,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     setAiInsight(null);
     try {
       const prompt = `Faça uma análise rápida dos dados financeiros de hoje do salão "${config.nomeSalao}":
-- Faturamento Bruto de Hoje: R$ ${totalRevenueToday.toFixed(2)}
+- Faturamento Bruto de Hoje: R$ ${(Number(totalRevenueToday) || 0).toFixed(2)}
 - Quantidade de Lançamentos: ${totalServicesToday}
-- Comissões da Equipe: R$ ${totalCommissionsToday.toFixed(2)}
+- Comissões da Equipe: R$ ${(Number(totalCommissionsToday) || 0).toFixed(2)}
 - Agendamentos Hoje: ${bookedCount} pendentes, ${completedCount} concluídos.
 
 Dê 3 recomendações curtas e motivadoras para o administrador melhorar o faturamento e a gestão do salão hoje.`;
@@ -112,7 +112,7 @@ Dê 3 recomendações curtas e motivadoras para o administrador melhorar o fatur
           <div>
             <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Faturamento Hoje</span>
             <div className="text-2xl font-black text-slate-900 mt-1 font-display">
-              R$ {totalRevenueToday.toFixed(2)}
+              R$ {(Number(totalRevenueToday) || 0).toFixed(2)}
             </div>
             <div className="text-[11px] font-semibold text-emerald-600 flex items-center gap-1 mt-1">
               <TrendingUp className="w-3.5 h-3.5" /> {totalServicesToday} procedimento(s)
@@ -128,7 +128,7 @@ Dê 3 recomendações curtas e motivadoras para o administrador melhorar o fatur
           <div>
             <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Líquido do Salão</span>
             <div className="text-2xl font-black text-emerald-600 mt-1 font-display">
-              R$ {totalNetToday.toFixed(2)}
+              R$ {(Number(totalNetToday) || 0).toFixed(2)}
             </div>
             <div className="text-[11px] text-slate-500 mt-1">
               Após taxas de cartão
@@ -144,7 +144,7 @@ Dê 3 recomendações curtas e motivadoras para o administrador melhorar o fatur
           <div>
             <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Comissões Hoje</span>
             <div className="text-2xl font-black text-purple-600 mt-1 font-display">
-              R$ {totalCommissionsToday.toFixed(2)}
+              R$ {(Number(totalCommissionsToday) || 0).toFixed(2)}
             </div>
             <div className="text-[11px] text-purple-700 font-medium mt-1">
               Distribuído aos profissionais
@@ -228,7 +228,7 @@ Dê 3 recomendações curtas e motivadoras para o administrador melhorar o fatur
               <BarChart data={professionalPerformance} margin={{ top: 10, right: 10, left: 0, bottom: 20 }}>
                 <XAxis dataKey="name" stroke="#64748b" fontSize={12} />
                 <YAxis stroke="#64748b" fontSize={12} tickFormatter={(val) => `R$${val}`} />
-                <Tooltip formatter={(value: any) => [`R$ ${Number(value).toFixed(2)}`, 'Comissão']} />
+                <Tooltip formatter={(value: any) => [`R$ ${(Number(value) || 0).toFixed(2)}`, 'Comissão']} />
                 <Bar dataKey="commissionAmount" fill={config.corCustom || '#2563eb'} radius={[6, 6, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
@@ -259,7 +259,7 @@ Dê 3 recomendações curtas e motivadoras para o administrador melhorar o fatur
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>
-                  <Tooltip formatter={(value: any) => [`R$ ${Number(value).toFixed(2)}`, 'Valor']} />
+                  <Tooltip formatter={(value: any) => [`R$ ${(Number(value) || 0).toFixed(2)}`, 'Valor']} />
                 </PieChart>
               </ResponsiveContainer>
             </div>
@@ -276,7 +276,7 @@ Dê 3 recomendações curtas e motivadoras para o administrador melhorar o fatur
                   <span className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
                   <span className="font-medium text-slate-700">{d.name}</span>
                 </div>
-                <span className="font-bold text-slate-900">R$ {d.value.toFixed(2)}</span>
+                <span className="font-bold text-slate-900">R$ {(Number(d.value) || 0).toFixed(2)}</span>
               </div>
             ))}
           </div>

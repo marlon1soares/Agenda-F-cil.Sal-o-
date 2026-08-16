@@ -315,6 +315,8 @@ export const AdminSalonsModal: React.FC<AdminSalonsModalProps> = ({
       const tokenCleanName = formName.replace(/[^a-zA-Z0-9]/g, '').slice(0, 6).toUpperCase();
       const newToken = `TOK-${tokenCleanName || 'SALÃO'}-${randomNum}`;
 
+      const isTrialMode = formPlanDays === 15;
+
       const newSalon: SalonApp = {
         id: `salon-${Date.now()}`,
         name: formName.trim(),
@@ -333,7 +335,9 @@ export const AdminSalonsModal: React.FC<AdminSalonsModalProps> = ({
         purchaseDate: today,
         expiresAt: expiresAt,
         planDays: formPlanDays,
-        status: 'active',
+        isTrial: isTrialMode,
+        trialStartedAt: isTrialMode ? today : undefined,
+        status: isTrialMode ? 'trial' : 'active',
         appCode: randomCode,
         purchaseToken: newToken,
         emailSentAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -1303,6 +1307,7 @@ export const AdminSalonsModal: React.FC<AdminSalonsModalProps> = ({
                     onChange={(e) => setFormPlanDays(Number(e.target.value))}
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500 font-bold"
                   >
+                    <option value={15}>15 Dias (Teste Gratuito)</option>
                     <option value={30}>30 Dias (Mensal)</option>
                     <option value={90}>90 Dias (Trimestral)</option>
                     <option value={180}>180 Dias (Semestral)</option>

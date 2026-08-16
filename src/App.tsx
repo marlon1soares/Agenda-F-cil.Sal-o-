@@ -22,6 +22,8 @@ import { Storage } from './utils/storage';
 import { syncEngine } from './utils/syncEngine';
 import { DEFAULT_SALON_APPS, DEFAULT_CONFIG } from './data/mockData';
 import { getUrlParam, hasUrlAction } from './utils/url';
+import { getSalonLicenseInfo } from './utils/license';
+import { BlockedLicenseBanner } from './components/BlockedLicenseBanner';
 import { LayoutDashboard, CreditCard, Calendar, Users, Scissors, UserCheck } from 'lucide-react';
 
 export function App() {
@@ -336,9 +338,23 @@ export function App() {
     Storage.saveConfig(newConfig);
   };
 
+  // Active Salon & License Status
+  const activeSalon = salons.find(s => s.id === activeSalonId) || salons[0];
+  const licenseInfo = getSalonLicenseInfo(activeSalon);
+
   return (
     <div className={`min-h-screen bg-slate-950 font-sans text-slate-800 transition-all flex flex-col ${isExpanded ? 'p-0' : 'p-2 sm:p-6'}`}>
       
+      {/* 15-Day Trial / License Status Warning & Blocking Banner */}
+      {userRole !== 'admin' && activeSalon && (
+        <BlockedLicenseBanner
+          salon={activeSalon}
+          licenseInfo={licenseInfo}
+          onOpenBuyApp={() => setIsBuyAppOpen(true)}
+          isAdmin={userRole === 'admin'}
+        />
+      )}
+
       {/* Main Salon Application Container */}
       <div className={`bg-slate-50 border border-slate-200 shadow-2xl overflow-hidden transition-all mx-auto w-full ${
         isExpanded ? 'rounded-none max-w-full h-screen' : 'rounded-3xl max-w-6xl'
@@ -637,8 +653,16 @@ export function App() {
         onClose={() => setIsBuyAppOpen(false)}
         userRole={userRole}
         onOpenAdminPaymentConfig={() => setIsAdminPaymentOpen(true)}
-        onPurchaseComplete={(newSalon) => {
-          handleCreateSalon(newSalon);
+        activeSalon={activeSalon}
+        onUpdateSalon={handleUpdateSalon}
+        onPurchaseComplete={(newOrUpdatedSalon) => {
+          const currentList = Storage.getSalons();
+          const exists = currentList.some(s => s.id === newOrUpdatedSalon.id);
+          if (exists) {
+            handleUpdateSalon(newOrUpdatedSalon);
+          } else {
+            handleCreateSalon(newOrUpdatedSalon);
+          }
         }}
       />
 

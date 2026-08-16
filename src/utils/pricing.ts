@@ -13,9 +13,11 @@ export interface LicensePlan {
   maxInstallments: number;
 }
 
-export function formatBRL(val: number): string {
-  if (isNaN(val) || val === undefined || val === null) return 'R$ 0,00';
-  return `R$ ${val.toFixed(2).replace('.', ',')}`;
+export function formatBRL(val?: number | string | null): string {
+  if (val === undefined || val === null) return 'R$ 0,00';
+  const num = typeof val === 'number' ? val : Number(val);
+  if (isNaN(num)) return 'R$ 0,00';
+  return `R$ ${num.toFixed(2).replace('.', ',')}`;
 }
 
 export function calculateDefaultPricesFromBase(base30: number): {
@@ -33,7 +35,10 @@ export function calculateDefaultPricesFromBase(base30: number): {
   };
 }
 
-export function getCalculatedLicensePlans(configOrBase?: AdminPaymentConfig | number): LicensePlan[] {
+export function getCalculatedLicensePlans(
+  configOrBase?: AdminPaymentConfig | number,
+  includeTrial: boolean = true
+): LicensePlan[] {
   let p30 = 30;
   let p90 = 75;
   let p180 = 135;
@@ -59,7 +64,24 @@ export function getCalculatedLicensePlans(configOrBase?: AdminPaymentConfig | nu
       : Number((base * 8).toFixed(2));
   }
 
-  return [
+  const plans: LicensePlan[] = [];
+
+  if (includeTrial) {
+    plans.push({
+      days: 15,
+      label: '15 Dias',
+      shortLabel: '15 Dias (Teste Grátis)',
+      priceStr: 'Grátis (R$ 0)',
+      numVal: 0,
+      monthlyEquivalentStr: '15 Dias Sem Custo',
+      detail: 'Teste Gratuito',
+      tag: '1x por Cadastro',
+      badge: '15 Dias Grátis',
+      maxInstallments: 1,
+    });
+  }
+
+  plans.push(
     {
       days: 30,
       label: '30 Dias',
@@ -107,8 +129,10 @@ export function getCalculatedLicensePlans(configOrBase?: AdminPaymentConfig | nu
       tag: 'Até 6x (3x S/ Juros)',
       badge: 'Até 6x (3x S/ Juros)',
       maxInstallments: 6,
-    },
-  ];
+    }
+  );
+
+  return plans;
 }
 
 export function getLicensePlanByDays(days: number, configOrBase?: AdminPaymentConfig | number): LicensePlan {
