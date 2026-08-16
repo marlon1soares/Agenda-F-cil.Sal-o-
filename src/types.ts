@@ -97,7 +97,8 @@ export interface ThemeConfig {
 }
 
 export interface AdminCredentials {
-  email: string;
+  cpf?: string;
+  email?: string;
   phone: string;
   password: string;
   registeredAt?: string;

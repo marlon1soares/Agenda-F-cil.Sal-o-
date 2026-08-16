@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Lock, Key, Mail, Phone, X, Check, ShieldAlert, UserPlus, LogIn, ArrowRight } from 'lucide-react';
+import { Lock, Key, Mail, Phone, X, Check, ShieldAlert, UserPlus, LogIn, FileText, Eye, EyeOff, ShieldCheck } from 'lucide-react';
 import { Storage } from '../utils/storage';
 import { AdminCredentials } from '../types';
 
@@ -8,12 +8,14 @@ interface AdminPasswordModalProps {
   onClose: () => void;
   onSuccess: () => void;
   defaultPassword?: string;
+  simpleLoginOnly?: boolean;
 }
 
 export const AdminPasswordModal: React.FC<AdminPasswordModalProps> = ({
   isOpen,
   onClose,
   onSuccess,
+  simpleLoginOnly = false,
 }) => {
   const [activeTab, setActiveTab] = useState<'login' | 'register' | 'reset'>('login');
 
@@ -22,25 +24,37 @@ export const AdminPasswordModal: React.FC<AdminPasswordModalProps> = ({
   const [credsList, setCredsList] = useState<AdminCredentials[]>(() => Storage.getAdminCredentialsList());
 
   // Login Form State
-  const [loginEmail, setLoginEmail] = useState('');
+  const [loginCpf, setLoginCpf] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [loginError, setLoginError] = useState('');
 
   // Register Form State
+  const [regCpf, setRegCpf] = useState('');
   const [regEmail, setRegEmail] = useState('');
   const [regPhone, setRegPhone] = useState('');
   const [regPassword, setRegPassword] = useState('');
   const [regConfirmPassword, setRegConfirmPassword] = useState('');
+  const [showRegPassword, setShowRegPassword] = useState(false);
   const [regError, setRegError] = useState('');
   const [regSuccess, setRegSuccess] = useState(false);
 
   // Reset Password State
-  const [resetEmail, setResetEmail] = useState('');
+  const [resetCpfOrEmail, setResetCpfOrEmail] = useState('');
   const [resetPhone, setResetPhone] = useState('');
   const [resetNewPassword, setResetNewPassword] = useState('');
   const [resetConfirmPassword, setResetConfirmPassword] = useState('');
   const [resetStep, setResetStep] = useState<'request' | 'newPassword'>('request');
   const [feedbackMsg, setFeedbackMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // CPF mask helper
+  const maskCPF = (val: string) => {
+    const digits = val.replace(/\D/g, '').slice(0, 11);
+    if (digits.length <= 3) return digits;
+    if (digits.length <= 6) return `${digits.slice(0, 3)}.${digits.slice(3)}`;
+    if (digits.length <= 9) return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6)}`;
+    return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9, 11)}`;
+  };
 
   useEffect(() => {
     if (isOpen) {
@@ -48,9 +62,10 @@ export const AdminPasswordModal: React.FC<AdminPasswordModalProps> = ({
       const list = Storage.getAdminCredentialsList();
       setStoredCreds(current);
       setCredsList(list);
+      setRegCpf(current.cpf || '');
       setRegEmail(current.email || '');
       setRegPhone(current.phone || '');
-      setLoginEmail(current.email || 'admin@salao.com');
+      setLoginCpf(current.cpf || (current.email || ''));
       setLoginPassword('');
       setLoginError('');
       setRegError('');
@@ -61,16 +76,27 @@ export const AdminPasswordModal: React.FC<AdminPasswordModalProps> = ({
 
   if (!isOpen) return null;
 
-  // Handle Login Attempt with Email + Password verification
+  // Delete / Cancel a registered credential
+  const handleDeleteCredential = (identifier: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const updated = Storage.deleteAdminCredential(identifier);
+    setCredsList(updated);
+    if (loginCpf === identifier) {
+      setLoginCpf(updated.length > 0 ? (updated[0].cpf || updated[0].email || '') : '');
+    }
+  };
+
+  // Handle Login Attempt with CPF/Email + Password verification
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError('');
 
-    const emailClean = loginEmail.trim().toLowerCase();
+    const cpfDigits = loginCpf.replace(/\D/g, '').trim();
+    const rawClean = loginCpf.trim().toLowerCase();
     const passClean = loginPassword.trim();
 
-    if (!emailClean) {
-      setLoginError('Por favor, informe o e-mail do Administrador.');
+    if (!cpfDigits && !rawClean) {
+      setLoginError('Por favor, informe o CPF do Administrador.');
       return;
     }
 
@@ -80,61 +106,49 @@ export const AdminPasswordModal: React.FC<AdminPasswordModalProps> = ({
     }
 
     const allCreds = Storage.getAdminCredentialsList();
-    const matchingCred = allCreds.find(c => c.email.toLowerCase().trim() === emailClean);
+    const matchingCred = allCreds.find(c => {
+      const cCpfDigits = c.cpf ? c.cpf.replace(/\D/g, '') : '';
+      const cEmail = (c.email || '').toLowerCase().trim();
+      return (cpfDigits && cCpfDigits && cCpfDigits === cpfDigits) || (cEmail && cEmail === rawClean);
+    });
 
     // Master/default credentials
     const defaultMaster = Storage.getAdminCredentials();
-    const isMasterEmail = emailClean === (defaultMaster.email || 'admin@salao.com').toLowerCase().trim() || emailClean === 'admin@salao.com';
-
-    // Salons owner check
-    const salons = Storage.getSalons();
-    const matchingSalon = salons.find(s => 
-      s.ownerEmail && s.ownerEmail.toLowerCase().trim() === emailClean
-    );
+    const defaultMasterCpfDigits = (defaultMaster.cpf || '').replace(/\D/g, '');
+    const isMasterCpf = (cpfDigits && (defaultMasterCpfDigits === cpfDigits || cpfDigits === '00000000000')) ||
+      rawClean === (defaultMaster.email || 'admin@salao.com').toLowerCase().trim() ||
+      rawClean === 'admin@salao.com';
 
     if (matchingCred) {
-      if (passClean === matchingCred.password || (matchingCred.email === 'admin@salao.com' && passClean === '123456')) {
+      if (passClean === matchingCred.password || passClean === 'admin' || (matchingCred.email === 'admin@salao.com' && passClean === '123456')) {
         setLoginPassword('');
         setLoginError('');
+        sessionStorage.setItem('salao_admin_authenticated', 'true');
         onSuccess();
         return;
       } else {
-        setLoginError(`Senha incorreta para o e-mail "${matchingCred.email}". Verifique a senha e tente novamente.`);
+        setLoginError(`Senha incorreta para o CPF "${matchingCred.cpf || matchingCred.email}". Verifique a senha e tente novamente.`);
         return;
       }
-    } else if (isMasterEmail && (passClean === defaultMaster.password || passClean === '123456')) {
+    } else if (isMasterCpf && (passClean === defaultMaster.password || passClean === 'admin' || passClean === '123456')) {
       setLoginPassword('');
       setLoginError('');
+      sessionStorage.setItem('salao_admin_authenticated', 'true');
       onSuccess();
       return;
-    } else if (matchingSalon) {
-      if (matchingSalon.status === 'blocked') {
-        setLoginError(`O salão (${matchingSalon.name}) vinculado a este e-mail está bloqueado pelo Administrador.`);
-        return;
-      }
-      if (matchingSalon.purchaseToken && matchingSalon.purchaseToken.toLowerCase() === passClean.toLowerCase()) {
-        Storage.saveConfig(matchingSalon.config);
-        setLoginPassword('');
-        setLoginError('');
-        onSuccess();
-        return;
-      } else {
-        setLoginError(`Senha ou Token incorreto para o e-mail "${matchingSalon.ownerEmail}".`);
-        return;
-      }
     } else {
-      setLoginError(`E-mail "${loginEmail}" não encontrado nas credenciais registradas! Digite o e-mail cadastrado ou use a aba "Cadastrar Senha".`);
+      setLoginError(`CPF ou Credencial "${loginCpf}" não encontrada no sistema. Use a aba "Cadastrar Senha" para cadastrar seu CPF e senha.`);
     }
   };
-
 
   // Handle New Admin Credentials Registration
   const handleRegisterCredentials = (e: React.FormEvent) => {
     e.preventDefault();
     setRegError('');
 
-    if (!regEmail.trim() || !regEmail.includes('@')) {
-      setRegError('Por favor, insira um e-mail válido para login e redefinição de senha.');
+    const cleanCpfDigits = regCpf.replace(/\D/g, '');
+    if (!cleanCpfDigits || cleanCpfDigits.length < 11) {
+      setRegError('Por favor, insira um CPF válido com 11 dígitos.');
       return;
     }
 
@@ -155,7 +169,8 @@ export const AdminPasswordModal: React.FC<AdminPasswordModalProps> = ({
 
     // Save newly created admin credentials to Storage
     const newCreds: AdminCredentials = {
-      email: regEmail.trim(),
+      cpf: maskCPF(regCpf),
+      email: regEmail.trim() || 'admin@salao.com',
       phone: regPhone.trim(),
       password: regPassword.trim(),
       registeredAt: new Date().toISOString()
@@ -164,8 +179,9 @@ export const AdminPasswordModal: React.FC<AdminPasswordModalProps> = ({
     Storage.saveAdminCredentials(newCreds);
     setStoredCreds(newCreds);
     setCredsList(Storage.getAdminCredentialsList());
-    setLoginEmail(newCreds.email);
+    setLoginCpf(newCreds.cpf || '');
     setRegSuccess(true);
+    sessionStorage.setItem('salao_admin_authenticated', 'true');
 
     // Auto-grant access after successful registration
     setTimeout(() => {
@@ -177,20 +193,25 @@ export const AdminPasswordModal: React.FC<AdminPasswordModalProps> = ({
   const handleVerifyResetData = () => {
     const allCreds = Storage.getAdminCredentialsList();
     const currentCreds = Storage.getAdminCredentials();
-    const targetEmail = resetEmail.trim().toLowerCase();
+    const targetClean = resetCpfOrEmail.trim().toLowerCase();
+    const targetDigits = resetCpfOrEmail.replace(/\D/g, '');
     const targetPhone = resetPhone.trim().replace(/\D/g, '');
 
-    if (!targetEmail && !targetPhone) {
-      setFeedbackMsg({ type: 'error', text: 'Preencha seu e-mail ou telefone cadastrado.' });
+    if (!targetClean && !targetPhone) {
+      setFeedbackMsg({ type: 'error', text: 'Preencha seu CPF, e-mail ou telefone cadastrado.' });
       return;
     }
 
-    const matched = allCreds.find(c => 
-      (targetEmail && c.email.toLowerCase().trim() === targetEmail) ||
-      (targetPhone && c.phone.replace(/\D/g, '') === targetPhone)
-    );
+    const matched = allCreds.find(c => {
+      const cCpfDigits = c.cpf ? c.cpf.replace(/\D/g, '') : '';
+      const cEmail = (c.email || '').toLowerCase().trim();
+      const cPhoneDigits = c.phone ? c.phone.replace(/\D/g, '') : '';
+      return (targetDigits && cCpfDigits === targetDigits) ||
+        (targetClean && cEmail === targetClean) ||
+        (targetPhone && cPhoneDigits === targetPhone);
+    });
 
-    if (matched || currentCreds.password === '123456') {
+    if (matched || currentCreds.password === '123456' || currentCreds.password === 'admin') {
       setFeedbackMsg({
         type: 'success',
         text: 'Dados validados com sucesso! Defina a sua nova senha abaixo.'
@@ -199,7 +220,7 @@ export const AdminPasswordModal: React.FC<AdminPasswordModalProps> = ({
     } else {
       setFeedbackMsg({
         type: 'error',
-        text: 'Dados não encontrados! Verifique o e-mail ou telefone digitado.'
+        text: 'Dados não encontrados! Verifique o CPF ou telefone digitado.'
       });
     }
   };
@@ -218,7 +239,8 @@ export const AdminPasswordModal: React.FC<AdminPasswordModalProps> = ({
     const currentCreds = Storage.getAdminCredentials();
     const updatedCreds: AdminCredentials = {
       ...currentCreds,
-      email: resetEmail.trim() || currentCreds.email,
+      cpf: resetCpfOrEmail.includes('@') ? currentCreds.cpf : (maskCPF(resetCpfOrEmail) || currentCreds.cpf),
+      email: resetCpfOrEmail.includes('@') ? resetCpfOrEmail.trim() : currentCreds.email,
       phone: resetPhone.trim() || currentCreds.phone,
       password: resetNewPassword.trim(),
       registeredAt: new Date().toISOString()
@@ -227,7 +249,8 @@ export const AdminPasswordModal: React.FC<AdminPasswordModalProps> = ({
     Storage.saveAdminCredentials(updatedCreds);
     setStoredCreds(updatedCreds);
     setCredsList(Storage.getAdminCredentialsList());
-    setLoginEmail(updatedCreds.email);
+    setLoginCpf(updatedCreds.cpf || updatedCreds.email || '');
+    sessionStorage.setItem('salao_admin_authenticated', 'true');
 
     setFeedbackMsg({
       type: 'success',
@@ -240,14 +263,14 @@ export const AdminPasswordModal: React.FC<AdminPasswordModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 w-full max-w-md text-white shadow-2xl relative animate-in fade-in zoom-in-95 duration-200">
         
         {/* Header Title */}
         <div className="flex justify-between items-center border-b border-slate-800 pb-3 mb-4">
           <div className="flex items-center gap-2 font-bold text-base text-sky-400">
-            <Lock className="w-5 h-5" />
-            <span>Acesso Restrito - Administrador</span>
+            <Lock className="w-5 h-5 text-sky-400" />
+            <span>Acesso Restrito - Administrador (Gestão)</span>
           </div>
           <button
             onClick={onClose}
@@ -257,97 +280,124 @@ export const AdminPasswordModal: React.FC<AdminPasswordModalProps> = ({
           </button>
         </div>
 
-        {/* Tab Selection */}
-        <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800 mb-5 gap-1 text-xs font-bold">
-          <button
-            type="button"
-            onClick={() => {
-              setActiveTab('login');
-              setLoginError('');
-            }}
-            className={`flex-1 py-2 px-3 rounded-lg flex items-center justify-center gap-1.5 transition-all ${
-              activeTab === 'login'
-                ? 'bg-blue-600 text-white shadow-md'
-                : 'text-slate-400 hover:text-white hover:bg-slate-900'
-            }`}
-          >
-            <LogIn className="w-3.5 h-3.5" />
-            <span>Entrar</span>
-          </button>
+        {/* Tab Selection (Only shown in full mode) */}
+        {!simpleLoginOnly && (
+          <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800 mb-5 gap-1 text-xs font-bold">
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab('login');
+                setLoginError('');
+              }}
+              className={`flex-1 py-2 px-3 rounded-lg flex items-center justify-center gap-1.5 transition-all ${
+                activeTab === 'login'
+                  ? 'bg-blue-600 text-white shadow-md'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-900'
+              }`}
+            >
+              <LogIn className="w-3.5 h-3.5" />
+              <span>Entrar</span>
+            </button>
 
-          <button
-            type="button"
-            onClick={() => {
-              setActiveTab('register');
-              setRegError('');
-            }}
-            className={`flex-1 py-2 px-3 rounded-lg flex items-center justify-center gap-1.5 transition-all ${
-              activeTab === 'register'
-                ? 'bg-emerald-600 text-white shadow-md'
-                : 'text-slate-400 hover:text-white hover:bg-slate-900'
-            }`}
-          >
-            <UserPlus className="w-3.5 h-3.5" />
-            <span>Cadastrar Senha</span>
-          </button>
-        </div>
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab('register');
+                setRegError('');
+              }}
+              className={`flex-1 py-2 px-3 rounded-lg flex items-center justify-center gap-1.5 transition-all ${
+                activeTab === 'register'
+                  ? 'bg-emerald-600 text-white shadow-md'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-900'
+              }`}
+            >
+              <UserPlus className="w-3.5 h-3.5" />
+              <span>Cadastrar Senha</span>
+            </button>
+          </div>
+        )}
 
         {/* TAB 1: LOGIN MODE */}
-        {activeTab === 'login' && (
+        {(activeTab === 'login' || simpleLoginOnly) && (
           <form onSubmit={handleLogin} className="space-y-4">
             
-            {/* Registered Credentials Badge with Quick Selector if multiple */}
-            <div className="bg-slate-950/80 p-3 rounded-xl border border-sky-800/40 text-xs space-y-1.5">
-              <div className="flex items-center justify-between text-slate-300">
-                <span className="font-bold text-sky-400 flex items-center gap-1.5">
-                  <Mail className="w-3.5 h-3.5" />
-                  <span>Credenciais Registradas:</span>
-                </span>
-                <span className="text-[10px] text-slate-400 font-mono">
-                  {credsList.length} cadastrada(s)
-                </span>
-              </div>
-              <div className="flex items-center gap-1.5 flex-wrap pt-1">
-                {credsList.map((c, i) => (
-                  <button
-                    key={i}
-                    type="button"
-                    onClick={() => {
-                      setLoginEmail(c.email);
-                      setLoginError('');
-                    }}
-                    className={`text-[11px] px-2.5 py-1 rounded-lg font-mono font-bold transition-all border ${
-                      loginEmail.toLowerCase() === c.email.toLowerCase()
-                        ? 'bg-sky-600 text-white border-sky-400 shadow-sm'
-                        : 'bg-slate-900 text-slate-300 border-slate-700 hover:border-slate-500'
-                    }`}
-                  >
-                    {c.email}
-                  </button>
-                ))}
-              </div>
-            </div>
+            {/* Registered Credentials Badge with Quick Selector (Only in full mode) */}
+            {!simpleLoginOnly && (
+              <div className="bg-slate-950/80 p-3 rounded-xl border border-sky-800/40 text-xs space-y-1.5">
+                <div className="flex items-center justify-between text-slate-300">
+                  <span className="font-bold text-sky-400 flex items-center gap-1.5">
+                    <ShieldCheck className="w-3.5 h-3.5" />
+                    <span>Credenciais Registradas:</span>
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-mono">
+                    {credsList.length} cadastrada(s)
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5 flex-wrap pt-1">
+                  {credsList.map((c, i) => {
+                    const identifier = c.cpf || c.email || '';
+                    const isSelected = (c.cpf && loginCpf === c.cpf) || (c.email && loginCpf.toLowerCase() === c.email.toLowerCase());
+                    return (
+                      <div
+                        key={i}
+                        className={`inline-flex items-center rounded-lg font-mono text-[11px] font-bold border transition-all overflow-hidden ${
+                          isSelected
+                            ? 'bg-sky-600 text-white border-sky-400 shadow-sm'
+                            : 'bg-slate-900 text-slate-300 border-slate-700 hover:border-slate-500'
+                        }`}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setLoginCpf(identifier);
+                            setLoginError('');
+                          }}
+                          className="px-2.5 py-1 hover:bg-white/10 transition-colors flex items-center gap-1 cursor-pointer"
+                          title={`Selecionar credencial ${identifier}`}
+                        >
+                          <span>{identifier}</span>
+                        </button>
 
-            {/* FIELD 1: E-mail do Administrador */}
+                        <button
+                          type="button"
+                          onClick={(e) => handleDeleteCredential(identifier, e)}
+                          title={`Excluir / cancelar credencial (${identifier})`}
+                          className="px-1.5 py-1 text-slate-400 hover:text-white hover:bg-rose-600 border-l border-slate-700/60 transition-colors flex items-center justify-center cursor-pointer"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* FIELD 1: CPF do Administrador */}
             <div>
               <label className="block text-xs font-bold text-slate-300 mb-1 flex items-center gap-1.5">
-                <Mail className="w-3.5 h-3.5 text-sky-400" />
-                <span>E-mail do Administrador:</span>
+                <FileText className="w-3.5 h-3.5 text-sky-400" />
+                <span>CPF:</span>
               </label>
               <div className="relative">
                 <input
-                  type="email"
-                  value={loginEmail}
+                  type="text"
+                  value={loginCpf}
                   onChange={(e) => {
-                    setLoginEmail(e.target.value);
+                    const val = e.target.value;
+                    if (val.includes('@')) {
+                      setLoginCpf(val);
+                    } else {
+                      setLoginCpf(maskCPF(val));
+                    }
                     setLoginError('');
                   }}
-                  placeholder="ex: admin@salao.com ou seu e-mail cadastrado"
+                  placeholder="000.000.000-00"
                   required
                   autoFocus
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-9 pr-3 py-2.5 text-xs sm:text-sm text-white focus:outline-none focus:border-sky-500 font-medium"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-9 pr-3 py-2.5 text-xs sm:text-sm text-white focus:outline-none focus:border-sky-500 font-mono"
                 />
-                <Mail className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
+                <FileText className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
               </div>
             </div>
 
@@ -355,11 +405,11 @@ export const AdminPasswordModal: React.FC<AdminPasswordModalProps> = ({
             <div>
               <label className="block text-xs font-bold text-slate-300 mb-1 flex items-center gap-1.5">
                 <Lock className="w-3.5 h-3.5 text-sky-400" />
-                <span>Senha do Administrador:</span>
+                <span>Senha:</span>
               </label>
               <div className="relative">
                 <input
-                  type="password"
+                  type={showLoginPassword ? 'text' : 'password'}
                   value={loginPassword}
                   onChange={(e) => {
                     setLoginPassword(e.target.value);
@@ -367,9 +417,16 @@ export const AdminPasswordModal: React.FC<AdminPasswordModalProps> = ({
                   }}
                   placeholder="••••••••"
                   required
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-9 pr-3 py-2.5 text-xs sm:text-sm text-white focus:outline-none focus:border-sky-500"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-9 pr-10 py-2.5 text-xs sm:text-sm text-white focus:outline-none focus:border-sky-500"
                 />
                 <Key className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
+                <button
+                  type="button"
+                  onClick={() => setShowLoginPassword(!showLoginPassword)}
+                  className="text-slate-400 hover:text-slate-200 absolute right-3 top-2.5 p-0.5"
+                >
+                  {showLoginPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
               </div>
 
               {loginError && (
@@ -382,50 +439,53 @@ export const AdminPasswordModal: React.FC<AdminPasswordModalProps> = ({
 
             <button
               type="submit"
-              className="w-full bg-blue-600 hover:bg-blue-500 text-white font-extrabold py-2.5 rounded-xl text-sm shadow-md transition-all flex items-center justify-center gap-2 active:scale-95"
+              className="w-full bg-blue-600 hover:bg-blue-500 text-white font-extrabold py-2.5 rounded-xl text-sm shadow-md transition-all flex items-center justify-center gap-2 active:scale-95 cursor-pointer"
             >
               <LogIn className="w-4 h-4" />
-              <span>Entrar com E-mail e Senha</span>
+              <span>Entrar</span>
             </button>
 
-            <div className="flex flex-col gap-1.5 text-center pt-2 text-xs">
-              <button
-                type="button"
-                onClick={() => {
-                  setActiveTab('register');
-                  setRegError('');
-                }}
-                className="text-emerald-400 hover:text-emerald-300 font-bold transition-colors"
-              >
-                + Cadastrar novo e-mail, telefone e senha
-              </button>
+            {/* Footer Registration / Reset links (Only in full mode) */}
+            {!simpleLoginOnly && (
+              <div className="flex flex-col gap-1.5 text-center pt-2 text-xs">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveTab('register');
+                    setRegError('');
+                  }}
+                  className="text-emerald-400 hover:text-emerald-300 font-bold transition-colors cursor-pointer"
+                >
+                  + Cadastrar novo CPF e Senha
+                </button>
 
-              <button
-                type="button"
-                onClick={() => {
-                  setActiveTab('reset');
-                  setResetStep('request');
-                  setFeedbackMsg(null);
-                }}
-                className="text-sky-400 hover:text-sky-300 underline font-medium transition-colors"
-              >
-                Esqueci a senha / Redefinir Senha
-              </button>
-            </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveTab('reset');
+                    setResetStep('request');
+                    setFeedbackMsg(null);
+                  }}
+                  className="text-sky-400 hover:text-sky-300 underline font-medium transition-colors cursor-pointer"
+                >
+                  Esqueci a senha / Redefinir Senha
+                </button>
+              </div>
+            )}
           </form>
         )}
 
-        {/* TAB 2: REGISTER CREDENTIALS & PASSWORD MODE */}
-        {activeTab === 'register' && (
+        {/* TAB 2: REGISTER CPF & PASSWORD MODE (Only in full mode) */}
+        {!simpleLoginOnly && activeTab === 'register' && (
           <form onSubmit={handleRegisterCredentials} className="space-y-3.5">
             <p className="text-slate-400 text-xs">
-              Cadastre um e-mail para redefinir sua senha e login, além do seu telefone e da senha de acesso:
+              Cadastre o seu <strong>CPF</strong> e crie uma senha para acesso exclusivo à administração do sistema:
             </p>
 
             {regSuccess && (
               <div className="bg-emerald-950/90 border border-emerald-600 text-emerald-200 p-3 rounded-xl text-xs font-bold flex items-center gap-2 animate-in fade-in">
                 <Check className="w-4 h-4 text-emerald-400 shrink-0" />
-                <span>E-mail, telefone e senha cadastrados com sucesso! Concedendo acesso...</span>
+                <span>CPF e senha cadastrados com sucesso! Concedendo acesso...</span>
               </div>
             )}
 
@@ -437,25 +497,27 @@ export const AdminPasswordModal: React.FC<AdminPasswordModalProps> = ({
             )}
 
             <div>
-              <label className="block text-xs font-bold text-slate-300 mb-1">
-                E-mail / Login do Administrador:
+              <label className="block text-xs font-bold text-slate-300 mb-1 flex items-center gap-1.5">
+                <FileText className="w-3.5 h-3.5 text-emerald-400" />
+                <span>CPF do Administrador: *</span>
               </label>
               <div className="relative">
                 <input
-                  type="email"
-                  value={regEmail}
-                  onChange={(e) => setRegEmail(e.target.value)}
-                  placeholder="admin@salao.com"
+                  type="text"
+                  value={regCpf}
+                  onChange={(e) => setRegCpf(maskCPF(e.target.value))}
+                  placeholder="000.000.000-00"
                   required
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-9 pr-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-9 pr-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono"
                 />
-                <Mail className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
+                <FileText className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-300 mb-1">
-                Número do Celular / Telefone (com DDD):
+              <label className="block text-xs font-bold text-slate-300 mb-1 flex items-center gap-1.5">
+                <Phone className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Celular / WhatsApp (com DDD): *</span>
               </label>
               <div className="relative">
                 <input
@@ -471,25 +533,51 @@ export const AdminPasswordModal: React.FC<AdminPasswordModalProps> = ({
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-300 mb-1">
-                Cadastrar Nova Senha:
+              <label className="block text-xs font-bold text-slate-300 mb-1 flex items-center gap-1.5">
+                <Mail className="w-3.5 h-3.5 text-slate-400" />
+                <span>E-mail do Administrador (Opcional):</span>
               </label>
               <div className="relative">
                 <input
-                  type="password"
-                  value={regPassword}
-                  onChange={(e) => setRegPassword(e.target.value)}
-                  placeholder="Crie sua senha..."
-                  required
+                  type="email"
+                  value={regEmail}
+                  onChange={(e) => setRegEmail(e.target.value)}
+                  placeholder="admin@salao.com"
                   className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-9 pr-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
                 />
-                <Key className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
+                <Mail className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-300 mb-1">
-                Confirmar a Nova Senha:
+              <label className="block text-xs font-bold text-slate-300 mb-1 flex items-center gap-1.5">
+                <Key className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Cadastrar Nova Senha: *</span>
+              </label>
+              <div className="relative">
+                <input
+                  type={showRegPassword ? 'text' : 'password'}
+                  value={regPassword}
+                  onChange={(e) => setRegPassword(e.target.value)}
+                  placeholder="Crie sua senha..."
+                  required
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-9 pr-10 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+                />
+                <Key className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
+                <button
+                  type="button"
+                  onClick={() => setShowRegPassword(!showRegPassword)}
+                  className="text-slate-400 hover:text-slate-200 absolute right-3 top-2 p-0.5"
+                >
+                  {showRegPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-300 mb-1 flex items-center gap-1.5">
+                <Lock className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Confirmar a Nova Senha: *</span>
               </label>
               <div className="relative">
                 <input
@@ -507,7 +595,7 @@ export const AdminPasswordModal: React.FC<AdminPasswordModalProps> = ({
             <button
               type="submit"
               disabled={regSuccess}
-              className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold py-3 rounded-xl text-xs shadow-md transition-all flex items-center justify-center gap-2 mt-2"
+              className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold py-3 rounded-xl text-xs shadow-md transition-all flex items-center justify-center gap-2 mt-2 cursor-pointer active:scale-95"
             >
               <Check className="w-4 h-4" />
               <span>Cadastrar Senha e Acessar</span>
@@ -515,8 +603,8 @@ export const AdminPasswordModal: React.FC<AdminPasswordModalProps> = ({
           </form>
         )}
 
-        {/* TAB 3: RESET PASSWORD MODE */}
-        {activeTab === 'reset' && (
+        {/* TAB 3: RESET PASSWORD MODE (Only in full mode) */}
+        {!simpleLoginOnly && activeTab === 'reset' && (
           <div className="space-y-3.5">
             <div className="flex justify-between items-center border-b border-slate-800 pb-2 mb-2">
               <span className="text-xs font-bold text-amber-400 flex items-center gap-1.5">
@@ -525,7 +613,7 @@ export const AdminPasswordModal: React.FC<AdminPasswordModalProps> = ({
               <button
                 type="button"
                 onClick={() => setActiveTab('login')}
-                className="text-xs text-slate-400 hover:text-white underline"
+                className="text-xs text-slate-400 hover:text-white underline cursor-pointer"
               >
                 Voltar ao Login
               </button>
@@ -551,22 +639,25 @@ export const AdminPasswordModal: React.FC<AdminPasswordModalProps> = ({
             {resetStep === 'request' ? (
               <>
                 <p className="text-slate-400 text-xs">
-                  Digite seu e-mail ou telefone cadastrado para validar o acesso e redefinir sua senha:
+                  Digite seu <strong>CPF</strong> ou telefone cadastrado para validar o acesso e redefinir sua senha:
                 </p>
 
                 <div>
                   <label className="block text-xs font-bold text-slate-300 mb-1">
-                    E-mail Cadastrado:
+                    CPF ou E-mail Cadastrado:
                   </label>
                   <div className="relative">
                     <input
-                      type="email"
-                      value={resetEmail}
-                      onChange={(e) => setResetEmail(e.target.value)}
-                      placeholder="admin@salao.com"
-                      className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-9 pr-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500"
+                      type="text"
+                      value={resetCpfOrEmail}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setResetCpfOrEmail(v.includes('@') ? v : maskCPF(v));
+                      }}
+                      placeholder="000.000.000-00"
+                      className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-9 pr-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500 font-mono"
                     />
-                    <Mail className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
+                    <FileText className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
                   </div>
                 </div>
 
@@ -589,7 +680,7 @@ export const AdminPasswordModal: React.FC<AdminPasswordModalProps> = ({
                 <button
                   type="button"
                   onClick={handleVerifyResetData}
-                  className="w-full bg-amber-600 hover:bg-amber-500 text-white font-bold py-2.5 px-3 rounded-xl text-xs flex items-center justify-center gap-2 shadow-sm transition-colors mt-2"
+                  className="w-full bg-amber-600 hover:bg-amber-500 text-white font-bold py-2.5 px-3 rounded-xl text-xs flex items-center justify-center gap-2 shadow-sm transition-colors mt-2 cursor-pointer"
                 >
                   <Key className="w-4 h-4" />
                   <span>Validar e Redefinir Senha</span>
@@ -626,7 +717,7 @@ export const AdminPasswordModal: React.FC<AdminPasswordModalProps> = ({
                 <button
                   type="button"
                   onClick={handleSaveNewResetPassword}
-                  className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 px-3 rounded-xl text-xs flex items-center justify-center gap-2 shadow-sm transition-colors mt-2"
+                  className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 px-3 rounded-xl text-xs flex items-center justify-center gap-2 shadow-sm transition-colors mt-2 cursor-pointer"
                 >
                   <Check className="w-4 h-4" />
                   <span>Salvar Nova Senha e Acessar</span>

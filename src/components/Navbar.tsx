@@ -75,7 +75,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         return (
           <>
             <Crown className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-            <span>👑 Administrador</span>
+            <span>👑 Administrador (Gestão)</span>
           </>
         );
       case 'salao':
@@ -166,9 +166,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                   onClick={() => {
                     setIsDropdownOpen(false);
                     onSelectRole('admin');
-                    if (onOpenAdminSalons) {
-                      onOpenAdminSalons();
-                    }
                   }}
                   className="w-full text-left px-3 py-2.5 font-bold text-[#38bdf8] hover:bg-slate-800/80 flex items-center justify-between border-b border-slate-800/60 transition-colors"
                 >
@@ -236,6 +233,17 @@ export const Navbar: React.FC<NavbarProps> = ({
                 >
                   <Link2 className="w-3.5 h-3.5 text-rose-200" />
                   <span>Criar Link p/ Clientes</span>
+                </button>
+              )}
+
+              {userRole === 'salao' && (
+                <button
+                  onClick={() => onSelectRole('admin')}
+                  title="Acesso restrito ao Painel de Gestão do Administrador com CPF e Senha"
+                  className="bg-slate-900 hover:bg-slate-800 text-sky-400 font-extrabold text-xs px-3 py-1.5 rounded-xl shadow-md flex items-center gap-1.5 transition-all active:scale-95 border border-sky-500/40 shrink-0"
+                >
+                  <Crown className="w-3.5 h-3.5 text-amber-400" />
+                  <span>👑 Administrador (Gestão)</span>
                 </button>
               )}
 

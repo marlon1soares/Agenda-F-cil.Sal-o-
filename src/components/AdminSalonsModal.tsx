@@ -20,6 +20,7 @@ interface AdminSalonsModalProps {
   onDeleteSalon: (salonId: string) => void;
   onOpenPaymentConfig?: () => void;
   onOpenSalonLink?: () => void;
+  onOpenAdminAuth?: () => void;
 }
 
 export const AdminSalonsModal: React.FC<AdminSalonsModalProps> = ({
@@ -33,6 +34,7 @@ export const AdminSalonsModal: React.FC<AdminSalonsModalProps> = ({
   onDeleteSalon,
   onOpenPaymentConfig,
   onOpenSalonLink,
+  onOpenAdminAuth,
 }) => {
   const [activeTab, setActiveTab] = useState<'cards' | 'pending' | 'connected' | 'inspector' | 'location_table'>('cards');
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'active' | 'blocked'>('all');
@@ -382,15 +384,15 @@ export const AdminSalonsModal: React.FC<AdminSalonsModalProps> = ({
             </div>
           </div>
 
-          {/* Top Action Buttons - Compact & Aligned */}
-          <div className="flex items-center gap-1.5 shrink-0">
+          {/* Top Action Buttons - Perfectly Aligned & Styled like Primary Navbar */}
+          <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
             {onOpenSalonLink && (
               <button
                 onClick={onOpenSalonLink}
-                className="bg-gradient-to-r from-violet-600 via-purple-600 to-indigo-600 hover:from-violet-500 hover:to-purple-500 text-white font-extrabold px-3.5 py-1.5 rounded-full text-xs flex items-center gap-1.5 shadow-lg shadow-purple-950/50 transition-all active:scale-95 border border-purple-400/50"
+                className="bg-gradient-to-r from-violet-600 via-purple-600 to-indigo-600 hover:from-violet-500 hover:to-purple-500 text-white font-extrabold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1.5 shadow-md transition-all active:scale-95 border border-violet-400/40"
                 title="Criar e enviar link direto de compra de licença para o proprietário do salão (WhatsApp ou Copiar)"
               >
-                <Link2 className="w-3.5 h-3.5 text-white" />
+                <Link2 className="w-3.5 h-3.5 text-violet-200" />
                 <span className="tracking-tight">Criar Link p/ Salão</span>
               </button>
             )}
@@ -398,7 +400,7 @@ export const AdminSalonsModal: React.FC<AdminSalonsModalProps> = ({
             {onOpenPaymentConfig && (
               <button
                 onClick={onOpenPaymentConfig}
-                className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-black px-2.5 py-1 rounded-lg text-xs flex items-center gap-1.5 shadow-md transition-all active:scale-95"
+                className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-black px-3 py-1.5 rounded-xl text-xs flex items-center gap-1.5 shadow-md transition-all active:scale-95 border border-amber-300/40"
                 title="Configurar Recebimento, Pix e Cartão"
               >
                 <Settings className="w-3.5 h-3.5" />
@@ -408,15 +410,28 @@ export const AdminSalonsModal: React.FC<AdminSalonsModalProps> = ({
 
             <button
               onClick={openCreateModal}
-              className="bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold px-2.5 py-1 rounded-lg text-xs flex items-center gap-1.5 shadow-md transition-all active:scale-95"
+              className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1.5 shadow-md transition-all active:scale-95 border border-emerald-400/40"
+              title="Cadastrar novo salão ou registrar compra"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>Mais Cadastro / Compra</span>
             </button>
 
+            {onOpenAdminAuth && (
+              <button
+                onClick={onOpenAdminAuth}
+                className="bg-slate-800 hover:bg-slate-700 text-sky-300 border border-sky-600/40 font-bold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1.5 shadow-md transition-all active:scale-95"
+                title="Cadastrar ou Alterar Senha e CPF do Administrador"
+              >
+                <Key className="w-3.5 h-3.5 text-sky-400" />
+                <span>Cadastrar/Alterar Senha</span>
+              </button>
+            )}
+
             <button
               onClick={onClose}
-              className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors ml-1"
+              className="text-slate-400 hover:text-white p-1.5 rounded-xl hover:bg-slate-800 transition-colors border border-transparent hover:border-slate-700 ml-0.5"
+              title="Fechar Janela"
             >
               <X className="w-4 h-4" />
             </button>
@@ -434,8 +449,8 @@ export const AdminSalonsModal: React.FC<AdminSalonsModalProps> = ({
         {/* Navigation Tabs Bar & Search Box - Compact Bar */}
         <div className="bg-slate-900/95 px-3 sm:px-5 py-2 border-b border-slate-800 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-2 shrink-0">
           
-          {/* Primary View Switcher Tabs */}
-          <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800 overflow-x-auto max-w-full no-scrollbar">
+          {/* Primary View Switcher Tabs without native scrollbar glitch */}
+          <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800 overflow-x-auto max-w-full [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
             
             <button
               onClick={() => setActiveTab('cards')}
@@ -537,7 +552,7 @@ export const AdminSalonsModal: React.FC<AdminSalonsModalProps> = ({
 
         {/* Quick Sub-Filter Badges for Cards Tab */}
         {activeTab === 'cards' && (
-          <div className="px-3 sm:px-5 py-1 bg-slate-950/60 border-b border-slate-800/80 flex items-center gap-1.5 overflow-x-auto shrink-0 text-xs">
+          <div className="px-3 sm:px-5 py-1 bg-slate-950/60 border-b border-slate-800/80 flex items-center gap-1.5 overflow-x-auto shrink-0 text-xs [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
             <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider shrink-0 mr-1">
               Filtro rápido:
             </span>

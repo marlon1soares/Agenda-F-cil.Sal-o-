@@ -83,6 +83,16 @@ function safeSetItem(key: string, value: string): void {
   }
 }
 
+function safeRemoveItem(key: string): void {
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.removeItem(key);
+    }
+  } catch (e) {
+    // ignore
+  }
+}
+
 // LocalStorage Persistence Wrappers
 export const Storage = {
   getConfig(): SalonConfig {
@@ -192,19 +202,37 @@ export const Storage = {
 
   getAdminCredentials(): AdminCredentials {
     const saved = safeGetItem('salaoAdminCredentials');
-    return saved ? JSON.parse(saved) : { email: 'admin@salao.com', phone: '(11) 99999-9999', password: '123456' };
+    const defaultMaster: AdminCredentials = {
+      cpf: '000.000.000-00',
+      email: 'marlon1soares28@gmail.com',
+      phone: '(11) 99999-9999',
+      password: 'admin',
+      registeredAt: new Date().toISOString()
+    };
+    if (!saved) return defaultMaster;
+    try {
+      const parsed = JSON.parse(saved);
+      return { ...defaultMaster, ...parsed };
+    } catch {
+      return defaultMaster;
+    }
   },
   getAdminCredentialsList(): AdminCredentials[] {
     const savedList = safeGetItem('salaoAdminCredentialsList');
+    const defaultMaster = this.getAdminCredentials();
     const defaultList: AdminCredentials[] = [
-      { email: 'admin@salao.com', phone: '(11) 99999-9999', password: '123456', registeredAt: new Date().toISOString() }
+      defaultMaster,
+      { cpf: '123.456.789-00', email: 'admin@salao.com', phone: '(11) 99999-9999', password: 'admin', registeredAt: new Date().toISOString() }
     ];
     let list: AdminCredentials[] = savedList ? JSON.parse(savedList) : defaultList;
 
     // Check single stored credential as well
     const single = this.getAdminCredentials();
-    if (single && single.email) {
-      const idx = list.findIndex(c => c.email.toLowerCase() === single.email.toLowerCase());
+    if (single && (single.cpf || single.email)) {
+      const idx = list.findIndex(c => 
+        (single.cpf && c.cpf && c.cpf.replace(/\D/g, '') === single.cpf.replace(/\D/g, '')) ||
+        (single.email && c.email && c.email.toLowerCase().trim() === (single.email || '').toLowerCase().trim())
+      );
       if (idx === -1) {
         list.push(single);
       } else {
@@ -216,8 +244,15 @@ export const Storage = {
   saveAdminCredentials(creds: AdminCredentials) {
     safeSetItem('salaoAdminCredentials', JSON.stringify(creds));
     const list = this.getAdminCredentialsList();
-    const cleanEmail = creds.email.toLowerCase().trim();
-    const existingIndex = list.findIndex(c => c.email.toLowerCase().trim() === cleanEmail);
+    const cleanCpf = creds.cpf ? creds.cpf.replace(/\D/g, '') : '';
+    const cleanEmail = creds.email ? creds.email.toLowerCase().trim() : '';
+
+    const existingIndex = list.findIndex(c => {
+      const cCpf = c.cpf ? c.cpf.replace(/\D/g, '') : '';
+      const cEmail = c.email ? c.email.toLowerCase().trim() : '';
+      return (cleanCpf && cCpf && cCpf === cleanCpf) || (cleanEmail && cEmail && cEmail === cleanEmail);
+    });
+
     if (existingIndex >= 0) {
       list[existingIndex] = { ...list[existingIndex], ...creds };
     } else {
@@ -227,6 +262,32 @@ export const Storage = {
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('salao_sync_data', { detail: { key: 'salaoAdminCredentials' } }));
     }
+  },
+  deleteAdminCredential(identifier: string): AdminCredentials[] {
+    const list = this.getAdminCredentialsList();
+    const cleanId = identifier.replace(/\D/g, '');
+    const cleanRaw = identifier.toLowerCase().trim();
+
+    const filtered = list.filter(c => {
+      const cCpfDigits = c.cpf ? c.cpf.replace(/\D/g, '') : '';
+      const cEmail = (c.email || '').toLowerCase().trim();
+      if (cleanId && cCpfDigits && cCpfDigits === cleanId) return false;
+      if (cleanRaw && cEmail && cEmail === cleanRaw) return false;
+      if (c.cpf === identifier || c.email === identifier) return false;
+      return true;
+    });
+
+    safeSetItem('salaoAdminCredentialsList', JSON.stringify(filtered));
+    // If the main single cred was deleted, update it to the first available or default
+    if (filtered.length > 0) {
+      safeSetItem('salaoAdminCredentials', JSON.stringify(filtered[0]));
+    } else {
+      safeRemoveItem('salaoAdminCredentials');
+    }
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('salao_sync_data', { detail: { key: 'salaoAdminCredentials' } }));
+    }
+    return filtered;
   },
 
   getAdminPaymentConfig(): AdminPaymentConfig {
