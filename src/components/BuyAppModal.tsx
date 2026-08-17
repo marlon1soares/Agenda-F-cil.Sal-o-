@@ -370,10 +370,6 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
     setStep('payment');
   };
 
-    // IF PAID PLAN IS SELECTED (30, 90, 180, 365 Days)
-    setStep('payment');
-  };
-
   // Copy Pix Key
   const handleCopyPix = () => {
     navigator.clipboard.writeText(adminPaymentConfig.chavePix);
