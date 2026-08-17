@@ -12,6 +12,8 @@ export interface SyncDatabaseState {
   services: any[];
   clients: any[];
   adminPaymentConfig: any;
+  adminCredentials?: any;
+  adminCredentialsList?: any[];
   messages: any[];
   notices: any[];
   onlineUsers: any[];
@@ -19,6 +21,43 @@ export interface SyncDatabaseState {
 }
 
 const DEFAULT_STATE: SyncDatabaseState = {
+  adminCredentials: {
+    cpf: "226.224.488-05",
+    email: "marlon1soares28@gmail.com",
+    phone: "(11) 99999-9999",
+    password: "admin",
+    registeredAt: "2026-01-01T00:00:00.000Z"
+  },
+  adminCredentialsList: [
+    {
+      cpf: "226.224.488-05",
+      email: "marlon1soares28@gmail.com",
+      phone: "(11) 99999-9999",
+      password: "admin",
+      registeredAt: "2026-01-01T00:00:00.000Z"
+    },
+    {
+      cpf: "309.287.638-54",
+      email: "marlon1soares28@gmail.com",
+      phone: "(11) 99999-8888",
+      password: "admin",
+      registeredAt: "2026-01-01T00:00:00.000Z"
+    },
+    {
+      cpf: "000.000.000-00",
+      email: "admin@salao.com",
+      phone: "(11) 99999-9999",
+      password: "admin",
+      registeredAt: "2026-01-01T00:00:00.000Z"
+    },
+    {
+      cpf: "123.456.789-00",
+      email: "admin@salao.com",
+      phone: "(11) 99999-9999",
+      password: "admin",
+      registeredAt: "2026-01-01T00:00:00.000Z"
+    }
+  ],
   salons: [
     {
       id: "salon-parcas",

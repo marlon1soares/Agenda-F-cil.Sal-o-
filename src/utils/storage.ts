@@ -207,11 +207,11 @@ export const Storage = {
   getAdminCredentials(): AdminCredentials {
     const saved = safeGetItem('salaoAdminCredentials');
     const defaultMaster: AdminCredentials = {
-      cpf: '000.000.000-00',
+      cpf: '226.224.488-05',
       email: 'marlon1soares28@gmail.com',
       phone: '(11) 99999-9999',
       password: 'admin',
-      registeredAt: new Date().toISOString()
+      registeredAt: '2026-01-01T00:00:00.000Z'
     };
     if (!saved) return defaultMaster;
     try {
@@ -225,10 +225,38 @@ export const Storage = {
     const savedList = safeGetItem('salaoAdminCredentialsList');
     const defaultMaster = this.getAdminCredentials();
     const defaultList: AdminCredentials[] = [
-      defaultMaster,
-      { cpf: '123.456.789-00', email: 'admin@salao.com', phone: '(11) 99999-9999', password: 'admin', registeredAt: new Date().toISOString() }
+      { cpf: '226.224.488-05', email: 'marlon1soares28@gmail.com', phone: '(11) 99999-9999', password: defaultMaster.cpf === '226.224.488-05' ? defaultMaster.password : 'admin', registeredAt: '2026-01-01T00:00:00.000Z' },
+      { cpf: '309.287.638-54', email: 'marlon1soares28@gmail.com', phone: '(11) 99999-8888', password: defaultMaster.cpf === '309.287.638-54' ? defaultMaster.password : 'admin', registeredAt: '2026-01-01T00:00:00.000Z' },
+      { cpf: '000.000.000-00', email: 'marlon1soares28@gmail.com', phone: '(11) 99999-9999', password: 'admin', registeredAt: '2026-01-01T00:00:00.000Z' },
+      { cpf: '123.456.789-00', email: 'admin@salao.com', phone: '(11) 99999-9999', password: 'admin', registeredAt: '2026-01-01T00:00:00.000Z' }
     ];
-    let list: AdminCredentials[] = savedList ? JSON.parse(savedList) : defaultList;
+
+    let list: AdminCredentials[] = [];
+    if (savedList) {
+      try {
+        const parsed = JSON.parse(savedList);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          list = parsed;
+        }
+      } catch {}
+    }
+
+    if (list.length === 0) {
+      list = defaultList;
+      safeSetItem('salaoAdminCredentialsList', JSON.stringify(list));
+    } else {
+      // Ensure the permanent admin accounts (226.224.488-05 and 309.287.638-54) are always in the list
+      defaultList.forEach(def => {
+        const defCpfDigits = def.cpf ? def.cpf.replace(/\D/g, '') : '';
+        const exists = list.some(c => {
+          const cDigits = c.cpf ? c.cpf.replace(/\D/g, '') : '';
+          return (defCpfDigits && cDigits && cDigits === defCpfDigits);
+        });
+        if (!exists) {
+          list.push(def);
+        }
+      });
+    }
 
     // Check single stored credential as well
     const single = this.getAdminCredentials();
@@ -247,6 +275,12 @@ export const Storage = {
   },
   saveAdminCredentials(creds: AdminCredentials) {
     safeSetItem('salaoAdminCredentials', JSON.stringify(creds));
+    try {
+      if (typeof window !== 'undefined' && window.sessionStorage) {
+        window.sessionStorage.setItem('salaoAdminCredentials', JSON.stringify(creds));
+      }
+    } catch {}
+
     const list = this.getAdminCredentialsList();
     const cleanCpf = creds.cpf ? creds.cpf.replace(/\D/g, '') : '';
     const cleanEmail = creds.email ? creds.email.toLowerCase().trim() : '';
@@ -262,7 +296,20 @@ export const Storage = {
     } else {
       list.push(creds);
     }
+
     safeSetItem('salaoAdminCredentialsList', JSON.stringify(list));
+    try {
+      if (typeof window !== 'undefined' && window.sessionStorage) {
+        window.sessionStorage.setItem('salaoAdminCredentialsList', JSON.stringify(list));
+      }
+    } catch {}
+
+    // Push to cloud sync engine so all cellphones, tablets, and devices update their credentials in real time
+    syncEngine.pushUpdate({
+      adminCredentials: creds,
+      adminCredentialsList: list
+    });
+
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('salao_sync_data', { detail: { key: 'salaoAdminCredentials' } }));
     }
@@ -288,6 +335,11 @@ export const Storage = {
     } else {
       safeRemoveItem('salaoAdminCredentials');
     }
+
+    syncEngine.pushUpdate({
+      adminCredentialsList: filtered
+    });
+
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('salao_sync_data', { detail: { key: 'salaoAdminCredentials' } }));
     }

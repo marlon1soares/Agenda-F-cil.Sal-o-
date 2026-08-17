@@ -1,4 +1,4 @@
-import { SalonApp, SalonConfig, Transaction, Appointment, Professional, ServiceItem, ClientRecord, AdminPaymentConfig, ChatMessage, SystemBroadcastNotice, LivePresenceUser } from '../types';
+import { SalonApp, SalonConfig, Transaction, Appointment, Professional, ServiceItem, ClientRecord, AdminPaymentConfig, AdminCredentials, ChatMessage, SystemBroadcastNotice, LivePresenceUser } from '../types';
 
 export interface FullSyncState {
   salons: SalonApp[];
@@ -10,6 +10,8 @@ export interface FullSyncState {
   services: ServiceItem[];
   clients: ClientRecord[];
   adminPaymentConfig: AdminPaymentConfig;
+  adminCredentials?: AdminCredentials;
+  adminCredentialsList?: AdminCredentials[];
   messages?: ChatMessage[];
   notices?: SystemBroadcastNotice[];
   onlineUsers?: LivePresenceUser[];

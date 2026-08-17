@@ -195,6 +195,18 @@ class SyncEngine {
       if (state.adminPaymentConfig) {
         try { localStorage.setItem('salaoAdminPaymentConfig', JSON.stringify(state.adminPaymentConfig)); } catch {}
       }
+      if (state.adminCredentials) {
+        try {
+          localStorage.setItem('salaoAdminCredentials', JSON.stringify(state.adminCredentials));
+          sessionStorage.setItem('salaoAdminCredentials', JSON.stringify(state.adminCredentials));
+        } catch {}
+      }
+      if (state.adminCredentialsList && Array.isArray(state.adminCredentialsList)) {
+        try {
+          localStorage.setItem('salaoAdminCredentialsList', JSON.stringify(state.adminCredentialsList));
+          sessionStorage.setItem('salaoAdminCredentialsList', JSON.stringify(state.adminCredentialsList));
+        } catch {}
+      }
       if (state.messages && Array.isArray(state.messages)) {
         messagesChanged = true;
         try { localStorage.setItem('salaoMessages', JSON.stringify(state.messages)); } catch {}

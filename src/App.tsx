@@ -948,7 +948,7 @@ export function App() {
       {/* Admin Password & Reset Modal */}
       <AdminPasswordModal
         isOpen={isAdminAuthOpen}
-        simpleLoginOnly={userRole !== 'admin'}
+        simpleLoginOnly={false}
         onClose={() => setIsAdminAuthOpen(false)}
         onSuccess={() => {
           setUserRole('admin');
