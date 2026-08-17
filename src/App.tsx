@@ -17,6 +17,7 @@ import { ClientLinkModal } from './components/ClientLinkModal';
 import { SalonLinkModal } from './components/SalonLinkModal';
 import { SalonAccessLinkModal } from './components/SalonAccessLinkModal';
 import { SalonAuthModal } from './components/SalonAuthModal';
+import { LiveConnectionHubModal } from './components/LiveConnectionHubModal';
 
 import { Transaction, Appointment, SalonConfig, UserRole, Professional, ServiceItem, ClientRecord, SalonApp } from './types';
 import { Storage } from './utils/storage';
@@ -25,7 +26,7 @@ import { DEFAULT_SALON_APPS, DEFAULT_CONFIG } from './data/mockData';
 import { getUrlParam, hasUrlAction } from './utils/url';
 import { getSalonLicenseInfo } from './utils/license';
 import { BlockedLicenseBanner } from './components/BlockedLicenseBanner';
-import { LayoutDashboard, CreditCard, Calendar, Users, Scissors, UserCheck, LogOut, RotateCcw, ShieldCheck, Building2, Store, Eye, CheckCircle2, AlertCircle, ShoppingCart, Sparkles, Plus, ExternalLink, Key, Link2 } from 'lucide-react';
+import { LayoutDashboard, CreditCard, Calendar, Users, Scissors, UserCheck, LogOut, RotateCcw, ShieldCheck, Building2, Store, Eye, CheckCircle2, AlertCircle, ShoppingCart, Sparkles, Plus, ExternalLink, Key, Link2, Settings } from 'lucide-react';
 
 export function App() {
   // Check if opened via dedicated direct purchase / activation link
@@ -111,6 +112,7 @@ export function App() {
   const [isClientLinkOpen, setIsClientLinkOpen] = useState(false);
   const [isSalonLinkOpen, setIsSalonLinkOpen] = useState(false);
   const [isSalonAccessLinkOpen, setIsSalonAccessLinkOpen] = useState(false);
+  const [isLiveHubOpen, setIsLiveHubOpen] = useState(false);
   const [salonAuthCredentials, setSalonAuthCredentials] = useState<{ cpf: string; token: string }>({ cpf: '', token: '' });
 
   const handleOpenSalonAuth = (creds?: { cpf?: string; token?: string }) => {
@@ -503,6 +505,7 @@ export function App() {
           onOpenClientLink={() => setIsClientLinkOpen(true)}
           onOpenSalonLink={() => setIsSalonLinkOpen(true)}
           onOpenSalonAccessLink={() => setIsSalonAuthOpen(true)}
+          onOpenLiveHub={() => setIsLiveHubOpen(true)}
           isExpanded={isExpanded}
           onToggleExpand={() => setIsExpanded(!isExpanded)}
           isMinimized={isMinimized}
@@ -514,59 +517,50 @@ export function App() {
         {!isMinimized && (
           <div className="p-2 sm:p-4 space-y-4">
             
-            {/* ROLE CONTEXT QUICK TOOLBAR */}
+            {/* ROLE CONTEXT QUICK TOOLBAR FOR ADMIN */}
             {userRole === 'admin' && (
-              <div className="bg-slate-900 border border-slate-800 p-3.5 rounded-2xl space-y-3 shadow-md">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                  <div className="flex items-center gap-2 text-xs font-bold text-amber-300">
-                    <span className="p-1.5 bg-amber-500/20 rounded-lg border border-amber-500/30">👑</span>
+              <div id="admin-context-toolbar" className="bg-slate-900 border border-slate-800 p-3 sm:p-4 rounded-2xl space-y-3 shadow-md">
+                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5 text-xs font-bold text-amber-300">
+                    <span className="p-2 bg-amber-500/20 rounded-xl border border-amber-500/30 text-base">👑</span>
                     <div>
-                      <span className="font-extrabold text-sm text-sky-400">Painel do Administrador (Gestão)</span>
-                      <p className="text-[11px] text-slate-400 font-normal">
-                        Monitore todos os salões e barbearias conectados à plataforma
+                      <div className="flex items-center gap-2">
+                        <span className="font-extrabold text-sm sm:text-base text-sky-400">Painel do Administrador (Gestão)</span>
+                        <span className="bg-emerald-500/20 text-emerald-300 text-[10px] font-black px-2 py-0.5 rounded-full border border-emerald-500/30">
+                          {salons.filter(s => s.status === 'active').length} Salões Ativos
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-400 font-normal mt-0.5">
+                        Monitore salões, barbearias, faturamento e solicitações de acesso
                       </p>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto justify-end">
+                  <div className="flex items-center gap-2 flex-wrap w-full md:w-auto justify-start md:justify-end">
                     <button
-                      onClick={() => setIsSalonLinkOpen(true)}
-                      className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white font-extrabold text-xs px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 shadow-sm border border-violet-400/30 active:scale-95"
-                      title="Gerar e enviar link de compra/salão para donos de salão"
-                    >
-                      <ShoppingCart className="w-3.5 h-3.5 text-violet-200" />
-                      <span>Criar link de compra/Salão</span>
-                    </button>
-
-                    <button
-                      onClick={() => setIsSalonAuthOpen(true)}
-                      className="bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs px-3.5 py-1.5 rounded-full transition-all flex items-center gap-1.5 shadow-sm border border-emerald-400/40 active:scale-95 cursor-pointer"
-                      title="Abrir tela e criar link de acesso ao salão com CPF e Token"
-                    >
-                      <Key className="w-3.5 h-3.5 text-white" />
-                      <span>Criar link para salão/acesso</span>
-                    </button>
-
-                    <button
+                      id="btn-admin-auth-settings"
                       onClick={() => setIsAdminAuthOpen(true)}
-                      className="bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 shadow-sm border border-emerald-400/30 active:scale-95"
+                      className="bg-slate-800 hover:bg-slate-700 text-emerald-300 font-extrabold text-xs px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 shadow-xs border border-emerald-500/30 active:scale-95 cursor-pointer"
                       title="Cadastrar ou alterar CPF e senha de Administrador"
                     >
-                      <Key className="w-3.5 h-3.5 text-emerald-200" />
-                      <span>Cadastrar / Alterar Senha</span>
+                      <Key className="w-3.5 h-3.5 text-emerald-300" />
+                      <span>Alterar Senha Admin</span>
                     </button>
 
                     <button
+                      id="btn-admin-payment-config"
                       onClick={() => setIsAdminPaymentOpen(true)}
-                      className="bg-amber-600 hover:bg-amber-500 text-slate-950 font-black text-xs px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 shadow-sm"
+                      className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 shadow-xs active:scale-95 cursor-pointer"
                       title="Configurar Conta de Recebimento Pix e Cartão"
                     >
-                      <span>⚙️ Recebimento (Pix/Cartão)</span>
+                      <Settings className="w-3.5 h-3.5" />
+                      <span>Configurar Recebimento (Pix)</span>
                     </button>
 
                     <button
+                      id="btn-admin-salons-manage"
                       onClick={() => setIsAdminSalonsOpen(true)}
-                      className="bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-xs px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 shadow-sm border border-blue-400/30"
+                      className="bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-xs px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 shadow-xs border border-blue-400/30 active:scale-95 cursor-pointer"
                       title="Abrir Gestão Completa de Salões & Solicitações"
                     >
                       <Building2 className="w-3.5 h-3.5 text-sky-200" />
@@ -579,7 +573,7 @@ export function App() {
                 <div className="pt-2 border-t border-slate-800/80 flex items-center gap-2 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden text-xs">
                   <span className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider shrink-0 flex items-center gap-1">
                     <Store className="w-3.5 h-3.5 text-sky-400" />
-                    <span>Salões Conectados ({salons.length}):</span>
+                    <span>Salões ({salons.length}):</span>
                   </span>
 
                   <div className="flex items-center gap-1.5 flex-nowrap">
@@ -588,12 +582,13 @@ export function App() {
                       return (
                         <button
                           key={salon.id}
+                          id={`btn-select-salon-${salon.id}`}
                           onClick={() => {
                             handleSelectSalon(salon);
                             if (activeTab === 'todos_saloes') setActiveTab('dashboard');
                           }}
                           title={`Visualizar e gerenciar layout de ${salon.config.nomeSalao}`}
-                          className={`px-3 py-1.5 rounded-xl font-bold flex items-center gap-2 transition-all shrink-0 border text-xs active:scale-95 ${
+                          className={`px-3 py-1.5 rounded-xl font-bold flex items-center gap-2 transition-all shrink-0 border text-xs active:scale-95 cursor-pointer ${
                             isCurrent
                               ? 'bg-blue-600 text-white border-blue-400 shadow-md shadow-blue-900/30'
                               : 'bg-slate-950 text-slate-300 border-slate-800 hover:border-slate-600 hover:bg-slate-800'
@@ -614,8 +609,9 @@ export function App() {
                     })}
 
                     <button
+                      id="btn-admin-add-new-salon"
                       onClick={() => setIsAdminSalonsOpen(true)}
-                      className="px-2.5 py-1.5 rounded-xl text-slate-400 hover:text-sky-300 bg-slate-950/60 hover:bg-slate-800 border border-dashed border-slate-700 hover:border-sky-500 font-bold flex items-center gap-1 shrink-0 transition-all text-xs"
+                      className="px-2.5 py-1.5 rounded-xl text-slate-400 hover:text-sky-300 bg-slate-950/60 hover:bg-slate-800 border border-dashed border-slate-700 hover:border-sky-500 font-bold flex items-center gap-1 shrink-0 transition-all text-xs cursor-pointer"
                       title="Cadastrar ou conectar novo salão"
                     >
                       <Plus className="w-3.5 h-3.5" />
@@ -642,6 +638,7 @@ export function App() {
                   handleSaveAppointment(date, timeSlot, ap);
                 }}
                 onOpenCatalog={() => setIsCatalogOpen(true)}
+                onOpenLiveHub={() => setIsLiveHubOpen(true)}
               />
             ) : (
               <>
@@ -887,6 +884,7 @@ export function App() {
                     onShiftDayTime={handleShiftDayTime}
                     onResetDaySchedule={handleResetDaySchedule}
                     onConvertToPOS={handleConvertAppointmentToPOS}
+                    onOpenLiveHub={() => setIsLiveHubOpen(true)}
                   />
                 )}
 
@@ -973,6 +971,7 @@ export function App() {
         onOpenSalonLink={() => setIsSalonLinkOpen(true)}
         onOpenSalonAccessLink={() => setIsSalonAuthOpen(true)}
         onOpenAdminAuth={() => setIsAdminAuthOpen(true)}
+        onOpenLiveHub={() => setIsLiveHubOpen(true)}
       />
 
       {/* Admin Receiving Payment Account Modal */}
@@ -1039,6 +1038,15 @@ export function App() {
           setUserRole('salao');
           setIsSalonAuthOpen(false);
         }}
+      />
+
+      {/* Triple Live Connection Hub: Admin, Salons and Clients Connected */}
+      <LiveConnectionHubModal
+        isOpen={isLiveHubOpen}
+        onClose={() => setIsLiveHubOpen(false)}
+        userRole={userRole}
+        activeSalon={activeSalon}
+        onSelectRole={handleSelectRole}
       />
 
 

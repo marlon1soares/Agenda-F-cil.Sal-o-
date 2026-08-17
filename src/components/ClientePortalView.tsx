@@ -18,6 +18,7 @@ interface ClientePortalViewProps {
   timeAdjustments?: Record<string, number>;
   onAppointmentBooked: (date: string, timeSlot: string, ap: Appointment) => void;
   onOpenCatalog?: () => void;
+  onOpenLiveHub?: () => void;
 }
 
 export const ClientePortalView: React.FC<ClientePortalViewProps> = ({
@@ -27,6 +28,7 @@ export const ClientePortalView: React.FC<ClientePortalViewProps> = ({
   timeAdjustments = {},
   onAppointmentBooked,
   onOpenCatalog,
+  onOpenLiveHub,
 }) => {
   // Guaranteed non-null salon and configuration objects
   const safeSalon: SalonApp = activeSalon || (salons && salons.length > 0 ? salons[0] : DEFAULT_SALON_APPS[0]);
@@ -227,7 +229,42 @@ export const ClientePortalView: React.FC<ClientePortalViewProps> = ({
                 </span>
               </div>
             </div>
+
+            {onOpenLiveHub && (
+              <button
+                type="button"
+                onClick={onOpenLiveHub}
+                title="Abrir Chat ao Vivo com o Proprietário do Salão"
+                className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs px-3 py-2 rounded-xl border border-emerald-400/40 shadow-md flex items-center gap-1.5 transition-all active:scale-95 shrink-0 cursor-pointer"
+              >
+                <MessageCircle className="w-4 h-4 text-emerald-100 animate-pulse" />
+                <span>Chat com o Salão</span>
+              </button>
+            )}
           </div>
+        </div>
+
+        {/* Real-Time Live Connection Ribbon */}
+        <div className="mt-3 pt-2.5 border-t border-white/15 flex flex-wrap items-center justify-between gap-2 text-[11px] text-rose-100">
+          <div className="flex items-center gap-2">
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+            </span>
+            <span className="font-bold text-white">Conexão em Tempo Real Ativa:</span>
+            <span className="opacity-90">Salão e Clientes 100% Sincronizados</span>
+          </div>
+
+          {onOpenLiveHub && (
+            <button
+              type="button"
+              onClick={onOpenLiveHub}
+              className="text-[10px] font-black bg-white/20 hover:bg-white/30 text-white px-2.5 py-0.5 rounded-full border border-white/20 flex items-center gap-1 transition-colors"
+            >
+              <span>Ver Avisos & Mural</span>
+              <ChevronRight className="w-3 h-3" />
+            </button>
+          )}
         </div>
       </div>
 

@@ -1,5 +1,5 @@
 import { FullSyncState } from '../types/sync';
-import { Storage } from './storage';
+import { soundEffects } from './audio';
 
 function getSafeClientId(): string {
   try {
@@ -28,6 +28,11 @@ class SyncEngine {
   private debounceTimer: any = null;
   private pendingUpdates: Partial<FullSyncState> = {};
   private isApplyingRemote = false;
+  private presenceInterval: any = null;
+
+  public getClientId(): string {
+    return CLIENT_ID;
+  }
 
   public init() {
     if (this.isInitialized || typeof window === 'undefined') return;
@@ -39,7 +44,10 @@ class SyncEngine {
     // 2. Connect to Server-Sent Events for Real-time Streaming
     this.connectSSE();
 
-    // 3. Listen to window focus or online to re-sync
+    // 3. Start Periodic Presence Heartbeat
+    this.startPresenceHeartbeat();
+
+    // 4. Listen to window focus or online to re-sync
     try {
       window.addEventListener('online', () => {
         this.fetchServerState();
@@ -58,6 +66,38 @@ class SyncEngine {
     } catch {
       // ignore
     }
+  }
+
+  public sendPresence(user: { id?: string; name: string; role: string; salonId?: string; salonName?: string; status?: string }) {
+    if (typeof window === 'undefined') return;
+    try {
+      const payload = {
+        id: user.id || CLIENT_ID,
+        name: user.name || 'Convidado',
+        role: user.role || 'cliente',
+        salonId: user.salonId,
+        salonName: user.salonName,
+        status: user.status || 'online',
+        lastSeen: Date.now()
+      };
+      fetch('/api/presence/heartbeat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user: payload })
+      }).catch(() => {});
+    } catch {}
+  }
+
+  private startPresenceHeartbeat() {
+    if (this.presenceInterval) clearInterval(this.presenceInterval);
+    this.presenceInterval = setInterval(() => {
+      try {
+        const role = localStorage.getItem('salao_active_role') || 'cliente';
+        const name = localStorage.getItem('salao_user_name') || localStorage.getItem('salao_cliente_name') || 'Usuário Online';
+        const activeSalonId = localStorage.getItem('salao_active_id') || 'salon-parcas';
+        this.sendPresence({ id: CLIENT_ID, name, role, salonId: activeSalonId });
+      } catch {}
+    }, 25000);
   }
 
   public async fetchServerState(): Promise<FullSyncState | null> {
@@ -124,6 +164,9 @@ class SyncEngine {
 
     this.isApplyingRemote = true;
     try {
+      let appointmentsChanged = false;
+      let messagesChanged = false;
+
       if (state.salons && Array.isArray(state.salons)) {
         try { localStorage.setItem('salaoAppsList', JSON.stringify(state.salons)); } catch {}
       }
@@ -131,6 +174,7 @@ class SyncEngine {
         try { localStorage.setItem('salaoConfig', JSON.stringify(state.config)); } catch {}
       }
       if (state.appointments) {
+        appointmentsChanged = true;
         try { localStorage.setItem('salaoAgenda', JSON.stringify(state.appointments)); } catch {}
       }
       if (state.transactions && Array.isArray(state.transactions)) {
@@ -150,6 +194,25 @@ class SyncEngine {
       }
       if (state.adminPaymentConfig) {
         try { localStorage.setItem('salaoAdminPaymentConfig', JSON.stringify(state.adminPaymentConfig)); } catch {}
+      }
+      if (state.messages && Array.isArray(state.messages)) {
+        messagesChanged = true;
+        try { localStorage.setItem('salaoMessages', JSON.stringify(state.messages)); } catch {}
+      }
+      if (state.notices && Array.isArray(state.notices)) {
+        try { localStorage.setItem('salaoNotices', JSON.stringify(state.notices)); } catch {}
+      }
+      if (state.onlineUsers && Array.isArray(state.onlineUsers)) {
+        try { localStorage.setItem('salaoOnlineUsers', JSON.stringify(state.onlineUsers)); } catch {}
+      }
+
+      // Play chime if another device booked an appointment or sent a message
+      if (senderId && senderId !== CLIENT_ID) {
+        if (appointmentsChanged) {
+          soundEffects.playBookingChime();
+        } else if (messagesChanged) {
+          soundEffects.playMessagePing();
+        }
       }
 
       // Notify entire app of synced remote data

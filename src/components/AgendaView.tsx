@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Appointment, SalonConfig, UserRole } from '../types';
 import { DEFAULT_TIMESLOTS } from '../data/mockData';
-import { Calendar as CalendarIcon, Clock, Lock, Plus, RotateCcw, CheckCircle2, ChevronUp, ChevronDown, DollarSign, X } from 'lucide-react';
+import { Calendar as CalendarIcon, Clock, Lock, Plus, RotateCcw, CheckCircle2, ChevronUp, ChevronDown, DollarSign, X, MessageSquare, Phone, Wifi } from 'lucide-react';
 
 interface AgendaViewProps {
   appointments: Record<string, Record<string, Appointment>>;
@@ -13,6 +13,7 @@ interface AgendaViewProps {
   onShiftDayTime: (date: string, deltaMinutes: number) => void;
   onResetDaySchedule: (date: string) => void;
   onConvertToPOS: (ap: Appointment) => void;
+  onOpenLiveHub?: () => void;
 }
 
 export const AgendaView: React.FC<AgendaViewProps> = ({
@@ -25,6 +26,7 @@ export const AgendaView: React.FC<AgendaViewProps> = ({
   onShiftDayTime,
   onResetDaySchedule,
   onConvertToPOS,
+  onOpenLiveHub,
 }) => {
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [activeModal, setActiveModal] = useState<'book' | 'block' | null>(null);
@@ -99,8 +101,32 @@ export const AgendaView: React.FC<AgendaViewProps> = ({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       
+      {/* Real-time sync status ribbon */}
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3 flex flex-wrap items-center justify-between gap-2 shadow-xs">
+        <div className="flex items-center gap-2">
+          <div className="relative flex h-3 w-3">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+          </div>
+          <div className="text-xs">
+            <span className="font-bold text-white">Sincronização em Tempo Real: </span>
+            <span className="text-emerald-400 font-medium">Conectado com Clientes e Administrador</span>
+          </div>
+        </div>
+
+        {onOpenLiveHub && (
+          <button
+            onClick={onOpenLiveHub}
+            className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs px-3 py-1.5 rounded-xl flex items-center gap-1.5 shadow-xs transition-colors"
+          >
+            <MessageSquare className="w-3.5 h-3.5" />
+            <span>Chat / Mural de Avisos</span>
+          </button>
+        )}
+      </div>
+
       {/* Date Selector & Day Schedule Controls */}
       <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         
@@ -214,9 +240,29 @@ export const AgendaView: React.FC<AgendaViewProps> = ({
                     {/* Client / Reason */}
                     <td className="p-3 font-semibold">
                       {status === 'agendado' || status === 'concluido' ? (
-                        <div>
-                          <div className="text-slate-900 font-bold">{ap?.clientName}</div>
-                          {ap?.clientPhone && <div className="text-[10px] text-slate-500">{ap.clientPhone}</div>}
+                        <div className="space-y-1">
+                          <div className="text-slate-900 font-bold flex items-center gap-1.5">
+                            <span>{ap?.clientName}</span>
+                            {ap?.origem === 'cliente' && (
+                              <span className="bg-sky-100 text-sky-700 text-[9px] font-black px-1.5 py-0.2 rounded border border-sky-300">
+                                Via Portal
+                              </span>
+                            )}
+                          </div>
+                          {ap?.clientPhone && (
+                            <div className="flex items-center gap-2 text-[10px] text-slate-500">
+                              <span>{ap.clientPhone}</span>
+                              <a
+                                href={`https://wa.me/55${ap.clientPhone.replace(/\D/g, '')}?text=${encodeURIComponent(`Olá ${ap.clientName}! Confirmando seu horário no ${config.nomeSalao} às ${displayTime}.`)}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                title="Enviar mensagem no WhatsApp para o cliente"
+                                className="text-emerald-600 hover:text-emerald-700 font-bold flex items-center gap-0.5"
+                              >
+                                <Phone className="w-2.5 h-2.5" /> Zap
+                              </a>
+                            </div>
+                          )}
                         </div>
                       ) : status === 'bloqueado' ? (
                         <span className="text-rose-600 italic font-semibold">{ap?.notes || 'Horário Bloqueado'}</span>

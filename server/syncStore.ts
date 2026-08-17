@@ -12,6 +12,9 @@ export interface SyncDatabaseState {
   services: any[];
   clients: any[];
   adminPaymentConfig: any;
+  messages: any[];
+  notices: any[];
+  onlineUsers: any[];
   lastUpdated: number;
 }
 
@@ -167,6 +170,33 @@ const DEFAULT_STATE: SyncDatabaseState = {
     precoPlano180Dias: 135.00,
     precoPlano365Dias: 240.00
   },
+  messages: [
+    {
+      id: "msg-welcome-1",
+      salonId: "salon-parcas",
+      salonName: "Controle Salão dos Parças",
+      fromRole: "admin",
+      toRole: "todos",
+      senderName: "Administrador Central",
+      content: "💈 Bem-vindo ao ecossistema conectado Agenda Fácil! Todos os salões, administradores e clientes agora contam com sincronização ao vivo em tempo real.",
+      timestamp: "09:00",
+      date: new Date().toISOString().split('T')[0],
+      createdAt: Date.now() - 3600000,
+      type: "admin_announcement"
+    }
+  ],
+  notices: [
+    {
+      id: "not-1",
+      title: "🚀 Conexão em Tempo Real Ativa",
+      message: "Seu sistema está 100% conectado! Agendamentos de clientes, atualizações de horários e mensagens sincronizam instantaneamente.",
+      fromRole: "admin",
+      target: "todos",
+      createdAt: new Date().toISOString().split('T')[0],
+      urgent: false
+    }
+  ],
+  onlineUsers: [],
   lastUpdated: Date.now()
 };
 
@@ -251,6 +281,40 @@ class SyncStore {
 
     this.broadcastRaw(payload);
     return this.state;
+  }
+
+  public addMessage(message: any, senderId?: string): SyncDatabaseState {
+    const messages = Array.isArray(this.state.messages) ? [...this.state.messages] : [];
+    messages.push(message);
+    // Keep last 200 messages
+    if (messages.length > 200) {
+      messages.splice(0, messages.length - 200);
+    }
+    return this.updateState({ messages }, senderId);
+  }
+
+  public addNotice(notice: any, senderId?: string): SyncDatabaseState {
+    const notices = Array.isArray(this.state.notices) ? [...this.state.notices] : [];
+    notices.unshift(notice);
+    if (notices.length > 50) {
+      notices.splice(50);
+    }
+    return this.updateState({ notices }, senderId);
+  }
+
+  public updatePresence(user: { id: string; name: string; role: string; salonId?: string; salonName?: string; status?: string }): SyncDatabaseState {
+    const now = Date.now();
+    let onlineUsers = Array.isArray(this.state.onlineUsers) ? [...this.state.onlineUsers] : [];
+    
+    // Filter out inactive users (> 45s without ping)
+    onlineUsers = onlineUsers.filter(u => now - u.lastSeen < 45000 && u.id !== user.id);
+    onlineUsers.push({
+      ...user,
+      lastSeen: now,
+      status: user.status || 'online'
+    });
+
+    return this.updateState({ onlineUsers });
   }
 
   public addSseClient(res: Response) {

@@ -84,6 +84,72 @@ app.post("/api/sync/state", (req, res) => {
   }
 });
 
+// Live Chat Endpoint (Client <-> Salon <-> Admin)
+app.post("/api/chat/message", (req, res) => {
+  try {
+    const { message, clientId } = req.body;
+    if (!message || !message.content) {
+      return res.status(400).json({ error: "message and message.content are required." });
+    }
+    const fullMsg = {
+      id: message.id || 'msg_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+      salonId: message.salonId || 'salon-parcas',
+      salonName: message.salonName || 'Salão',
+      fromRole: message.fromRole || 'cliente',
+      toRole: message.toRole || 'salao',
+      senderName: message.senderName || 'Usuário',
+      senderPhone: message.senderPhone || '',
+      clientPhone: message.clientPhone || '',
+      content: message.content,
+      timestamp: message.timestamp || new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+      date: message.date || new Date().toISOString().split('T')[0],
+      createdAt: Date.now(),
+      type: message.type || 'chat'
+    };
+    const state = syncStore.addMessage(fullMsg, clientId);
+    res.json({ success: true, message: fullMsg, messages: state.messages });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || "Failed to send chat message." });
+  }
+});
+
+// Broadcast System Notice Endpoint (Admin / Platform Announcements)
+app.post("/api/notices/broadcast", (req, res) => {
+  try {
+    const { notice, clientId } = req.body;
+    if (!notice || !notice.message) {
+      return res.status(400).json({ error: "notice and notice.message are required." });
+    }
+    const fullNotice = {
+      id: notice.id || 'not_' + Date.now(),
+      title: notice.title || 'Comunicado Geral',
+      message: notice.message,
+      fromRole: notice.fromRole || 'admin',
+      target: notice.target || 'todos',
+      createdAt: notice.createdAt || new Date().toISOString().split('T')[0],
+      urgent: !!notice.urgent
+    };
+    const state = syncStore.addNotice(fullNotice, clientId);
+    res.json({ success: true, notice: fullNotice, notices: state.notices });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || "Failed to broadcast notice." });
+  }
+});
+
+// Presence & Online Heartbeat Endpoint
+app.post("/api/presence/heartbeat", (req, res) => {
+  try {
+    const { user } = req.body;
+    if (!user || !user.id) {
+      return res.status(400).json({ error: "user object with id is required." });
+    }
+    const state = syncStore.updatePresence(user);
+    res.json({ success: true, onlineUsers: state.onlineUsers });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || "Failed to update presence." });
+  }
+});
+
 // Send Purchase Confirmation & Access Token Email
 app.post("/api/send-purchase-email", async (req, res) => {
   try {

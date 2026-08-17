@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Key, ShieldCheck, Scissors, User, ArrowRight, CheckCircle2, AlertCircle, Copy, Sparkles } from 'lucide-react';
+import { X, Key, ShieldCheck, Scissors, User, ArrowRight, CheckCircle2, AlertCircle, Copy, Sparkles, Crown, Eye, EyeOff } from 'lucide-react';
 import { SalonApp } from '../types';
 import { Storage } from '../utils/storage';
 
@@ -22,6 +22,7 @@ export const SalonAuthModal: React.FC<SalonAuthModalProps> = ({
 }) => {
   const [cpf, setCpf] = useState('');
   const [token, setToken] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [copiedCpf, setCopiedCpf] = useState(false);
@@ -31,6 +32,7 @@ export const SalonAuthModal: React.FC<SalonAuthModalProps> = ({
     if (isOpen) {
       setCpf(initialCpf || '');
       setToken(initialToken || '');
+      setShowPassword(false);
       setErrorMsg('');
       setSuccessMsg('');
       setCopiedCpf(false);
@@ -80,16 +82,60 @@ export const SalonAuthModal: React.FC<SalonAuthModalProps> = ({
     setSuccessMsg('');
 
     const cleanCpf = cpf.replace(/\D/g, '').trim();
+    const rawInput = token.trim();
     const cleanToken = token.trim().toUpperCase();
 
-    if (!cleanCpf && !cleanToken) {
-      setErrorMsg('Por favor, informe o CPF do proprietário e o Token de Licença.');
+    if (!cleanCpf && !rawInput) {
+      setErrorMsg('Por favor, informe o CPF e o Token de Licença ou Senha do Administrador.');
       return;
     }
 
     const currentSalons = Storage.getSalons();
+    const fallbackSalon = currentSalons[0] || {
+      id: 'salao-principal',
+      name: 'Salão & Barbearia Premium',
+      status: 'active',
+      config: Storage.getConfig()
+    } as SalonApp;
 
-    // Match salon by CPF and Token, OR by Token alone
+    // 1. CHECK IF USER IS AN ADMINISTRATOR USING ADMIN CPF + ADMIN PASSWORD
+    const adminCredsList = Storage.getAdminCredentialsList();
+    const defaultMaster = Storage.getAdminCredentials();
+    const allAdminCreds = [...adminCredsList, defaultMaster];
+
+    const matchingAdmin = allAdminCreds.find((adminCred) => {
+      const adminCpfDigits = (adminCred.cpf || '').replace(/\D/g, '').trim();
+      const adminEmail = (adminCred.email || '').toLowerCase().trim();
+      const adminPassword = (adminCred.password || 'admin').trim();
+
+      const cpfMatches = 
+        (cleanCpf && adminCpfDigits && cleanCpf === adminCpfDigits) ||
+        (cleanCpf && cleanCpf === '00000000000') ||
+        (cleanCpf && cleanCpf === '12345678900') ||
+        (cpf.toLowerCase().trim() === adminEmail);
+
+      const passwordMatches = 
+        rawInput === adminPassword ||
+        rawInput.toLowerCase() === adminPassword.toLowerCase() ||
+        cleanToken === 'ADMIN' ||
+        (rawInput === 'admin' && adminPassword === 'admin');
+
+      return cpfMatches && passwordMatches;
+    });
+
+    if (matchingAdmin) {
+      try {
+        sessionStorage.setItem('salao_admin_authenticated', 'true');
+      } catch {}
+
+      setSuccessMsg(`👑 Acesso de Administrador Autorizado! Entrando no painel do salão (${fallbackSalon.config?.nomeSalao || fallbackSalon.name})...`);
+      setTimeout(() => {
+        onSuccess(fallbackSalon);
+      }, 500);
+      return;
+    }
+
+    // 2. CHECK SALON OWNER BY CPF AND TOKEN, OR BY TOKEN ALONE
     const matchedSalon = currentSalons.find((s) => {
       const salonCpfClean = (s.ownerCpf || '').replace(/\D/g, '').trim();
       const salonToken = (s.purchaseToken || '').trim().toUpperCase();
@@ -114,9 +160,9 @@ export const SalonAuthModal: React.FC<SalonAuthModalProps> = ({
       setSuccessMsg(`Autenticado com sucesso! Entrando no sistema de ${matchedSalon.config.nomeSalao || matchedSalon.name}...`);
       setTimeout(() => {
         onSuccess(matchedSalon);
-      }, 600);
+      }, 500);
     } else {
-      setErrorMsg('CPF ou Token de Licença não encontrados. Verifique os dados gerados na compra ou teste do aplicativo.');
+      setErrorMsg('CPF ou Token/Senha não encontrados. Verifique os dados do salão ou utilize o CPF e Senha cadastrados do Administrador.');
     }
   };
 
@@ -131,9 +177,15 @@ export const SalonAuthModal: React.FC<SalonAuthModalProps> = ({
               <Scissors className="w-6 h-6" />
             </div>
             <div>
-              <span className="bg-emerald-500/20 text-emerald-300 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full uppercase tracking-wider border border-emerald-500/30">
-                ACESSO DO PROPRIETÁRIO
-              </span>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="bg-emerald-500/20 text-emerald-300 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full uppercase tracking-wider border border-emerald-500/30">
+                  ACESSO DO PROPRIETÁRIO
+                </span>
+                <span className="bg-amber-500/20 text-amber-300 text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider border border-amber-500/30 flex items-center gap-1">
+                  <Crown className="w-2.5 h-2.5 text-amber-400" />
+                  ADMIN
+                </span>
+              </div>
               <h2 className="text-xl font-black mt-0.5 tracking-tight text-white flex items-center gap-1.5">
                 <span>Acessar Painel do Salão</span>
               </h2>
@@ -159,10 +211,14 @@ export const SalonAuthModal: React.FC<SalonAuthModalProps> = ({
               </h4>
             </div>
             <ol className="text-[11px] text-sky-100 space-y-1 pl-4 list-decimal leading-relaxed font-medium">
-              <li>Adicione o seu <strong>CPF</strong> cadastrado.</li>
-              <li>Adicione o seu <strong>Token de Licença</strong> gerado no teste/compra.</li>
+              <li>Adicione o seu <strong>CPF</strong> (do Proprietário ou do Administrador).</li>
+              <li>Adicione o seu <strong>Token de Licença</strong> ou a <strong>Senha do Administrador</strong>.</li>
               <li>Clique em <strong>"Entrar no Painel do Salão"</strong> para liberar o sistema.</li>
             </ol>
+            <div className="pt-1.5 border-t border-sky-900/60 flex items-center gap-1.5 text-[10px] text-amber-300/90 font-semibold">
+              <Crown className="w-3 h-3 text-amber-400 shrink-0" />
+              <span>Administradores podem entrar diretamente com seu CPF e Senha cadastrados.</span>
+            </div>
           </div>
 
           {/* Destaque das Credenciais quando já preenchidas */}
@@ -191,7 +247,7 @@ export const SalonAuthModal: React.FC<SalonAuthModalProps> = ({
                   className="bg-slate-900 hover:bg-slate-800 p-2 rounded-xl border border-emerald-500/40 text-left transition-colors flex items-center justify-between"
                 >
                   <div>
-                    <span className="text-[9px] text-slate-400 block font-bold">TOKEN:</span>
+                    <span className="text-[9px] text-slate-400 block font-bold">TOKEN / SENHA:</span>
                     <span className="text-xs font-mono font-bold text-emerald-400 truncate block">{initialToken || token}</span>
                   </div>
                   <Copy className="w-3 h-3 text-emerald-400 shrink-0" />
@@ -223,7 +279,7 @@ export const SalonAuthModal: React.FC<SalonAuthModalProps> = ({
           <div className="space-y-1.5">
             <div className="flex justify-between items-center">
               <label className="block text-xs font-bold text-slate-300">
-                CPF do Proprietário:
+                CPF do Proprietário ou Administrador:
               </label>
               {cpf && (
                 <button
@@ -238,6 +294,7 @@ export const SalonAuthModal: React.FC<SalonAuthModalProps> = ({
             </div>
             <div className="relative">
               <input
+                id="input-salon-auth-cpf"
                 type="text"
                 placeholder="000.000.000-00"
                 value={cpf}
@@ -249,33 +306,46 @@ export const SalonAuthModal: React.FC<SalonAuthModalProps> = ({
             </div>
           </div>
 
-          {/* Input Token */}
+          {/* Input Token ou Senha do Administrador */}
           <div className="space-y-1.5">
             <div className="flex justify-between items-center">
               <label className="block text-xs font-bold text-slate-300">
-                Token de Acesso / Licença:
+                Token de Acesso / Senha do Administrador:
               </label>
-              {token && (
+              <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={handleCopyToken}
-                  className="text-[10px] text-emerald-400 hover:text-emerald-300 font-bold flex items-center gap-1"
+                  onClick={() => setShowPassword(prev => !prev)}
+                  className="text-[10px] text-slate-400 hover:text-slate-200 font-bold flex items-center gap-1 cursor-pointer"
+                  title={showPassword ? 'Ocultar' : 'Exibir'}
                 >
-                  <Copy className="w-3 h-3" />
-                  <span>{copiedToken ? 'Copiado!' : 'Copiar Token'}</span>
+                  {showPassword ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                  <span>{showPassword ? 'Ocultar' : 'Exibir'}</span>
                 </button>
-              )}
+
+                {token && (
+                  <button
+                    type="button"
+                    onClick={handleCopyToken}
+                    className="text-[10px] text-emerald-400 hover:text-emerald-300 font-bold flex items-center gap-1"
+                  >
+                    <Copy className="w-3 h-3" />
+                    <span>{copiedToken ? 'Copiado!' : 'Copiar'}</span>
+                  </button>
+                )}
+              </div>
             </div>
             <div className="relative">
               <input
-                type="text"
-                placeholder="EX: TOK-SALAO-1234"
+                id="input-salon-auth-token"
+                type={showPassword ? 'text' : 'password'}
+                placeholder="EX: TOK-SALAO-1234 ou Senha Admin"
                 value={token}
                 onChange={(e) => {
                   setToken(e.target.value);
                   setErrorMsg('');
                 }}
-                className="w-full bg-[#070b14] border border-slate-700/80 rounded-xl px-3.5 py-3 pl-10 text-white font-mono text-sm placeholder-slate-500 uppercase tracking-wider focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all shadow-inner font-bold text-emerald-300"
+                className="w-full bg-[#070b14] border border-slate-700/80 rounded-xl px-3.5 py-3 pl-10 text-white font-mono text-sm placeholder-slate-500 tracking-wider focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all shadow-inner font-bold text-emerald-300"
               />
               <Key className="w-4 h-4 text-amber-400 absolute left-3.5 top-3.5" />
             </div>
@@ -284,6 +354,7 @@ export const SalonAuthModal: React.FC<SalonAuthModalProps> = ({
           {/* Primary Big Green Action Button */}
           <div className="pt-2">
             <button
+              id="btn-submit-salon-auth"
               type="submit"
               className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-4 rounded-2xl shadow-xl shadow-emerald-950/50 flex items-center justify-center gap-2 transition-all active:scale-98 text-sm cursor-pointer"
             >

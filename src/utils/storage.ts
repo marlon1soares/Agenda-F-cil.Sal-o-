@@ -1,4 +1,8 @@
-import { SalonConfig, Transaction, Appointment, Professional, ServiceItem, ClientRecord, CatalogMedia, CatalogFolder, AdminCredentials, SalonApp, AdminPaymentConfig } from '../types';
+import { 
+  SalonConfig, Transaction, Appointment, Professional, ServiceItem, ClientRecord, 
+  CatalogMedia, CatalogFolder, AdminCredentials, SalonApp, AdminPaymentConfig,
+  ChatMessage, SystemBroadcastNotice, LivePresenceUser
+} from '../types';
 import { DEFAULT_CONFIG, DEFAULT_PROFESSIONALS, DEFAULT_SERVICES, DEFAULT_CLIENTS, INITIAL_TRANSACTIONS, INITIAL_APPOINTMENTS, INITIAL_CATALOG, DEFAULT_SALON_APPS } from '../data/mockData';
 import { syncEngine } from './syncEngine';
 
@@ -413,6 +417,71 @@ export const Storage = {
     const updated = current.filter(s => s.id !== id);
     this.saveSalons(updated);
     return updated;
+  },
+
+  getMessages(): ChatMessage[] {
+    const saved = safeGetItem('salaoMessages');
+    return saved ? JSON.parse(saved) : [];
+  },
+  saveMessages(messages: ChatMessage[]) {
+    safeSetItem('salaoMessages', JSON.stringify(messages));
+    syncEngine.pushUpdate({ messages });
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('salao_sync_data', { detail: { key: 'salaoMessages' } }));
+    }
+  },
+  addMessage(msg: ChatMessage) {
+    const current = this.getMessages();
+    const updated = [...current, msg];
+    if (updated.length > 200) updated.splice(0, updated.length - 200);
+    this.saveMessages(updated);
+    // Also post to server endpoint to trigger SSE immediately
+    try {
+      fetch('/api/chat/message', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: msg, clientId: syncEngine.getClientId() })
+      }).catch(() => {});
+    } catch {}
+    return updated;
+  },
+
+  getNotices(): SystemBroadcastNotice[] {
+    const saved = safeGetItem('salaoNotices');
+    return saved ? JSON.parse(saved) : [];
+  },
+  saveNotices(notices: SystemBroadcastNotice[]) {
+    safeSetItem('salaoNotices', JSON.stringify(notices));
+    syncEngine.pushUpdate({ notices });
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('salao_sync_data', { detail: { key: 'salaoNotices' } }));
+    }
+  },
+  broadcastNotice(notice: SystemBroadcastNotice) {
+    const current = this.getNotices();
+    const updated = [notice, ...current];
+    if (updated.length > 50) updated.splice(50);
+    this.saveNotices(updated);
+    try {
+      fetch('/api/notices/broadcast', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ notice, clientId: syncEngine.getClientId() })
+      }).catch(() => {});
+    } catch {}
+    return updated;
+  },
+
+  getOnlineUsers(): LivePresenceUser[] {
+    const saved = safeGetItem('salaoOnlineUsers');
+    return saved ? JSON.parse(saved) : [];
+  },
+  saveOnlineUsers(users: LivePresenceUser[]) {
+    safeSetItem('salaoOnlineUsers', JSON.stringify(users));
+    syncEngine.pushUpdate({ onlineUsers: users });
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('salao_sync_data', { detail: { key: 'salaoOnlineUsers' } }));
+    }
   }
 };
 

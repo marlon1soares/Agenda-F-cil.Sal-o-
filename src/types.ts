@@ -191,4 +191,41 @@ export interface AdminPaymentConfig {
   precoPlano365Dias?: number; // 1 Ano (padrão: 240.00)
 }
 
+export interface ChatMessage {
+  id: string;
+  salonId?: string;
+  salonName?: string;
+  fromRole: UserRole;
+  toRole: UserRole | 'todos';
+  senderName: string;
+  senderPhone?: string;
+  clientPhone?: string;
+  content: string;
+  timestamp: string; // HH:mm
+  date: string; // YYYY-MM-DD
+  createdAt: number;
+  read?: boolean;
+  type?: 'chat' | 'booking_alert' | 'status_update' | 'admin_announcement';
+}
+
+export interface SystemBroadcastNotice {
+  id: string;
+  title: string;
+  message: string;
+  fromRole: UserRole;
+  target: 'todos' | 'saloes' | 'clientes';
+  createdAt: string;
+  urgent?: boolean;
+}
+
+export interface LivePresenceUser {
+  id: string;
+  name: string;
+  role: UserRole;
+  salonId?: string;
+  salonName?: string;
+  lastSeen: number;
+  status: 'online' | 'em_atendimento' | 'disponivel';
+}
+
 

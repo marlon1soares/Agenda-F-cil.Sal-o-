@@ -22,6 +22,7 @@ interface AdminSalonsModalProps {
   onOpenSalonLink?: () => void;
   onOpenSalonAccessLink?: () => void;
   onOpenAdminAuth?: () => void;
+  onOpenLiveHub?: () => void;
 }
 
 export const AdminSalonsModal: React.FC<AdminSalonsModalProps> = ({
@@ -37,6 +38,7 @@ export const AdminSalonsModal: React.FC<AdminSalonsModalProps> = ({
   onOpenSalonLink,
   onOpenSalonAccessLink,
   onOpenAdminAuth,
+  onOpenLiveHub,
 }) => {
   const [activeTab, setActiveTab] = useState<'cards' | 'pending' | 'connected' | 'inspector' | 'location_table'>('cards');
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'active' | 'blocked'>('all');
@@ -388,6 +390,17 @@ export const AdminSalonsModal: React.FC<AdminSalonsModalProps> = ({
 
           {/* Top Action Buttons - Compact, concise labels, perfect spacing */}
           <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
+            {onOpenLiveHub && (
+              <button
+                onClick={onOpenLiveHub}
+                className="bg-gradient-to-r from-emerald-700 to-teal-700 hover:from-emerald-600 hover:to-teal-600 text-white font-extrabold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1.5 shadow-sm transition-all active:scale-95 border border-emerald-400/40 cursor-pointer"
+                title="Abrir Central de Conexão Tripla, Chat com Salões/Clientes e Mural de Comunicados Oficiais"
+              >
+                <Activity className="w-3.5 h-3.5 text-emerald-300 animate-pulse shrink-0" />
+                <span className="tracking-tight">Central Ao Vivo</span>
+              </button>
+            )}
+
             {onOpenSalonLink && (
               <button
                 onClick={onOpenSalonLink}
