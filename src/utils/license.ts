@@ -36,8 +36,58 @@ function cleanEmailStr(val?: string | null): string {
 }
 
 /**
- * Strict check: Ensures that no owner data (CPF, RG, Phone, Email, or Address)
- * can ever register for the 15-day free trial more than once.
+ * Checks if a given CPF belongs to a registered Administrator
+ */
+export function isAdminCpf(cpf?: string | null): boolean {
+  if (!cpf) return false;
+  const clean = cleanDigits(cpf);
+  if (!clean) return false;
+
+  const adminList = Storage.getAdminCredentialsList();
+  const master = Storage.getAdminCredentials();
+
+  const allAdmins = [...adminList];
+  if (master && !allAdmins.some(a => cleanDigits(a.cpf) === cleanDigits(master.cpf))) {
+    allAdmins.push(master);
+  }
+
+  return allAdmins.some(admin => {
+    const adminCpfDigits = cleanDigits(admin.cpf);
+    return Boolean(adminCpfDigits && adminCpfDigits === clean);
+  });
+}
+
+/**
+ * Checks if any given identifier (CPF, email, or phone) matches a registered Administrator
+ */
+export function isAdminIdentifier(data: { cpf?: string; email?: string; phone?: string }): boolean {
+  const reqCpf = cleanDigits(data.cpf);
+  const reqEmail = cleanEmailStr(data.email);
+  const reqPhone = cleanDigits(data.phone);
+
+  const adminList = Storage.getAdminCredentialsList();
+  const master = Storage.getAdminCredentials();
+
+  const allAdmins = [...adminList];
+  if (master && !allAdmins.some(a => cleanDigits(a.cpf) === cleanDigits(master.cpf))) {
+    allAdmins.push(master);
+  }
+
+  return allAdmins.some(admin => {
+    const aCpf = cleanDigits(admin.cpf);
+    const aEmail = cleanEmailStr(admin.email);
+    const aPhone = cleanDigits(admin.phone);
+
+    if (reqCpf && aCpf && reqCpf === aCpf) return true;
+    if (reqEmail && aEmail && reqEmail === aEmail) return true;
+    if (reqPhone && aPhone && (reqPhone === aPhone || (reqPhone.length >= 8 && aPhone.endsWith(reqPhone.slice(-8))))) return true;
+    return false;
+  });
+}
+
+/**
+ * Strict check: Ensures that regular users (non-admin) can only use the 15-day trial ONCE.
+ * Administrators registered with CPF and password have UNLIMITED access to 15-day trials whenever needed.
  */
 export function checkTrialEligibility(
   data: {
@@ -49,8 +99,16 @@ export function checkTrialEligibility(
     logradouro?: string;
     numero?: string;
   },
-  currentSalonId?: string
+  currentSalonId?: string,
+  userRole?: string
 ): TrialEligibilityCheck {
+  // If the user has active admin role, admin session, or is a registered Administrator:
+  // Administradores possuem liberação total e ilimitada para utilizar os 15 dias gratuitos sempre que necessário.
+  const isSessionAdmin = typeof sessionStorage !== 'undefined' && sessionStorage.getItem('salao_admin_authenticated') === 'true';
+  if (userRole === 'admin' || isSessionAdmin || isAdminIdentifier(data)) {
+    return { eligible: true };
+  }
+
   const salons = Storage.getSalons();
 
   const reqCpf = cleanDigits(data.cpf);
@@ -65,9 +123,6 @@ export function checkTrialEligibility(
     if (currentSalonId && s.id === currentSalonId) continue;
 
     // Check if the salon was registered as a trial or has trial record
-    const hasUsedTrial = s.isTrial === true || s.planDays === 15 || s.trialStartedAt || s.status === 'trial';
-    
-    // We treat any matching identity on existing salons as already registered
     const sCpf = cleanDigits(s.ownerCpf);
     if (reqCpf && sCpf && reqCpf === sCpf) {
       return {
@@ -139,10 +194,15 @@ export function checkTrialEligibility(
 
 /**
  * Checks if a CPF has ever registered or used a 15-day trial before.
- * Each CPF is strictly limited to 1 trial in a lifetime.
+ * Non-admin CPFs are strictly limited to 1 trial.
+ * Admin CPFs have unlimited access and return false (never blocked).
  */
-export function hasCpfUsedTrial(cpf: string, currentSalonId?: string): boolean {
-  return !checkTrialEligibility({ cpf }, currentSalonId).eligible;
+export function hasCpfUsedTrial(cpf: string, currentSalonId?: string, userRole?: string): boolean {
+  const isSessionAdmin = typeof sessionStorage !== 'undefined' && sessionStorage.getItem('salao_admin_authenticated') === 'true';
+  if (userRole === 'admin' || isSessionAdmin || isAdminCpf(cpf)) {
+    return false;
+  }
+  return !checkTrialEligibility({ cpf }, currentSalonId, userRole).eligible;
 }
 
 /**

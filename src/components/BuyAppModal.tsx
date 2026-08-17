@@ -3,7 +3,7 @@ import { SalonApp, SalonConfig, AdminPaymentConfig, UserRole } from '../types';
 import { Storage } from '../utils/storage';
 import { generatePixEMVPayload, generateQrCodeDataUrl } from '../utils/pix';
 import { getCalculatedLicensePlans, getLicensePlanByDays, formatBRL } from '../utils/pricing';
-import { checkTrialEligibility } from '../utils/license';
+import { checkTrialEligibility, isAdminCpf, isAdminIdentifier, hasCpfUsedTrial } from '../utils/license';
 import { getUrlParam, getPublicAppUrl, buildAppUrl } from '../utils/url';
 import { 
   ShoppingCart, Check, Sparkles, Mail, User, ShieldCheck, Phone, 
@@ -19,7 +19,7 @@ interface BuyAppModalProps {
   userRole?: UserRole;
   activeSalon?: SalonApp | null;
   onUpdateSalon?: (updatedSalon: SalonApp) => void;
-  onOpenSalonAuth?: () => void;
+  onOpenSalonAuth?: (credentials?: { cpf?: string; token?: string }) => void;
 }
 
 export const BuyAppModal: React.FC<BuyAppModalProps> = ({
@@ -53,15 +53,27 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
 
   const [error, setError] = useState('');
 
-  // Check if current salon/context has already used the 15-day trial
-  const isTrialAlreadyUsed = Boolean(
-    activeSalon && (
+  // Check if active user is an Administrator or if typed/active CPF belongs to a registered administrator
+  const isSessionAdmin = typeof sessionStorage !== 'undefined' && sessionStorage.getItem('salao_admin_authenticated') === 'true';
+  const isUserAdmin = Boolean(
+    userRole === 'admin' ||
+    isSessionAdmin ||
+    isAdminCpf(cpf) ||
+    isAdminIdentifier({ cpf, email, phone }) ||
+    (activeSalon?.ownerCpf && isAdminCpf(activeSalon.ownerCpf))
+  );
+
+  // Check if current salon/context has already used the 15-day trial (Only restricts non-admin regular users)
+  // Administradores possuem liberação total e ilimitada dos 15 dias gratuitos sempre que precisarem!
+  const isTrialAlreadyUsed = !isUserAdmin && Boolean(
+    (activeSalon && (
       activeSalon.isTrial ||
       activeSalon.planDays === 15 ||
       activeSalon.trialStartedAt ||
       activeSalon.status === 'blocked' ||
       activeSalon.status === 'expired'
-    )
+    )) ||
+    (cpf.trim().length >= 11 && hasCpfUsedTrial(cpf, activeSalon?.id, userRole))
   );
 
   // Auto-populate from URL query params or activeSalon if opened from a direct link / renewal
@@ -84,7 +96,7 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
         setCidade(activeSalon.cidade || '');
         setUf(activeSalon.uf || '');
 
-        if (isTrialAlreadyUsed) {
+        if (isTrialAlreadyUsed && !isUserAdmin) {
           setPlanDays(30);
         } else {
           setPlanDays(15);
@@ -98,7 +110,7 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
         if (planParam) {
           const days = parseInt(planParam, 10);
           if ([15, 30, 90, 180, 365].includes(days)) {
-            if (days === 15 && isTrialAlreadyUsed) {
+            if (days === 15 && isTrialAlreadyUsed && !isUserAdmin) {
               setPlanDays(30);
             } else {
               setPlanDays(days);
@@ -257,128 +269,106 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
     e.preventDefault();
     setError('');
 
-    if (!name.trim()) {
-      setError('Informe seu nome completo.');
-      return;
-    }
-    if (!rg.trim()) {
-      setError('Informe seu RG.');
-      return;
-    }
-    if (!cpf.trim()) {
-      setError('Informe seu CPF.');
-      return;
-    }
-    if (!email.trim() || !email.includes('@')) {
-      setError('Informe um e-mail válido para receber o acesso.');
-      return;
-    }
-    if (!phone.trim()) {
-      setError('Informe seu WhatsApp para contato.');
-      return;
-    }
-    if (!salonName.trim()) {
-      setError('Informe o nome do seu salão de beleza ou barbearia.');
-      return;
-    }
-    if (!cep.trim()) {
-      setError('Informe o CEP do salão.');
-      return;
-    }
-    if (!cidade.trim() || !uf.trim()) {
-      setError('Informe a Cidade e o Estado (UF) do estabelecimento.');
-      return;
-    }
-    if (!logradouro.trim() || !numero.trim() || !bairro.trim()) {
-      setError('Informe o endereço completo (Rua, Número e Bairro) do estabelecimento.');
-      return;
-    }
+    const finalName = name.trim() || 'Proprietário';
+    const finalCpf = cpf.trim() || '000.000.000-00';
+    const finalSalonName = salonName.trim() || 'Meu Salão & Barbearia';
+    const finalEmail = (email.trim() && email.includes('@')) ? email.trim() : (email.trim() ? `${email.trim()}@gmail.com` : 'contato@salao.com');
+    const finalPhone = phone.trim() || '(11) 99999-9999';
+    const finalRg = rg.trim() || 'ISENTO';
+    const finalCep = cep.trim() || '01001-000';
+    const finalCidade = cidade.trim() || 'São Paulo';
+    const finalUf = (uf.trim() || 'SP').toUpperCase();
+    const finalLogradouro = logradouro.trim() || 'Av. Principal';
+    const finalNumero = numero.trim() || '100';
+    const finalBairro = bairro.trim() || 'Centro';
 
     // IF 15-DAY FREE TRIAL IS SELECTED
     if (planDays === 15) {
       const eligibility = checkTrialEligibility(
         {
-          cpf,
-          rg,
-          phone,
-          email,
-          cep,
-          logradouro,
-          numero
+          cpf: finalCpf,
+          rg: finalRg,
+          phone: finalPhone,
+          email: finalEmail,
+          cep: finalCep,
+          logradouro: finalLogradouro,
+          numero: finalNumero
         },
-        activeSalon?.id
+        activeSalon?.id,
+        userRole
       );
 
       if (!eligibility.eligible) {
         setError(
-          `⚠️ Não foi possível ativar o teste gratuito: ${eligibility.reason}\n\nO período de 15 dias gratuitos é concedido estritamente 1 única vez por proprietário e endereço. Para desbloquear e usar o sistema, selecione um dos planos de licença (30 Dias, 3 Meses, 6 Meses ou 1 Ano).`
+          `⚠️ Não foi possível ativar o teste gratuito: ${eligibility.reason}\n\nO período de 15 dias gratuitos é concedido 1 única vez por CPF. Administradores possuem liberação ilimitada. Selecione um dos planos de licença (30 Dias, 3 Meses, 6 Meses ou 1 Ano).`
         );
         return;
       }
 
       // Activate Free Trial Immediately (No Payment Required)
       setIsProcessing(true);
-      setTimeout(() => {
-        const today = new Date();
-        const purchaseDate = today.toISOString().split('T')[0];
-        const expDate = new Date();
-        expDate.setDate(expDate.getDate() + 15);
-        const expiresAt = expDate.toISOString().split('T')[0];
+      const today = new Date();
+      const purchaseDate = today.toISOString().split('T')[0];
+      const expDate = new Date();
+      expDate.setDate(expDate.getDate() + 15);
+      const expiresAt = expDate.toISOString().split('T')[0];
 
-        const appCode = Storage.getNextSalonCode();
-        const randomNum = Math.floor(1000 + Math.random() * 9000);
-        const tokenCleanName = salonName.replace(/[^a-zA-Z0-9]/g, '').slice(0, 6).toUpperCase();
-        const purchaseToken = `TOK-${tokenCleanName || 'SALÃO'}-${randomNum}`;
+      const appCode = Storage.getNextSalonCode();
+      const randomNum = Math.floor(1000 + Math.random() * 9000);
+      const tokenCleanName = finalSalonName.replace(/[^a-zA-Z0-9]/g, '').slice(0, 6).toUpperCase();
+      const purchaseToken = `TOK-${tokenCleanName || 'SALAO'}-${randomNum}`;
 
-        const initialConfig: SalonConfig = {
-          nomeSalao: salonName.trim(),
-          logoUrl: '',
-          bgHeaderUrl: '',
-          temaKey: 'azul',
-          corCustom: '#2563eb',
-          profs: [
-            { id: `prof-p1`, nome: name.split(' ')[0] || 'Profissional 1', porc: 70 },
-            { id: `prof-p2`, nome: 'Auxiliar', porc: 30 }
-          ]
-        };
+      const initialConfig: SalonConfig = {
+        nomeSalao: finalSalonName,
+        logoUrl: '',
+        bgHeaderUrl: '',
+        temaKey: 'azul',
+        corCustom: '#2563eb',
+        profs: [
+          { id: `prof-p1`, nome: finalName.split(' ')[0] || 'Profissional 1', porc: 70 },
+          { id: `prof-p2`, nome: 'Auxiliar', porc: 30 }
+        ]
+      };
 
-        const newSalon: SalonApp = {
-          id: `salon-${Date.now()}`,
-          name: salonName.trim(),
-          ownerName: name.trim(),
-          ownerEmail: email.trim(),
-          ownerPhone: phone.trim(),
-          ownerRg: rg.trim(),
-          ownerCpf: cpf.trim(),
-          cep: cep.trim(),
-          logradouro: logradouro.trim(),
-          numero: numero.trim(),
-          bairro: bairro.trim(),
-          cidade: cidade.trim(),
-          uf: uf.trim().toUpperCase(),
-          createdAt: purchaseDate,
-          purchaseDate: purchaseDate,
-          expiresAt: expiresAt,
-          planDays: 15,
-          isTrial: true,
-          trialStartedAt: purchaseDate,
-          status: 'trial',
-          appCode: appCode,
-          purchaseToken: purchaseToken,
-          emailSentAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          config: initialConfig
-        };
+      const newSalon: SalonApp = {
+        id: `salon-${Date.now()}`,
+        name: finalSalonName,
+        ownerName: finalName,
+        ownerEmail: finalEmail,
+        ownerPhone: finalPhone,
+        ownerRg: finalRg,
+        ownerCpf: finalCpf,
+        cep: finalCep,
+        logradouro: finalLogradouro,
+        numero: finalNumero,
+        bairro: finalBairro,
+        cidade: finalCidade,
+        uf: finalUf,
+        createdAt: purchaseDate,
+        purchaseDate: purchaseDate,
+        expiresAt: expiresAt,
+        planDays: 15,
+        isTrial: true,
+        trialStartedAt: purchaseDate,
+        status: 'trial',
+        appCode: appCode,
+        purchaseToken: purchaseToken,
+        emailSentAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        config: initialConfig
+      };
 
-        setCreatedSalon(newSalon);
-        onPurchaseComplete(newSalon);
-        setIsProcessing(false);
-        setStep('success');
+      setCreatedSalon(newSalon);
+      onPurchaseComplete(newSalon);
+      setIsProcessing(false);
+      setStep('success');
 
-        sendEmailNotification(newSalon, 'Grátis (15 Dias de Teste)');
-      }, 1000);
-
+      sendEmailNotification(newSalon, 'Grátis (15 Dias de Teste)');
       return;
     }
+
+    // IF PAID PLAN IS SELECTED (30, 90, 180, 365 Days)
+    setStep('payment');
+  };
 
     // IF PAID PLAN IS SELECTED (30, 90, 180, 365 Days)
     setStep('payment');
@@ -680,6 +670,16 @@ Salão: *${createdSalon.name}*
               </div>
             )}
 
+            {/* Admin status notice */}
+            {isUserAdmin && (
+              <div className="bg-emerald-950/50 border border-emerald-500/40 p-2.5 rounded-2xl flex items-center gap-2 text-[11px] text-emerald-300 shadow-inner">
+                <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>
+                  <strong>Acesso de Administrador Identificado:</strong> O teste de <strong>15 Dias Gratuitos está liberado sem limites</strong> para criar e testar salões quando necessário.
+                </span>
+              </div>
+            )}
+
             {/* Plan Selector */}
             <div>
               <div className="flex items-center justify-between mb-1">
@@ -694,7 +694,8 @@ Salão: *${createdSalon.name}*
 
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
                 {availablePlans.map((p) => {
-                  const isDisabledTrial = p.days === 15 && isTrialAlreadyUsed;
+                  const isPlanTrial = p.days === 15;
+                  const isDisabledTrial = isPlanTrial && isTrialAlreadyUsed;
 
                   return (
                     <button
@@ -704,12 +705,14 @@ Salão: *${createdSalon.name}*
                       onClick={() => {
                         if (!isDisabledTrial) {
                           setPlanDays(p.days);
-                          setCardInstallments('1');
+                          setCardInstallments(1);
                         }
                       }}
                       title={
                         isDisabledTrial
-                          ? 'Período de teste gratuito de 15 dias já foi utilizado por este salão.'
+                          ? 'Período de teste gratuito de 15 dias já foi utilizado por este CPF/salão.'
+                          : isUserAdmin && isPlanTrial
+                          ? '15 Dias Gratuitos (Uso Ilimitado para Administradores)'
                           : `${p.label} - ${p.priceStr}`
                       }
                       className={`p-2.5 rounded-2xl border text-center transition-all flex flex-col items-center justify-between select-none ${
@@ -735,12 +738,14 @@ Salão: *${createdSalon.name}*
                         isDisabledTrial
                           ? 'bg-slate-900 text-slate-500 border-slate-800'
                           : p.days === 15
-                          ? 'bg-sky-950/90 text-sky-300 border-sky-500/40'
+                          ? isUserAdmin
+                            ? 'bg-emerald-950/90 text-emerald-300 border-emerald-500/40'
+                            : 'bg-sky-950/90 text-sky-300 border-sky-500/40'
                           : p.days >= 180
                           ? 'bg-emerald-950/80 text-emerald-300 border-emerald-500/40'
                           : 'bg-slate-900 text-amber-300 border-amber-500/30'
                       }`}>
-                        {isDisabledTrial ? 'Já Utilizado' : p.tag}
+                        {isDisabledTrial ? 'Já Utilizado' : isUserAdmin && isPlanTrial ? 'Ilimitado (Admin)' : p.tag}
                       </span>
                     </button>
                   );
@@ -752,14 +757,13 @@ Salão: *${createdSalon.name}*
             <div>
               <label className="block font-bold text-slate-300 mb-1 flex items-center gap-1.5">
                 <User className="w-3.5 h-3.5 text-blue-400" />
-                <span>Nome Completo do Comprador: *</span>
+                <span>Nome Completo do Comprador:</span>
               </label>
               <input
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Ex: Carlos Eduardo de Souza"
-                required
                 className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
               />
             </div>
@@ -769,14 +773,13 @@ Salão: *${createdSalon.name}*
               <div>
                 <label className="block font-bold text-slate-300 mb-1 flex items-center gap-1.5">
                   <FileText className="w-3.5 h-3.5 text-sky-400" />
-                  <span>CPF do Comprador: *</span>
+                  <span>CPF do Comprador (Seu Login):</span>
                 </label>
                 <input
                   type="text"
                   value={cpf}
                   onChange={(e) => setCpf(e.target.value)}
                   placeholder="000.000.000-00"
-                  required
                   className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 font-mono"
                 />
               </div>
@@ -784,14 +787,13 @@ Salão: *${createdSalon.name}*
               <div>
                 <label className="block font-bold text-slate-300 mb-1 flex items-center gap-1.5">
                   <FileText className="w-3.5 h-3.5 text-purple-400" />
-                  <span>RG do Comprador: *</span>
+                  <span>RG do Comprador:</span>
                 </label>
                 <input
                   type="text"
                   value={rg}
                   onChange={(e) => setRg(e.target.value)}
                   placeholder="00.000.000-0"
-                  required
                   className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
                 />
               </div>
@@ -802,14 +804,13 @@ Salão: *${createdSalon.name}*
               <div>
                 <label className="block font-bold text-slate-300 mb-1 flex items-center gap-1.5">
                   <Mail className="w-3.5 h-3.5 text-amber-400" />
-                  <span>Seu E-mail (Acesso): *</span>
+                  <span>Seu E-mail (Acesso):</span>
                 </label>
                 <input
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="seuemail@exemplo.com"
-                  required
                   className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
                 />
               </div>
@@ -817,14 +818,13 @@ Salão: *${createdSalon.name}*
               <div>
                 <label className="block font-bold text-slate-300 mb-1 flex items-center gap-1.5">
                   <Phone className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>Telefone / WhatsApp: *</span>
+                  <span>Telefone / WhatsApp:</span>
                 </label>
                 <input
                   type="tel"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   placeholder="(11) 99999-8888"
-                  required
                   className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
                 />
               </div>
@@ -835,7 +835,7 @@ Salão: *${createdSalon.name}*
               <div className="flex items-center justify-between border-b border-slate-800 pb-2">
                 <label className="font-extrabold text-amber-300 flex items-center gap-1.5">
                   <MapPin className="w-4 h-4 text-rose-400" />
-                  <span>Endereço do Salão / Localização para Relatório: *</span>
+                  <span>Endereço do Salão / Localização para Relatório:</span>
                 </label>
                 {isFetchingCep && (
                   <span className="text-[10px] text-sky-400 animate-pulse flex items-center gap-1 font-bold">
@@ -861,21 +861,20 @@ Salão: *${createdSalon.name}*
 
                 <div>
                   <label className="block text-[11px] font-bold text-slate-300 mb-1">
-                    Cidade: *
+                    Cidade:
                   </label>
                   <input
                     type="text"
                     value={cidade}
                     onChange={(e) => setCidade(e.target.value)}
                     placeholder="Ex: São Paulo"
-                    required
                     className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 text-xs"
                   />
                 </div>
 
                 <div>
                   <label className="block text-[11px] font-bold text-slate-300 mb-1">
-                    Estado (UF): *
+                    Estado (UF):
                   </label>
                   <input
                     type="text"
@@ -883,7 +882,6 @@ Salão: *${createdSalon.name}*
                     value={uf}
                     onChange={(e) => setUf(e.target.value.toUpperCase())}
                     placeholder="SP"
-                    required
                     className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 uppercase text-xs font-mono"
                   />
                 </div>
@@ -923,14 +921,13 @@ Salão: *${createdSalon.name}*
             <div>
               <label className="block font-bold text-slate-300 mb-1 flex items-center gap-1.5">
                 <Building2 className="w-3.5 h-3.5 text-pink-400" />
-                <span>Nome do Salão de Beleza / Barbearia: *</span>
+                <span>Nome do Salão de Beleza / Barbearia:</span>
               </label>
               <input
                 type="text"
                 value={salonName}
                 onChange={(e) => setSalonName(e.target.value)}
                 placeholder="Ex: Studio Elegance & Hair"
-                required
                 className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
               />
             </div>
@@ -1263,255 +1260,259 @@ Salão: *${createdSalon.name}*
           </div>
         )}
 
-        {/* STEP 3: SUCCESS SCREEN WITH GENERATED TOKEN */}
+        {/* STEP 3: UNIFIED ACCESS SCREEN WITH GENERATED CPF + TOKEN + STEP-BY-STEP */}
         {step === 'success' && (
-          <div className="p-5 sm:p-6 text-center space-y-4 max-h-[80vh] overflow-y-auto">
-            <div className="w-14 h-14 bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 rounded-3xl flex items-center justify-center mx-auto shadow-lg">
-              <Check className="w-7 h-7" />
+          <div className="p-4 sm:p-6 text-center space-y-4 max-h-[85vh] overflow-y-auto">
+            <div className="w-16 h-16 bg-emerald-500/20 text-emerald-400 border-2 border-emerald-400/50 rounded-full flex items-center justify-center mx-auto shadow-xl shadow-emerald-950/50">
+              <CheckCircle2 className="w-10 h-10 animate-bounce text-emerald-400" />
             </div>
 
             <div>
-              {createdSalon?.isTrial ? (
-                <>
-                  <span className="bg-sky-500/20 text-sky-300 text-[10px] font-black px-3 py-0.5 rounded-full uppercase tracking-wider border border-sky-500/40">
-                    🎉 Teste Gratuito de 15 Dias Ativado!
-                  </span>
-                  <h3 className="text-lg sm:text-xl font-black text-white mt-1">
-                    Parabéns! Seu Salão Está Liberado Gratuitamente
-                  </h3>
-                  <p className="text-slate-300 text-xs mt-0.5 max-w-md mx-auto">
-                    Aproveite os próximos <strong>15 dias de teste grátis</strong> para gerenciar agendamentos, clientes e profissionais. A partir do 16º dia, o sistema solicitará a escolha de um plano para continuar.
-                  </p>
-                </>
-              ) : (
-                <>
-                  <span className="bg-emerald-500/20 text-emerald-300 text-[10px] font-black px-3 py-0.5 rounded-full uppercase tracking-wider border border-emerald-500/40">
-                    Pagamento Confirmado & Licença Ativada
-                  </span>
-                  <h3 className="text-lg sm:text-xl font-black text-white mt-1">
-                    Parabéns! Seu Salão Está Liberado
-                  </h3>
-                  <p className="text-slate-300 text-xs mt-0.5 max-w-md mx-auto">
-                    A licença de <strong>{createdSalon?.planDays} dias</strong> foi ativada com sucesso. O sistema funcionará continuamente até o vencimento.
-                  </p>
-                </>
-              )}
+              <span className="bg-emerald-500/20 text-emerald-300 text-xs font-black px-3.5 py-1 rounded-full uppercase tracking-wider border border-emerald-500/40 inline-block mb-1.5 shadow-sm">
+                🎉 Teste Gratuito de 15 Dias Ativado!
+              </span>
+              <h3 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+                Seu Salão Foi Cadastrado e Seu Acesso Liberado!
+              </h3>
+              <p className="text-xs text-slate-300 mt-1 max-w-md mx-auto">
+                Salão: <strong className="text-emerald-400 font-bold">{createdSalon?.name}</strong> • Titular: <strong className="text-white font-bold">{createdSalon?.ownerName}</strong>
+              </p>
             </div>
 
-            {/* Token & Login Display Box (CPF + TOKEN + ACCESS LINK) */}
-            <div className="bg-slate-950 p-4 rounded-2xl border-2 border-emerald-500/50 max-w-md mx-auto text-left relative overflow-hidden shadow-2xl space-y-3">
+            {/* Layout de Descrição Explicativa */}
+            <div className="bg-gradient-to-r from-blue-950/90 via-slate-900 to-indigo-950/90 p-4 rounded-2xl border-2 border-sky-400/70 max-w-md mx-auto text-left shadow-2xl space-y-2">
+              <div className="flex items-center gap-2 text-amber-300">
+                <Sparkles className="w-4 h-4 text-amber-400" />
+                <h4 className="text-xs font-extrabold uppercase tracking-wide">
+                  Instruções de Acesso ao Salão:
+                </h4>
+              </div>
+              <p className="text-xs text-sky-100 leading-relaxed font-medium">
+                Para entrar no sistema de gestão, <strong>é necessário adicionar o seu CPF e o TOKEN gerados abaixo</strong> na tela de acesso. Você pode copiar e colar nos campos correspondentes ou utilizar o botão de acesso rápido para entrar imediatamente.
+              </p>
+            </div>
+
+            {/* Quadro de Credenciais com Botões de Cópia Rápida */}
+            <div className="bg-slate-950 p-4 sm:p-5 rounded-3xl border-2 border-emerald-500/70 max-w-md mx-auto text-left space-y-3.5 shadow-2xl">
               <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-                <span className="text-xs font-black text-amber-300 flex items-center gap-1.5 uppercase tracking-wide">
+                <span className="text-xs font-black text-amber-300 flex items-center gap-1.5 uppercase">
                   <Key className="w-4 h-4 text-amber-400" />
-                  <span>Suas Credenciais Oficiais de Acesso:</span>
+                  <span>Suas Credenciais Oficiais:</span>
                 </span>
-                <span className="bg-emerald-500/20 text-emerald-300 text-[10px] font-mono px-2 py-0.5 rounded-full font-bold border border-emerald-500/30">
-                  Licença Ativa ✓
+                <span className="bg-emerald-500/20 text-emerald-300 text-[10px] font-mono px-2.5 py-0.5 rounded-full font-bold border border-emerald-500/30">
+                  Liberado 15 Dias ✓
                 </span>
               </div>
 
-              {/* Link de Acesso Direto */}
-              <div className="bg-gradient-to-r from-teal-950/80 to-emerald-950/80 p-3 rounded-xl border border-teal-500/50 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] text-teal-300 font-black uppercase flex items-center gap-1">
-                    <Link2 className="w-3.5 h-3.5 text-teal-400" />
-                    <span>LINK DE ACESSO AO SEU SALÃO:</span>
-                  </span>
-                  {copiedAccessLink && (
-                    <span className="text-[10px] font-bold text-emerald-400 flex items-center gap-1 animate-pulse">
-                      <Check className="w-3 h-3" /> Copiado!
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <input
-                    type="text"
-                    readOnly
-                    value={salonAccessUrl}
-                    className="w-full bg-slate-900/90 border border-teal-600/40 rounded-lg px-2.5 py-1.5 text-xs text-teal-100 font-mono select-all"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleCopyAccessLink}
-                    className="bg-teal-600 hover:bg-teal-500 text-white font-black text-xs px-2.5 py-1.5 rounded-lg flex items-center gap-1 shrink-0 transition-all active:scale-95 cursor-pointer shadow"
-                  >
-                    <Copy className="w-3 h-3" />
-                    <span>{copiedAccessLink ? 'Copiado!' : 'Copiar'}</span>
-                  </button>
-                </div>
-                <p className="text-[10px] text-teal-200/90">
-                  💡 Guarde este link para entrar no seu salão sempre que quiser.
-                </p>
-              </div>
-
-              {/* Login CPF */}
-              <div className="bg-slate-900/90 p-3 rounded-xl border border-slate-800 flex items-center justify-between gap-2">
+              {/* CPF Box */}
+              <div className="bg-slate-900/95 p-3.5 rounded-2xl border border-slate-700/80 flex items-center justify-between gap-2 shadow-inner">
                 <div>
-                  <span className="text-[10px] text-slate-400 block font-bold uppercase">1. LOGIN (SEU CPF):</span>
-                  <span className="text-sm sm:text-base font-black text-sky-400 font-mono">
-                    {createdSalon?.ownerCpf || 'CPF Cadastrado'}
+                  <span className="text-[10px] text-slate-400 block font-black uppercase tracking-wider">
+                    1. SEU CPF DE ACESSO (LOGIN):
+                  </span>
+                  <span className="text-base sm:text-lg font-black text-sky-400 font-mono tracking-wide">
+                    {createdSalon?.ownerCpf || '000.000.000-00'}
                   </span>
                   <span className="text-[10px] text-slate-500 block">
-                    (E-mail: {createdSalon?.ownerEmail})
+                    (Titular: {createdSalon?.ownerName})
                   </span>
                 </div>
                 <button
                   type="button"
                   onClick={handleCopyCpf}
-                  className="bg-slate-800 hover:bg-slate-700 text-sky-300 text-[11px] font-bold px-2.5 py-1.5 rounded-lg border border-slate-700 transition-colors flex items-center gap-1 shrink-0 cursor-pointer"
+                  className="bg-sky-950 hover:bg-sky-900 text-sky-300 text-xs font-bold px-3 py-2 rounded-xl border border-sky-600/50 transition-all flex items-center gap-1.5 shrink-0 cursor-pointer active:scale-95 shadow"
                 >
-                  <Copy className="w-3 h-3" />
+                  <Copy className="w-3.5 h-3.5" />
                   <span>{copiedCpf ? 'Copiado!' : 'Copiar CPF'}</span>
                 </button>
               </div>
 
-              {/* Token */}
-              <div className="bg-slate-900/90 p-3 rounded-xl border-2 border-emerald-500/50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+              {/* Token Box */}
+              <div className="bg-slate-900/95 p-3.5 rounded-2xl border-2 border-emerald-500/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 shadow-lg">
                 <div>
-                  <span className="text-[10px] text-slate-400 block font-bold uppercase">2. TOKEN DE ACESSO (SUA SENHA):</span>
-                  <div className="font-mono text-lg sm:text-xl font-black text-emerald-400 tracking-wider">
+                  <span className="text-[10px] text-emerald-300 block font-black uppercase tracking-wider">
+                    2. SEU TOKEN DE LICENÇA (SENHA):
+                  </span>
+                  <div className="font-mono text-xl sm:text-2xl font-black text-emerald-400 tracking-wider">
                     {createdSalon?.purchaseToken}
                   </div>
                 </div>
                 <button
                   type="button"
                   onClick={handleCopyToken}
-                  className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold px-3 py-1.5 rounded-lg text-xs flex items-center justify-center gap-1 shadow transition-all active:scale-95 shrink-0 cursor-pointer"
+                  className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-500 text-white font-black px-3.5 py-2 rounded-xl text-xs flex items-center justify-center gap-1.5 shadow transition-all active:scale-95 shrink-0 cursor-pointer"
                 >
-                  <Copy className="w-3 h-3" />
+                  <Copy className="w-3.5 h-3.5" />
                   <span>{copiedToken ? 'Token Copiado!' : 'Copiar Token'}</span>
                 </button>
               </div>
 
-              {/* Purchase Details & Plan Expiration Date */}
-              <div className="bg-slate-900/60 p-3 rounded-xl border border-slate-800 text-[11px] space-y-1.5">
+              {/* Link Direto */}
+              <div className="bg-teal-950/60 p-3 rounded-2xl border border-teal-600/40 space-y-1.5">
+                <div className="flex items-center justify-between text-[10px] text-teal-300 font-black uppercase">
+                  <span className="flex items-center gap-1">
+                    <Link2 className="w-3.5 h-3.5 text-teal-400" />
+                    <span>LINK DIRETO DO SALÃO:</span>
+                  </span>
+                  {copiedAccessLink && <span className="text-emerald-400">Copiado!</span>}
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="text"
+                    readOnly
+                    value={salonAccessUrl}
+                    className="w-full bg-slate-900/90 border border-teal-600/40 rounded-xl px-2.5 py-1.5 text-xs text-teal-100 font-mono select-all"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleCopyAccessLink}
+                    className="bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs px-2.5 py-1.5 rounded-xl shrink-0 cursor-pointer"
+                  >
+                    <Copy className="w-3 h-3" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Detalhes do Plano */}
+              <div className="bg-slate-900/60 p-3 rounded-2xl border border-slate-800 text-[11px] space-y-1">
                 <div className="flex justify-between items-center text-slate-300">
-                  <span className="text-slate-400">Salão / Barbearia:</span>
+                  <span className="text-slate-400">Salão Cadastrado:</span>
                   <span className="font-bold text-pink-300">{createdSalon?.name}</span>
                 </div>
                 <div className="flex justify-between items-center text-slate-300">
-                  <span className="text-slate-400">Proprietário:</span>
-                  <span className="font-bold text-white">{createdSalon?.ownerName}</span>
-                </div>
-                <div className="flex justify-between items-center text-slate-300">
-                  <span className="text-slate-400">Data da Compra:</span>
-                  <span className="font-bold text-white">{createdSalon?.purchaseDate}</span>
-                </div>
-                <div className="flex justify-between items-center text-slate-300 border-t border-slate-800 pt-1">
-                  <span className="text-slate-400 font-semibold">Término do Plano (Vencimento):</span>
-                  <span className="font-black text-emerald-400 text-xs">
-                    Até {createdSalon?.expiresAt} ({createdSalon?.planDays} Dias)
-                  </span>
+                  <span className="text-slate-400">Validade do Teste:</span>
+                  <span className="font-black text-emerald-400">15 Dias (Até {createdSalon?.expiresAt})</span>
                 </div>
               </div>
             </div>
 
-            {/* Step-by-Step Access Instructions */}
-            <div className="bg-slate-950 p-4 rounded-2xl border border-sky-500/40 max-w-md mx-auto text-left space-y-2">
+            {/* Passo a Passo para Acessar */}
+            <div className="bg-slate-950 p-4 rounded-2xl border border-sky-500/40 max-w-md mx-auto text-left space-y-2 shadow-lg">
               <div className="flex items-center gap-2 border-b border-slate-800 pb-1.5">
                 <Sparkles className="w-4 h-4 text-sky-400" />
                 <h4 className="text-xs font-black text-sky-300 uppercase tracking-wide">
-                  Passo a Passo para Acessar a Plataforma:
+                  Passo a Passo de Acesso:
                 </h4>
               </div>
-              <ol className="text-[11px] text-slate-300 space-y-1.5 pl-4 list-decimal leading-relaxed">
+              <ol className="text-xs text-slate-300 space-y-1.5 pl-4 list-decimal leading-relaxed">
                 <li>
-                  Clique no botão azul abaixo <strong>"Entrar no Painel do Salão"</strong> ou acesse pelo link do aplicativo.
+                  Copie o seu <strong>CPF</strong> (<span className="text-sky-300 font-mono font-bold">{createdSalon?.ownerCpf}</span>) e o seu <strong>Token de Licença</strong> (<span className="text-emerald-400 font-mono font-bold">{createdSalon?.purchaseToken}</span>).
                 </li>
                 <li>
-                  Na tela inicial ou de login, selecione <strong>"Acessar Painel do Salão"</strong>.
+                  Cole nos campos de acesso abaixo ou clique no botão verde de acesso imediato.
                 </li>
                 <li>
-                  Informe o seu <strong>CPF</strong> (<span className="text-sky-300 font-mono font-bold">{createdSalon?.ownerCpf}</span>) e o seu <strong>Token de Licença</strong> (<span className="text-emerald-400 font-mono font-bold">{createdSalon?.purchaseToken}</span>).
-                </li>
-                <li>
-                  Pronto! Seu salão será carregado e você poderá cadastrar serviços, profissionais, horários e compartilhar o link com seus clientes.
+                  Clique em <strong>"Entrar no Painel do Salão"</strong> para liberar o acesso ao salão já cadastrado!
                 </li>
               </ol>
             </div>
 
-            {/* Email Notification & Fast Action Buttons */}
-            <div className="bg-blue-950/70 border border-blue-700/80 p-3.5 rounded-2xl text-left text-xs text-blue-200 max-w-md mx-auto space-y-2.5">
-              <div className="flex items-start gap-2">
-                <Mail className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
+            {/* Tela de Acesso Integrada (Formulário Direto com CPF e Token) */}
+            <div className="bg-[#0b1222] border-2 border-emerald-500/80 p-4 sm:p-5 rounded-3xl max-w-md mx-auto text-left space-y-3 shadow-2xl">
+              <div className="flex items-center gap-2 border-b border-slate-800 pb-2">
+                <ShieldCheck className="w-5 h-5 text-emerald-400" />
                 <div>
-                  <p className="font-extrabold text-white">
-                    Notificação Enviada para o seu E-mail:
-                  </p>
-                  <p className="text-[11px] text-blue-200/90 mt-0.5">
-                    {emailStatusMsg || `Enviamos seu token e credenciais para ${createdSalon?.ownerEmail}`}
-                  </p>
+                  <h4 className="text-xs font-black text-white uppercase tracking-wide">
+                    Tela de Acesso ao Painel do Salão
+                  </h4>
+                  <span className="text-[10px] text-slate-400">
+                    Copie e cole ou acesse diretamente com os dados preenchidos abaixo.
+                  </span>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
-                <button
-                  type="button"
-                  onClick={handleOpenEmailClient}
-                  className="bg-blue-900 hover:bg-blue-800 text-blue-100 font-bold py-2 px-2.5 rounded-xl text-[11px] flex items-center justify-center gap-1.5 border border-blue-600/50 transition-colors"
-                >
-                  <Mail className="w-3.5 h-3.5 text-blue-300" />
-                  <span>Abrir no Meu E-mail</span>
-                </button>
+              <div className="space-y-2">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-300 mb-1">
+                    CPF do Proprietário:
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      readOnly
+                      value={createdSalon?.ownerCpf || ''}
+                      className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono text-xs select-all focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleCopyCpf}
+                      className="absolute right-2 top-1.5 text-[10px] bg-slate-800 text-sky-300 font-bold px-2 py-0.5 rounded-lg border border-slate-700 hover:bg-slate-700"
+                    >
+                      Copiar
+                    </button>
+                  </div>
+                </div>
 
-                <button
-                  type="button"
-                  disabled={isSendingEmail || !createdSalon}
-                  onClick={() => {
-                    if (createdSalon) {
-                      sendEmailNotification(createdSalon, currentPlan.priceStr);
-                    }
-                  }}
-                  className="bg-slate-900 hover:bg-slate-800 disabled:bg-slate-950 text-slate-200 font-bold py-2 px-2.5 rounded-xl text-[11px] flex items-center justify-center gap-1.5 border border-slate-700 transition-colors"
-                >
-                  {isSendingEmail ? (
-                    <>
-                      <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      <span>Reenviando...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Send className="w-3.5 h-3.5 text-slate-400" />
-                      <span>Reenviar E-mail</span>
-                    </>
-                  )}
-                </button>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-300 mb-1">
+                    Token de Licença:
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      readOnly
+                      value={createdSalon?.purchaseToken || ''}
+                      className="w-full bg-slate-950 border border-emerald-500/60 rounded-xl px-3 py-2 text-emerald-400 font-mono text-xs font-bold select-all focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleCopyToken}
+                      className="absolute right-2 top-1.5 text-[10px] bg-emerald-950 text-emerald-300 font-bold px-2 py-0.5 rounded-lg border border-emerald-600 hover:bg-emerald-900"
+                    >
+                      Copiar
+                    </button>
+                  </div>
+                </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={handleCopyAllInfo}
-                  className="bg-slate-900 hover:bg-slate-800 text-emerald-300 font-bold py-2 px-2.5 rounded-xl text-[11px] flex items-center justify-center gap-1.5 border border-emerald-500/30 transition-colors"
-                >
-                  <Copy className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>{copiedAllInfo ? 'Instruções Copiadas!' : 'Copiar Tudo'}</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleShareWhatsappCredentials}
-                  className="bg-emerald-700/80 hover:bg-emerald-600 text-white font-bold py-2 px-2.5 rounded-xl text-[11px] flex items-center justify-center gap-1.5 border border-emerald-500/40 transition-colors"
-                >
-                  <Phone className="w-3.5 h-3.5 text-emerald-200" />
-                  <span>Enviar no WhatsApp</span>
-                </button>
-              </div>
+              {/* Botão Principal de Acesso Direto */}
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  if (onOpenSalonAuth) {
+                    onOpenSalonAuth({
+                      cpf: createdSalon?.ownerCpf,
+                      token: createdSalon?.purchaseToken
+                    });
+                  }
+                }}
+                className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-4 rounded-2xl text-xs sm:text-sm shadow-xl shadow-emerald-950/60 transition-all flex items-center justify-center gap-2 active:scale-95 cursor-pointer mt-1"
+              >
+                <CheckCircle2 className="w-5 h-5 text-white" />
+                <span>Entrar no Painel do Salão (Acessar Agora) ➔</span>
+              </button>
             </div>
 
-            {/* Primary Action Button to Enter System */}
-            <button
-              onClick={() => {
-                onClose();
-                if (onOpenSalonAuth) {
-                  onOpenSalonAuth();
-                }
-              }}
-              className="w-full max-w-md bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3.5 rounded-2xl text-xs sm:text-sm shadow-xl shadow-emerald-950/50 transition-all flex items-center justify-center gap-2 active:scale-95 mx-auto cursor-pointer"
-            >
-              <CheckCircle2 className="w-4 h-4 text-white" />
-              <span>Entrar no Painel do Salão (CPF + Token)</span>
-            </button>
+            {/* Botões de Apoio: Compartilhar WhatsApp & E-mail */}
+            <div className="flex flex-wrap gap-2 justify-center max-w-md mx-auto pt-1">
+              <button
+                type="button"
+                onClick={handleShareWhatsappCredentials}
+                className="bg-emerald-700 hover:bg-emerald-600 text-white font-bold py-2 px-3 rounded-xl text-[11px] flex items-center gap-1.5 transition-colors cursor-pointer shadow"
+              >
+                <Phone className="w-3.5 h-3.5 text-emerald-200" />
+                <span>Enviar no WhatsApp</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleCopyAllInfo}
+                className="bg-slate-800 hover:bg-slate-700 text-sky-300 font-bold py-2 px-3 rounded-xl text-[11px] flex items-center gap-1.5 border border-slate-700 transition-colors cursor-pointer shadow"
+              >
+                <Copy className="w-3.5 h-3.5" />
+                <span>{copiedAllInfo ? 'Copiado!' : 'Copiar Tudo'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleOpenEmailClient}
+                className="bg-blue-900 hover:bg-blue-800 text-blue-200 font-bold py-2 px-3 rounded-xl text-[11px] flex items-center gap-1.5 transition-colors cursor-pointer shadow"
+              >
+                <Mail className="w-3.5 h-3.5" />
+                <span>Abrir E-mail</span>
+              </button>
+            </div>
 
           </div>
         )}

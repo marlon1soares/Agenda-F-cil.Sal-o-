@@ -111,6 +111,14 @@ export function App() {
   const [isClientLinkOpen, setIsClientLinkOpen] = useState(false);
   const [isSalonLinkOpen, setIsSalonLinkOpen] = useState(false);
   const [isSalonAccessLinkOpen, setIsSalonAccessLinkOpen] = useState(false);
+  const [salonAuthCredentials, setSalonAuthCredentials] = useState<{ cpf: string; token: string }>({ cpf: '', token: '' });
+
+  const handleOpenSalonAuth = (creds?: { cpf?: string; token?: string }) => {
+    if (creds) {
+      setSalonAuthCredentials({ cpf: creds.cpf || '', token: creds.token || '' });
+    }
+    setIsSalonAuthOpen(true);
+  };
 
   // Initialize Real-time synchronization and detect URL parameters
   useEffect(() => {
@@ -443,6 +451,7 @@ export function App() {
           userRole="salao"
           activeSalon={activeSalon}
           onUpdateSalon={handleUpdateSalon}
+          onOpenSalonAuth={handleOpenSalonAuth}
           onPurchaseComplete={(newOrUpdatedSalon) => {
             const currentList = Storage.getSalons();
             const exists = currentList.some(s => s.id === newOrUpdatedSalon.id);
@@ -979,7 +988,7 @@ export function App() {
         userRole={userRole}
         activeSalon={activeSalon}
         onUpdateSalon={handleUpdateSalon}
-        onOpenSalonAuth={() => setIsSalonAuthOpen(true)}
+        onOpenSalonAuth={handleOpenSalonAuth}
         onPurchaseComplete={(newOrUpdatedSalon) => {
           const currentList = Storage.getSalons();
           const exists = currentList.some(s => s.id === newOrUpdatedSalon.id);
@@ -1023,6 +1032,8 @@ export function App() {
         isOpen={isSalonAuthOpen}
         onClose={() => setIsSalonAuthOpen(false)}
         salons={salons}
+        initialCpf={salonAuthCredentials.cpf}
+        initialToken={salonAuthCredentials.token}
         onSuccess={(salon) => {
           handleSelectSalon(salon);
           setUserRole('salao');
