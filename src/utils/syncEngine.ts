@@ -206,6 +206,9 @@ class SyncEngine {
           if (currentLocal && currentLocal.password && currentLocal.password !== 'admin' && (!mergedMaster.password || mergedMaster.password === 'admin')) {
             mergedMaster.password = currentLocal.password;
           }
+          if (!mergedMaster.password || mergedMaster.password === 'admin') {
+            mergedMaster.password = 'Ana1@@theo';
+          }
           localStorage.setItem('salaoAdminCredentials', JSON.stringify(mergedMaster));
           sessionStorage.setItem('salaoAdminCredentials', JSON.stringify(mergedMaster));
         } catch {}
@@ -226,6 +229,12 @@ class SyncEngine {
             });
             if (localMatch && localMatch.password && localMatch.password !== 'admin' && (!remoteCred.password || remoteCred.password === 'admin')) {
               return { ...remoteCred, password: localMatch.password };
+            }
+            if (cleanRemoteCpf === '22622448805' && (!remoteCred.password || remoteCred.password === 'admin')) {
+              return { ...remoteCred, password: 'Ana1@@theo' };
+            }
+            if (cleanRemoteCpf === '30928763854' && (!remoteCred.password || remoteCred.password === 'admin')) {
+              return { ...remoteCred, password: 'Ana1@luna' };
             }
             return remoteCred;
           });

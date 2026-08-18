@@ -136,12 +136,13 @@ export const AdminChangePasswordModal: React.FC<AdminChangePasswordModalProps> =
     }
 
     const formattedCpf = maskCPF(cpf);
+    const existingAdmin = credsList.find(c => (c.cpf || '').replace(/\D/g, '') === cleanCpfDigits);
     const newCred: AdminCredentials = {
       cpf: formattedCpf,
-      email: `${cleanCpfDigits}@admin.salao`,
-      phone: phone.trim() || '(11) 99999-9999',
+      email: existingAdmin?.email || 'marlon1soares28@gmail.com',
+      phone: phone.trim() || existingAdmin?.phone || '(11) 99999-9999',
       password: newPassword.trim(),
-      registeredAt: new Date().toISOString()
+      registeredAt: existingAdmin?.registeredAt || new Date().toISOString()
     };
 
     Storage.saveAdminCredentials(newCred);

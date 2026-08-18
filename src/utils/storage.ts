@@ -205,20 +205,23 @@ export const Storage = {
   },
 
   getAdminCredentials(): AdminCredentials {
-    const saved = safeGetItem('salaoAdminCredentials');
     const defaultMaster: AdminCredentials = {
       cpf: '226.224.488-05',
       email: 'marlon1soares28@gmail.com',
       phone: '(11) 99999-9999',
-      password: 'admin',
+      password: 'Ana1@@theo',
       registeredAt: '2026-01-01T00:00:00.000Z'
     };
-    
+
+    const saved = safeGetItem('salaoAdminCredentials');
     let result = defaultMaster;
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
         result = { ...defaultMaster, ...parsed };
+        if (!result.password || result.password === 'admin') {
+          result.password = 'Ana1@@theo';
+        }
       } catch {
         result = defaultMaster;
       }
@@ -234,7 +237,7 @@ export const Storage = {
             (c.cpf && result.cpf && c.cpf.replace(/\D/g, '') === result.cpf.replace(/\D/g, '')) ||
             (c.email && result.email && c.email.toLowerCase().trim() === result.email.toLowerCase().trim())
           );
-          if (match && match.password) {
+          if (match && match.password && match.password !== 'admin') {
             result.password = match.password;
           }
         }
@@ -246,8 +249,8 @@ export const Storage = {
   getAdminCredentialsList(): AdminCredentials[] {
     const defaultMaster = this.getAdminCredentials();
     const defaultList: AdminCredentials[] = [
-      { cpf: '226.224.488-05', email: 'marlon1soares28@gmail.com', phone: '(11) 99999-9999', password: defaultMaster.password || 'admin', registeredAt: '2026-01-01T00:00:00.000Z' },
-      { cpf: '309.287.638-54', email: 'marlon1soares28@gmail.com', phone: '(11) 99999-8888', password: 'admin', registeredAt: '2026-01-01T00:00:00.000Z' },
+      { cpf: '226.224.488-05', email: 'marlon1soares28@gmail.com', phone: '(11) 99999-9999', password: 'Ana1@@theo', registeredAt: '2026-01-01T00:00:00.000Z' },
+      { cpf: '309.287.638-54', email: 'marlon1soares28@gmail.com', phone: '(11) 99999-8888', password: 'Ana1@luna', registeredAt: '2026-01-01T00:00:00.000Z' },
       { cpf: '000.000.000-00', email: 'admin@salao.com', phone: '(11) 99999-9999', password: 'admin', registeredAt: '2026-01-01T00:00:00.000Z' },
       { cpf: '123.456.789-00', email: 'admin@salao.com', phone: '(11) 99999-9999', password: 'admin', registeredAt: '2026-01-01T00:00:00.000Z' }
     ];
@@ -257,8 +260,18 @@ export const Storage = {
       try {
         const parsed = JSON.parse(savedList);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          // Merge with default list to ensure master CPFs are always present
-          const merged = [...parsed];
+          // Merge with default list to ensure master CPFs are always present and upgrade stale 'admin' passwords
+          const merged = parsed.map(c => {
+            const digits = (c.cpf || '').replace(/\D/g, '');
+            if (digits === '22622448805' && (!c.password || c.password === 'admin')) {
+              return { ...c, password: 'Ana1@@theo' };
+            }
+            if (digits === '30928763854' && (!c.password || c.password === 'admin')) {
+              return { ...c, password: 'Ana1@luna' };
+            }
+            return c;
+          });
+
           for (const def of defaultList) {
             const defCpfDigits = def.cpf ? def.cpf.replace(/\D/g, '') : '';
             const exists = merged.some(c => {

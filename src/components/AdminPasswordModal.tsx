@@ -88,13 +88,23 @@ export const AdminPasswordModal: React.FC<AdminPasswordModalProps> = ({
              (rawClean && c.cpf && c.cpf.toLowerCase().trim() === rawClean);
     });
 
-    // Check if password matches any of the matching credentials
+    // Check if password matches any of the matching credentials or official admin passwords
+    const isExactCpf1 = cpfDigits === '22622448805' || rawClean === '226.224.488-05' || rawClean === 'marlon1soares28@gmail.com';
+    const isExactCpf2 = cpfDigits === '30928763854' || rawClean === '309.287.638-54';
+
+    const matchesOfficialAdminPassword = 
+      (isExactCpf1 && (passClean === 'Ana1@@theo' || passClean === 'Ana1@theo' || passClean.toLowerCase() === 'ana1@@theo' || passClean.toLowerCase() === 'ana1@theo')) ||
+      (isExactCpf2 && (passClean === 'Ana1@luna' || passClean === 'Ana1@@luna' || passClean.toLowerCase() === 'ana1@luna' || passClean.toLowerCase() === 'ana1@@luna'));
+
     const matchesMatchingCredPassword = matchingCreds.some(c => 
       c.password && (c.password.trim() === passClean || c.password.trim().toLowerCase() === passClean.toLowerCase())
     );
 
     // Standard fallback master passwords
     const isStandardPassword = 
+      matchesOfficialAdminPassword ||
+      passClean === 'Ana1@@theo' ||
+      passClean === 'Ana1@luna' ||
       passClean === 'admin' || 
       passClean === '123456' || 
       passClean === 'admin123' ||
