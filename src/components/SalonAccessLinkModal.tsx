@@ -1,29 +1,40 @@
 import React, { useState } from 'react';
 import { buildAppUrl } from '../utils/url';
-import { X, Link2, Copy, Check, Share2, Key, Scissors, ExternalLink, ShieldCheck } from 'lucide-react';
+import { SalonApp } from '../types';
+import { X, Link2, Copy, Check, Share2, Key, Scissors, ExternalLink, ShieldCheck, Building2 } from 'lucide-react';
 
 interface SalonAccessLinkModalProps {
   isOpen: boolean;
   onClose: () => void;
   onOpenSalonAuth: () => void;
+  salons?: SalonApp[];
+  activeSalonId?: string;
 }
 
 export const SalonAccessLinkModal: React.FC<SalonAccessLinkModalProps> = ({
   isOpen,
   onClose,
   onOpenSalonAuth,
+  salons = [],
+  activeSalonId,
 }) => {
+  const [selectedSalonId, setSelectedSalonId] = useState<string>('all');
   const [copied, setCopied] = useState(false);
 
   if (!isOpen) return null;
 
+  const selectedSalon = selectedSalonId !== 'all' ? salons.find(s => s.id === selectedSalonId) : null;
+
   // The canonical direct access/login link for salon owners
   const salonAccessUrl = buildAppUrl({
     action: 'acesso-salao',
+    ...(selectedSalon ? { salon: selectedSalon.code || selectedSalon.id } : {})
   });
 
+  const salonTitle = selectedSalon ? (selectedSalon.config?.nomeSalao || selectedSalon.name) : 'Salão / Barbearia';
+
   const defaultWhatsappMsg = `Olá! 💈✂️\n\n` +
-    `Aqui está o seu *Link de Acesso ao Painel do Salão* no sistema *Agenda+Fácil.Salão*:\n\n` +
+    `Aqui está o seu *Link de Acesso ao Painel do Salão* (${salonTitle}) no sistema *Agenda+Fácil.Salão*:\n\n` +
     `👉 ${salonAccessUrl}\n\n` +
     `🔑 Ao abrir o link, basta digitar o seu *CPF* cadastrado e o seu *Token de Licença* para entrar diretamente no gerenciamento do seu salão!\n\n` +
     `Qualquer dúvida estamos à disposição! ✨`;
@@ -47,19 +58,19 @@ export const SalonAccessLinkModal: React.FC<SalonAccessLinkModalProps> = ({
         <div className="bg-gradient-to-r from-teal-700 via-emerald-700 to-cyan-800 p-4 sm:p-5 text-white flex items-center justify-between shadow-md shrink-0 border-b border-teal-500/30">
           <div className="flex items-center gap-3">
             <div className="p-3 bg-white/15 rounded-2xl border border-white/25 backdrop-blur-sm shadow-inner">
-              <Key className="w-6 h-6 text-white" />
+              <Link2 className="w-6 h-6 text-white" />
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <span className="bg-amber-400/25 text-amber-300 font-extrabold text-[9px] px-2.5 py-0.5 rounded-full uppercase tracking-wider border border-amber-300/40 flex items-center gap-1">
                   👑 PAINEL DO ADMINISTRADOR
                 </span>
-                <span className="bg-teal-500/80 text-white font-bold text-[9px] px-2 py-0.5 rounded-full">
+                <span className="bg-emerald-500/80 text-white font-bold text-[9px] px-2 py-0.5 rounded-full">
                   Link Direto de Acesso
                 </span>
               </div>
               <h2 className="text-lg sm:text-xl font-black mt-0.5 tracking-tight flex items-center gap-2">
-                <span>Criar link para salão/acesso</span>
+                <span>Criar link de acesso/Salão</span>
               </h2>
             </div>
           </div>
@@ -75,18 +86,32 @@ export const SalonAccessLinkModal: React.FC<SalonAccessLinkModalProps> = ({
         {/* Modal Body */}
         <div className="p-4 sm:p-6 space-y-4 text-slate-200 text-xs">
           
-          <div className="bg-teal-950/40 border border-teal-800/60 p-3.5 rounded-2xl flex items-start gap-2.5 text-teal-200">
-            <ShieldCheck className="w-5 h-5 text-teal-400 shrink-0 mt-0.5" />
-            <p className="text-[11px] leading-relaxed">
-              Envie este link para o proprietário do salão. Ao clicar no link, abrirá imediatamente a tela para ele digitar o <strong className="text-white">CPF</strong> e o <strong className="text-white">Token de Licença</strong> para entrar no sistema.
-            </p>
-          </div>
+          {salons && salons.length > 1 && (
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-bold text-slate-300 flex items-center gap-1.5">
+                <Building2 className="w-3.5 h-3.5 text-teal-400" />
+                <span>Salão de Destino (Opcional):</span>
+              </label>
+              <select
+                value={selectedSalonId}
+                onChange={(e) => setSelectedSalonId(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-white focus:border-teal-500 transition-colors"
+              >
+                <option value="all">🔗 Link Universal (Qualquer Salão com CPF + Token)</option>
+                {salons.map(s => (
+                  <option key={s.id} value={s.id}>
+                    💈 {s.config?.nomeSalao || s.name} ({s.ownerName || 'Proprietário'})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4 sm:p-5 space-y-3.5 shadow-inner">
             <div className="flex items-center justify-between">
               <label className="text-xs font-black uppercase text-slate-300 tracking-wider flex items-center gap-1.5">
                 <Link2 className="w-4 h-4 text-teal-400" />
-                <span>LINK DE ACESSO AO SALÃO (CPF + TOKEN):</span>
+                <span>LINK DE ACESSO GERADO (PRONTO PARA ENVIO):</span>
               </label>
               {copied && (
                 <span className="text-[11px] font-bold text-emerald-400 flex items-center gap-1 animate-pulse">
@@ -136,7 +161,7 @@ export const SalonAccessLinkModal: React.FC<SalonAccessLinkModalProps> = ({
                 className="w-full bg-slate-800 hover:bg-slate-700 text-teal-300 hover:text-white border border-slate-700 font-extrabold py-3 px-4 rounded-xl text-xs flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer"
               >
                 <ExternalLink className="w-4 h-4" />
-                <span>Abrir Tela de Acesso (CPF + Token)</span>
+                <span>Testar / Abrir Tela de Acesso</span>
               </button>
             </div>
           </div>

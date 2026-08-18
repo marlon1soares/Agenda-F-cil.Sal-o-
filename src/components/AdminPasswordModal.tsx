@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { Lock, Key, Mail, Phone, X, Check, ShieldAlert, UserPlus, LogIn, FileText, Eye, EyeOff, ShieldCheck } from 'lucide-react';
 import { Storage } from '../utils/storage';
-import { AdminCredentials } from '../types';
+import { AdminCredentials, UserRole } from '../types';
 
 interface AdminPasswordModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (targetRole?: UserRole) => void;
   defaultPassword?: string;
   simpleLoginOnly?: boolean;
+  targetRole?: UserRole;
+  isAlreadyAdmin?: boolean;
 }
 
 export const AdminPasswordModal: React.FC<AdminPasswordModalProps> = ({
@@ -16,6 +18,8 @@ export const AdminPasswordModal: React.FC<AdminPasswordModalProps> = ({
   onClose,
   onSuccess,
   simpleLoginOnly = false,
+  targetRole = 'admin',
+  isAlreadyAdmin = false,
 }) => {
   const [activeTab, setActiveTab] = useState<'login' | 'register' | 'reset'>('login');
 
@@ -70,14 +74,19 @@ export const AdminPasswordModal: React.FC<AdminPasswordModalProps> = ({
       setRegCpf(current.cpf || '');
       setRegEmail(current.email || '');
       setRegPhone(current.phone || '');
+      
+      // Default to the first registered admin CPF if empty
       if (!loginCpf) {
-        setLoginCpf(current.cpf || (current.email || ''));
+        setLoginCpf(current.cpf || '226.224.488-05');
       }
       setLoginPassword('');
       setLoginError('');
       setRegError('');
       setRegSuccess(false);
       setFeedbackMsg(null);
+      if (!isAlreadyAdmin) {
+        setActiveTab('login');
+      }
     }
 
     window.addEventListener('salao_sync_data', refreshCreds);
@@ -86,13 +95,14 @@ export const AdminPasswordModal: React.FC<AdminPasswordModalProps> = ({
       window.removeEventListener('salao_sync_data', refreshCreds);
       window.removeEventListener('storage', refreshCreds);
     };
-  }, [isOpen]);
+  }, [isOpen, isAlreadyAdmin]);
 
   if (!isOpen) return null;
 
-  // Delete / Cancel a registered credential
+  // Delete / Cancel a registered credential (only for already authenticated admins)
   const handleDeleteCredential = (identifier: string, e: React.MouseEvent) => {
     e.stopPropagation();
+    if (!isAlreadyAdmin) return;
     const updated = Storage.deleteAdminCredential(identifier);
     setCredsList(updated);
     if (loginCpf === identifier) {
@@ -148,7 +158,7 @@ export const AdminPasswordModal: React.FC<AdminPasswordModalProps> = ({
           sessionStorage.setItem('salao_admin_authenticated', 'true');
           localStorage.setItem('salao_admin_authenticated', 'true');
         } catch {}
-        onSuccess();
+        onSuccess(targetRole);
         return;
       } else {
         setLoginError(`Senha incorreta para o CPF "${matchingCred.cpf || matchingCred.email}". Verifique a senha e tente novamente.`);
@@ -161,10 +171,10 @@ export const AdminPasswordModal: React.FC<AdminPasswordModalProps> = ({
         sessionStorage.setItem('salao_admin_authenticated', 'true');
         localStorage.setItem('salao_admin_authenticated', 'true');
       } catch {}
-      onSuccess();
+      onSuccess(targetRole);
       return;
     } else {
-      setLoginError(`CPF ou Credencial "${loginCpf}" não encontrada no sistema. Use a aba "Cadastrar Senha" para cadastrar seu CPF e senha.`);
+      setLoginError(`CPF ou Credencial "${loginCpf}" não autorizada. Verifique se o CPF digitado é o de um dos administradores.`);
     }
   };
 
@@ -300,7 +310,7 @@ export const AdminPasswordModal: React.FC<AdminPasswordModalProps> = ({
         <div className="flex justify-between items-center border-b border-slate-800 pb-3 mb-4">
           <div className="flex items-center gap-2 font-bold text-base text-sky-400">
             <Lock className="w-5 h-5 text-sky-400" />
-            <span>Acesso Restrito - Administrador (Gestão)</span>
+            <span>{isAlreadyAdmin ? 'Gerenciar Senha do Administrador' : 'Acesso de Gestão'}</span>
           </div>
           <button
             onClick={onClose}
@@ -310,8 +320,8 @@ export const AdminPasswordModal: React.FC<AdminPasswordModalProps> = ({
           </button>
         </div>
 
-        {/* Tab Selection (Only shown in full mode) */}
-        {!simpleLoginOnly && (
+        {/* Tab Selection (Only shown when already logged in as Admin) */}
+        {isAlreadyAdmin && !simpleLoginOnly && (
           <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800 mb-5 gap-1 text-xs font-bold">
             <button
               type="button"
@@ -348,46 +358,46 @@ export const AdminPasswordModal: React.FC<AdminPasswordModalProps> = ({
         )}
 
         {/* TAB 1: LOGIN MODE */}
-        {(activeTab === 'login' || simpleLoginOnly) && (
+        {(activeTab === 'login' || !isAlreadyAdmin || simpleLoginOnly) && (
           <form onSubmit={handleLogin} className="space-y-4">
             
-            {/* Registered Credentials Badge with Quick Selector (Only in full mode) */}
-            {!simpleLoginOnly && (
-              <div className="bg-slate-950/80 p-3 rounded-xl border border-sky-800/40 text-xs space-y-1.5">
-                <div className="flex items-center justify-between text-slate-300">
-                  <span className="font-bold text-sky-400 flex items-center gap-1.5">
-                    <ShieldCheck className="w-3.5 h-3.5" />
-                    <span>Credenciais Registradas:</span>
-                  </span>
-                  <span className="text-[10px] text-slate-400 font-mono">
-                    {credsList.length} cadastrada(s)
-                  </span>
-                </div>
-                <div className="flex items-center gap-1.5 flex-wrap pt-1">
-                  {credsList.map((c, i) => {
-                    const identifier = c.cpf || c.email || '';
-                    const isSelected = (c.cpf && loginCpf === c.cpf) || (c.email && loginCpf.toLowerCase() === c.email.toLowerCase());
-                    return (
-                      <div
-                        key={i}
-                        className={`inline-flex items-center rounded-lg font-mono text-[11px] font-bold border transition-all overflow-hidden ${
-                          isSelected
-                            ? 'bg-sky-600 text-white border-sky-400 shadow-sm'
-                            : 'bg-slate-900 text-slate-300 border-slate-700 hover:border-slate-500'
-                        }`}
+            {/* Registered Credentials Selector */}
+            <div className="bg-slate-950/80 p-3 rounded-xl border border-sky-800/40 text-xs space-y-1.5">
+              <div className="flex items-center justify-between text-slate-300">
+                <span className="font-bold text-sky-400 flex items-center gap-1.5">
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  <span>Credenciais Registradas:</span>
+                </span>
+                <span className="text-[10px] text-slate-400 font-mono">
+                  {credsList.length} cadastrada(s)
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5 flex-wrap pt-1">
+                {credsList.map((c, i) => {
+                  const identifier = c.cpf || c.email || '';
+                  const isSelected = (c.cpf && loginCpf === c.cpf) || (c.email && loginCpf.toLowerCase() === c.email.toLowerCase());
+                  return (
+                    <div
+                      key={i}
+                      className={`inline-flex items-center rounded-lg font-mono text-[11px] font-bold border transition-all overflow-hidden ${
+                        isSelected
+                          ? 'bg-sky-600 text-white border-sky-400 shadow-sm'
+                          : 'bg-slate-900 text-slate-300 border-slate-700 hover:border-slate-500'
+                      }`}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setLoginCpf(identifier);
+                          setLoginError('');
+                        }}
+                        className="px-2.5 py-1 hover:bg-white/10 transition-colors flex items-center gap-1 cursor-pointer"
+                        title={`Selecionar credencial ${identifier}`}
                       >
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setLoginCpf(identifier);
-                            setLoginError('');
-                          }}
-                          className="px-2.5 py-1 hover:bg-white/10 transition-colors flex items-center gap-1 cursor-pointer"
-                          title={`Selecionar credencial ${identifier}`}
-                        >
-                          <span>{identifier}</span>
-                        </button>
+                        <span>{identifier}</span>
+                      </button>
 
+                      {isAlreadyAdmin && (
                         <button
                           type="button"
                           onClick={(e) => handleDeleteCredential(identifier, e)}
@@ -396,12 +406,12 @@ export const AdminPasswordModal: React.FC<AdminPasswordModalProps> = ({
                         >
                           <X className="w-3 h-3" />
                         </button>
-                      </div>
-                    );
-                  })}
-                </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
-            )}
+            </div>
 
             {/* FIELD 1: CPF do Administrador */}
             <div>
@@ -475,8 +485,8 @@ export const AdminPasswordModal: React.FC<AdminPasswordModalProps> = ({
               <span>Entrar</span>
             </button>
 
-            {/* Footer Registration / Reset links (Only in full mode) */}
-            {!simpleLoginOnly && (
+            {/* Footer Registration / Reset links (Only shown if already Admin) */}
+            {isAlreadyAdmin && (
               <div className="flex flex-col gap-1.5 text-center pt-2 text-xs">
                 <button
                   type="button"
@@ -505,8 +515,8 @@ export const AdminPasswordModal: React.FC<AdminPasswordModalProps> = ({
           </form>
         )}
 
-        {/* TAB 2: REGISTER CPF & PASSWORD MODE (Only in full mode) */}
-        {!simpleLoginOnly && activeTab === 'register' && (
+        {/* TAB 2: REGISTER CPF & PASSWORD MODE (Only accessible to authenticated admins) */}
+        {isAlreadyAdmin && activeTab === 'register' && (
           <form onSubmit={handleRegisterCredentials} className="space-y-3.5">
             <p className="text-slate-400 text-xs">
               Cadastre o seu <strong>CPF</strong> e crie uma senha para acesso exclusivo à administração do sistema:
@@ -633,8 +643,8 @@ export const AdminPasswordModal: React.FC<AdminPasswordModalProps> = ({
           </form>
         )}
 
-        {/* TAB 3: RESET PASSWORD MODE (Only in full mode) */}
-        {!simpleLoginOnly && activeTab === 'reset' && (
+        {/* TAB 3: RESET PASSWORD MODE (Only accessible to authenticated admins) */}
+        {isAlreadyAdmin && activeTab === 'reset' && (
           <div className="space-y-3.5">
             <div className="flex justify-between items-center border-b border-slate-800 pb-2 mb-2">
               <span className="text-xs font-bold text-amber-400 flex items-center gap-1.5">

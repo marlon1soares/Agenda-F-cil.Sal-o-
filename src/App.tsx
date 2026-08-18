@@ -95,6 +95,7 @@ export function App() {
   const [isCatalogOpen, setIsCatalogOpen] = useState(false);
   const [isConfigOpen, setIsConfigOpen] = useState(false);
   const [isAdminAuthOpen, setIsAdminAuthOpen] = useState(false);
+  const [adminAuthTargetRole, setAdminAuthTargetRole] = useState<UserRole>('admin');
   const [isSalonAuthOpen, setIsSalonAuthOpen] = useState<boolean>(() => {
     try {
       return hasUrlAction('acesso-salao', 'acesso', 'login-salao', 'acessar-salao');
@@ -119,7 +120,8 @@ export function App() {
     if (creds) {
       setSalonAuthCredentials({ cpf: creds.cpf || '', token: creds.token || '' });
     }
-    setIsSalonAuthOpen(true);
+    setAdminAuthTargetRole('salao');
+    setIsAdminAuthOpen(true);
   };
 
   // Initialize Real-time synchronization and detect URL parameters
@@ -272,10 +274,13 @@ export function App() {
   const handleSelectRole = (targetRole: UserRole) => {
     if (targetRole === 'admin') {
       if (userRole !== 'admin') {
+        setAdminAuthTargetRole('admin');
         setIsAdminAuthOpen(true);
       }
     } else if (targetRole === 'salao') {
-      setIsSalonAuthOpen(true);
+      // Prompt Admin Login Screen (CPF + Password) as requested
+      setAdminAuthTargetRole('salao');
+      setIsAdminAuthOpen(true);
     } else {
       setUserRole(targetRole);
     }
@@ -504,7 +509,7 @@ export function App() {
           onOpenAdminPaymentConfig={() => setIsAdminPaymentOpen(true)}
           onOpenClientLink={() => setIsClientLinkOpen(true)}
           onOpenSalonLink={() => setIsSalonLinkOpen(true)}
-          onOpenSalonAccessLink={() => setIsSalonAuthOpen(true)}
+          onOpenSalonAccessLink={() => setIsSalonAccessLinkOpen(true)}
           onOpenLiveHub={() => setIsLiveHubOpen(true)}
           isExpanded={isExpanded}
           onToggleExpand={() => setIsExpanded(!isExpanded)}
@@ -945,15 +950,19 @@ export function App() {
         onSaveConfig={handleSaveConfig}
       />
 
-      {/* Admin Password & Reset Modal */}
+      {/* Admin Password & Auth Modal */}
       <AdminPasswordModal
         isOpen={isAdminAuthOpen}
-        simpleLoginOnly={false}
+        isAlreadyAdmin={userRole === 'admin'}
+        targetRole={adminAuthTargetRole}
         onClose={() => setIsAdminAuthOpen(false)}
-        onSuccess={() => {
-          setUserRole('admin');
+        onSuccess={(resolvedRole) => {
+          const roleToSet = resolvedRole || adminAuthTargetRole || 'admin';
+          setUserRole(roleToSet);
           setIsAdminAuthOpen(false);
-          setIsAdminSalonsOpen(false);
+          if (roleToSet === 'admin') {
+            setIsAdminSalonsOpen(false);
+          }
         }}
       />
 
@@ -969,8 +978,11 @@ export function App() {
         onDeleteSalon={handleDeleteSalon}
         onOpenPaymentConfig={() => setIsAdminPaymentOpen(true)}
         onOpenSalonLink={() => setIsSalonLinkOpen(true)}
-        onOpenSalonAccessLink={() => setIsSalonAuthOpen(true)}
-        onOpenAdminAuth={() => setIsAdminAuthOpen(true)}
+        onOpenSalonAccessLink={() => setIsSalonAccessLinkOpen(true)}
+        onOpenAdminAuth={() => {
+          setAdminAuthTargetRole('admin');
+          setIsAdminAuthOpen(true);
+        }}
         onOpenLiveHub={() => setIsLiveHubOpen(true)}
       />
 
@@ -1011,6 +1023,8 @@ export function App() {
         isOpen={isSalonAccessLinkOpen}
         onClose={() => setIsSalonAccessLinkOpen(false)}
         onOpenSalonAuth={() => setIsSalonAuthOpen(true)}
+        salons={salons}
+        activeSalonId={activeSalonId}
       />
 
       {/* Client Direct Link & WhatsApp Generator Modal */}

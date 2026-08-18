@@ -199,7 +199,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                     <Scissors className="w-4 h-4 text-emerald-300 shrink-0" />
                     <div className="flex flex-col">
                       <span>💈 Salão / Barbearia</span>
-                      <span className="text-[9px] font-medium text-emerald-400/80">Entrada c/ CPF e Token</span>
+                      <span className="text-[9px] font-medium text-emerald-400/80">Entrada c/ CPF e Senha</span>
                     </div>
                   </div>
                 </button>
