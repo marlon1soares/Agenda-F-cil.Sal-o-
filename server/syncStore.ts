@@ -260,11 +260,18 @@ class SyncStore {
       if (fs.existsSync(DB_FILE)) {
         const raw = fs.readFileSync(DB_FILE, 'utf-8');
         const parsed = JSON.parse(raw);
-        return {
+        const merged: SyncDatabaseState = {
           ...DEFAULT_STATE,
           ...parsed,
           lastUpdated: parsed.lastUpdated || Date.now()
         };
+        if (parsed.adminCredentialsList && Array.isArray(parsed.adminCredentialsList) && parsed.adminCredentialsList.length > 0) {
+          merged.adminCredentialsList = parsed.adminCredentialsList;
+        }
+        if (parsed.adminCredentials && parsed.adminCredentials.cpf) {
+          merged.adminCredentials = parsed.adminCredentials;
+        }
+        return merged;
       }
     } catch (e) {
       console.warn('[SyncStore] Could not read from database file, using default state:', e);
@@ -308,7 +315,11 @@ class SyncStore {
       lastUpdated: Date.now()
     };
 
-    this.scheduleSave();
+    if (updates.adminCredentials || updates.adminCredentialsList || updates.salons) {
+      this.persistToDisk(this.state);
+    } else {
+      this.scheduleSave();
+    }
 
     // Broadcast to all connected clients (Admin, Salon Owner, Clients)
     const payload = `data: ${JSON.stringify({

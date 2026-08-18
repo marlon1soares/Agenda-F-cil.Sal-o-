@@ -195,16 +195,43 @@ class SyncEngine {
       if (state.adminPaymentConfig) {
         try { localStorage.setItem('salaoAdminPaymentConfig', JSON.stringify(state.adminPaymentConfig)); } catch {}
       }
-      if (state.adminCredentials) {
+      if (state.adminCredentials && state.adminCredentials.cpf) {
         try {
-          localStorage.setItem('salaoAdminCredentials', JSON.stringify(state.adminCredentials));
-          sessionStorage.setItem('salaoAdminCredentials', JSON.stringify(state.adminCredentials));
+          const currentLocalRaw = localStorage.getItem('salaoAdminCredentials');
+          let currentLocal: any = null;
+          if (currentLocalRaw) {
+            try { currentLocal = JSON.parse(currentLocalRaw); } catch {}
+          }
+          const mergedMaster = { ...state.adminCredentials };
+          if (currentLocal && currentLocal.password && currentLocal.password !== 'admin' && (!mergedMaster.password || mergedMaster.password === 'admin')) {
+            mergedMaster.password = currentLocal.password;
+          }
+          localStorage.setItem('salaoAdminCredentials', JSON.stringify(mergedMaster));
+          sessionStorage.setItem('salaoAdminCredentials', JSON.stringify(mergedMaster));
         } catch {}
       }
-      if (state.adminCredentialsList && Array.isArray(state.adminCredentialsList)) {
+      if (state.adminCredentialsList && Array.isArray(state.adminCredentialsList) && state.adminCredentialsList.length > 0) {
         try {
-          localStorage.setItem('salaoAdminCredentialsList', JSON.stringify(state.adminCredentialsList));
-          sessionStorage.setItem('salaoAdminCredentialsList', JSON.stringify(state.adminCredentialsList));
+          const currentListRaw = localStorage.getItem('salaoAdminCredentialsList');
+          let currentList: any[] = [];
+          if (currentListRaw) {
+            try { currentList = JSON.parse(currentListRaw) || []; } catch {}
+          }
+
+          const mergedList = state.adminCredentialsList.map((remoteCred: any) => {
+            const cleanRemoteCpf = (remoteCred.cpf || '').replace(/\D/g, '');
+            const localMatch = currentList.find((l: any) => {
+              const cleanLocalCpf = (l.cpf || '').replace(/\D/g, '');
+              return cleanRemoteCpf && cleanLocalCpf && cleanLocalCpf === cleanRemoteCpf;
+            });
+            if (localMatch && localMatch.password && localMatch.password !== 'admin' && (!remoteCred.password || remoteCred.password === 'admin')) {
+              return { ...remoteCred, password: localMatch.password };
+            }
+            return remoteCred;
+          });
+
+          localStorage.setItem('salaoAdminCredentialsList', JSON.stringify(mergedList));
+          sessionStorage.setItem('salaoAdminCredentialsList', JSON.stringify(mergedList));
         } catch {}
       }
       if (state.messages && Array.isArray(state.messages)) {

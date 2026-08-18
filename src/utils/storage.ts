@@ -213,13 +213,35 @@ export const Storage = {
       password: 'admin',
       registeredAt: '2026-01-01T00:00:00.000Z'
     };
-    if (!saved) return defaultMaster;
-    try {
-      const parsed = JSON.parse(saved);
-      return { ...defaultMaster, ...parsed };
-    } catch {
-      return defaultMaster;
+    
+    let result = defaultMaster;
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        result = { ...defaultMaster, ...parsed };
+      } catch {
+        result = defaultMaster;
+      }
     }
+
+    // Check if the list contains this admin with an active customized password
+    const savedListRaw = safeGetItem('salaoAdminCredentialsList');
+    if (savedListRaw) {
+      try {
+        const parsedList: AdminCredentials[] = JSON.parse(savedListRaw);
+        if (Array.isArray(parsedList) && parsedList.length > 0) {
+          const match = parsedList.find(c => 
+            (c.cpf && result.cpf && c.cpf.replace(/\D/g, '') === result.cpf.replace(/\D/g, '')) ||
+            (c.email && result.email && c.email.toLowerCase().trim() === result.email.toLowerCase().trim())
+          );
+          if (match && match.password) {
+            result.password = match.password;
+          }
+        }
+      } catch {}
+    }
+
+    return result;
   },
   getAdminCredentialsList(): AdminCredentials[] {
     const savedList = safeGetItem('salaoAdminCredentialsList');

@@ -364,6 +364,24 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </button>
               )}
 
+              {userRole === 'salao' && onOpenBuyApp && (
+                <div className="inline-flex items-center shrink-0">
+                  <button
+                    id="btn-action-buy-app-salao"
+                    type="button"
+                    onClick={onOpenBuyApp}
+                    title="Abrir painel de compras do App e renovação de licença"
+                    className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-xs px-3 py-1.5 rounded-xl shadow-sm flex items-center gap-1.5 transition-all active:scale-95 border border-emerald-400/40 cursor-pointer select-none group"
+                  >
+                    <ShoppingCart className="w-4 h-4 text-yellow-300 group-hover:scale-110 transition-transform shrink-0" />
+                    <span>Comprar App</span>
+                    <span className="bg-yellow-400/20 text-yellow-300 font-black text-[10px] px-1.5 py-0.5 rounded border border-yellow-300/40 inline-flex items-center">
+                      <span>{formatBRL(Storage.getAdminPaymentConfig().precoPlano30Dias || 30)}/mês</span>
+                    </span>
+                  </button>
+                </div>
+              )}
+
               {userRole === 'admin' && onOpenSalonLink && (
                 <button
                   id="btn-action-salon-buy-link"
