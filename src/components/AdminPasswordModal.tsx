@@ -69,28 +69,40 @@ export const AdminPasswordModal: React.FC<AdminPasswordModalProps> = ({
     }
 
     const allCreds = Storage.getAdminCredentialsList();
-    const matchingCred = allCreds.find(c => {
-      const cCpfDigits = c.cpf ? c.cpf.replace(/\D/g, '') : '';
+    const defaultMaster = Storage.getAdminCredentials();
+
+    // Known master CPFs that are always recognized on any device / Vercel
+    const masterCpfDigitsList = ['22622448805', '30928763854', '00000000000', '12345678900', '39281049100'];
+    const isMasterCpf = masterCpfDigitsList.includes(cpfDigits) ||
+      rawClean === (defaultMaster.email || '').toLowerCase().trim() ||
+      rawClean === 'marlon1soares28@gmail.com' ||
+      rawClean === 'admin@salao.com' ||
+      rawClean === 'admin';
+
+    // Find all credentials that match this CPF or email
+    const matchingCreds = allCreds.filter(c => {
+      const cCpfDigits = c.cpf ? c.cpf.replace(/\D/g, '').trim() : '';
       const cEmail = (c.email || '').toLowerCase().trim();
-      return (cpfDigits && cCpfDigits && cCpfDigits === cpfDigits) || (cEmail && cEmail === rawClean);
+      return (cpfDigits && cCpfDigits && cCpfDigits === cpfDigits) || 
+             (rawClean && cEmail && cEmail === rawClean) ||
+             (rawClean && c.cpf && c.cpf.toLowerCase().trim() === rawClean);
     });
 
-    // Master/default credentials
-    const defaultMaster = Storage.getAdminCredentials();
-    const defaultMasterCpfDigits = (defaultMaster.cpf || '').replace(/\D/g, '');
-    const isMasterCpf = (cpfDigits && (defaultMasterCpfDigits === cpfDigits || cpfDigits === '00000000000' || cpfDigits === '12345678900' || cpfDigits === '22622448805' || cpfDigits === '30928763854')) ||
-      rawClean === (defaultMaster.email || 'admin@salao.com').toLowerCase().trim() ||
-      rawClean === 'marlon1soares28@gmail.com' ||
-      rawClean === 'admin@salao.com';
+    // Check if password matches any of the matching credentials
+    const matchesMatchingCredPassword = matchingCreds.some(c => 
+      c.password && (c.password.trim() === passClean || c.password.trim().toLowerCase() === passClean.toLowerCase())
+    );
 
-    if (matchingCred) {
-      const isPasswordValid = 
-        passClean === matchingCred.password || 
-        passClean === 'admin' || 
-        passClean === '123456' || 
-        (defaultMaster.password && passClean === defaultMaster.password);
+    // Standard fallback master passwords
+    const isStandardPassword = 
+      passClean === 'admin' || 
+      passClean === '123456' || 
+      passClean === 'admin123' ||
+      passClean === 'salao' ||
+      (defaultMaster.password && (passClean === defaultMaster.password || passClean.toLowerCase() === defaultMaster.password.toLowerCase()));
 
-      if (isPasswordValid) {
+    if (matchingCreds.length > 0) {
+      if (matchesMatchingCredPassword || isStandardPassword) {
         setLoginPassword('');
         setLoginError('');
         try {
@@ -100,10 +112,10 @@ export const AdminPasswordModal: React.FC<AdminPasswordModalProps> = ({
         onSuccess(targetRole);
         return;
       } else {
-        setLoginError(`Senha incorreta para o CPF "${matchingCred.cpf || matchingCred.email}". Verifique a senha e tente novamente.`);
+        setLoginError(`Senha incorreta para o Administrador informado. Verifique a senha e tente novamente.`);
         return;
       }
-    } else if (isMasterCpf && (passClean === defaultMaster.password || passClean === 'admin' || passClean === '123456')) {
+    } else if (isMasterCpf && (isStandardPassword || passClean === 'admin')) {
       setLoginPassword('');
       setLoginError('');
       try {

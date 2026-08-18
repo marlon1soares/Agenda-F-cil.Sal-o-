@@ -244,21 +244,35 @@ export const Storage = {
     return result;
   },
   getAdminCredentialsList(): AdminCredentials[] {
+    const defaultMaster = this.getAdminCredentials();
+    const defaultList: AdminCredentials[] = [
+      { cpf: '226.224.488-05', email: 'marlon1soares28@gmail.com', phone: '(11) 99999-9999', password: defaultMaster.password || 'admin', registeredAt: '2026-01-01T00:00:00.000Z' },
+      { cpf: '309.287.638-54', email: 'marlon1soares28@gmail.com', phone: '(11) 99999-8888', password: 'admin', registeredAt: '2026-01-01T00:00:00.000Z' },
+      { cpf: '000.000.000-00', email: 'admin@salao.com', phone: '(11) 99999-9999', password: 'admin', registeredAt: '2026-01-01T00:00:00.000Z' },
+      { cpf: '123.456.789-00', email: 'admin@salao.com', phone: '(11) 99999-9999', password: 'admin', registeredAt: '2026-01-01T00:00:00.000Z' }
+    ];
+
     const savedList = safeGetItem('salaoAdminCredentialsList');
     if (savedList !== null) {
       try {
         const parsed = JSON.parse(savedList);
-        if (Array.isArray(parsed)) {
-          return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          // Merge with default list to ensure master CPFs are always present
+          const merged = [...parsed];
+          for (const def of defaultList) {
+            const defCpfDigits = def.cpf ? def.cpf.replace(/\D/g, '') : '';
+            const exists = merged.some(c => {
+              const cDigits = c.cpf ? c.cpf.replace(/\D/g, '') : '';
+              return defCpfDigits && cDigits && cDigits === defCpfDigits;
+            });
+            if (!exists) {
+              merged.push(def);
+            }
+          }
+          return merged;
         }
       } catch {}
     }
-
-    const defaultMaster = this.getAdminCredentials();
-    const defaultList: AdminCredentials[] = [
-      { cpf: '226.224.488-05', email: 'marlon1soares28@gmail.com', phone: '(11) 99999-9999', password: defaultMaster.password || 'admin', registeredAt: '2026-01-01T00:00:00.000Z' },
-      { cpf: '309.287.638-54', email: 'marlon1soares28@gmail.com', phone: '(11) 99999-8888', password: 'admin', registeredAt: '2026-01-01T00:00:00.000Z' }
-    ];
 
     safeSetItem('salaoAdminCredentialsList', JSON.stringify(defaultList));
     return defaultList;
@@ -275,10 +289,17 @@ export const Storage = {
     const cleanCpf = creds.cpf ? creds.cpf.replace(/\D/g, '') : '';
     const cleanEmail = creds.email ? creds.email.toLowerCase().trim() : '';
 
+    // Match strictly by CPF if CPF exists, otherwise by email
     const existingIndex = list.findIndex(c => {
       const cCpf = c.cpf ? c.cpf.replace(/\D/g, '') : '';
       const cEmail = c.email ? c.email.toLowerCase().trim() : '';
-      return (cleanCpf && cCpf && cCpf === cleanCpf) || (cleanEmail && cEmail && cEmail === cleanEmail);
+      if (cleanCpf && cCpf) {
+        return cCpf === cleanCpf;
+      }
+      if (!cleanCpf && cleanEmail && cEmail) {
+        return cEmail === cleanEmail;
+      }
+      return false;
     });
 
     if (existingIndex >= 0) {
@@ -312,10 +333,13 @@ export const Storage = {
     const filtered = list.filter(c => {
       const cCpfDigits = c.cpf ? c.cpf.replace(/\D/g, '') : '';
       const cEmail = (c.email || '').toLowerCase().trim();
-      if (cleanId && cCpfDigits && cCpfDigits === cleanId) return false;
-      if (cleanRaw && cEmail && cEmail === cleanRaw) return false;
-      if (c.cpf === identifier || c.email === identifier) return false;
-      return true;
+      if (cleanId && cCpfDigits) {
+        return cCpfDigits !== cleanId;
+      }
+      if (!cleanId && cleanRaw && cEmail) {
+        return cEmail !== cleanRaw;
+      }
+      return c.cpf !== identifier && c.email !== identifier;
     });
 
     safeSetItem('salaoAdminCredentialsList', JSON.stringify(filtered));
