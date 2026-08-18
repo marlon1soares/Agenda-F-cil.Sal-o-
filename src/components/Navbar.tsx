@@ -18,6 +18,7 @@ interface NavbarProps {
   onOpenClientLink?: () => void;
   onOpenSalonLink?: () => void;
   onOpenSalonAccessLink?: () => void;
+  onOpenAdminChangePassword?: () => void;
   isExpanded: boolean;
   onToggleExpand: () => void;
   isMinimized: boolean;
@@ -37,6 +38,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenClientLink,
   onOpenSalonLink,
   onOpenSalonAccessLink,
+  onOpenAdminChangePassword,
   isExpanded,
   onToggleExpand,
   isMinimized,
@@ -395,6 +397,18 @@ export const Navbar: React.FC<NavbarProps> = ({
                 >
                   <Building2 className="w-3.5 h-3.5 text-sky-200" />
                   <span>Meus Salões</span>
+                </button>
+              )}
+
+              {userRole === 'admin' && onOpenAdminChangePassword && (
+                <button
+                  id="btn-action-admin-change-password"
+                  onClick={onOpenAdminChangePassword}
+                  title="Alterar Senha do Administrador e Gerenciar Usuários/Acessos"
+                  className="bg-slate-900 hover:bg-slate-800 text-emerald-400 font-extrabold text-xs px-3 py-1.5 rounded-xl shadow-sm flex items-center gap-1.5 transition-all active:scale-95 border border-emerald-500/40 shrink-0 cursor-pointer"
+                >
+                  <Key className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Alterar Senha Admin</span>
                 </button>
               )}
 

@@ -223,55 +223,23 @@ export const Storage = {
   },
   getAdminCredentialsList(): AdminCredentials[] {
     const savedList = safeGetItem('salaoAdminCredentialsList');
-    const defaultMaster = this.getAdminCredentials();
-    const defaultList: AdminCredentials[] = [
-      { cpf: '226.224.488-05', email: 'marlon1soares28@gmail.com', phone: '(11) 99999-9999', password: defaultMaster.cpf === '226.224.488-05' ? defaultMaster.password : 'admin', registeredAt: '2026-01-01T00:00:00.000Z' },
-      { cpf: '309.287.638-54', email: 'marlon1soares28@gmail.com', phone: '(11) 99999-8888', password: defaultMaster.cpf === '309.287.638-54' ? defaultMaster.password : 'admin', registeredAt: '2026-01-01T00:00:00.000Z' },
-      { cpf: '000.000.000-00', email: 'marlon1soares28@gmail.com', phone: '(11) 99999-9999', password: 'admin', registeredAt: '2026-01-01T00:00:00.000Z' },
-      { cpf: '123.456.789-00', email: 'admin@salao.com', phone: '(11) 99999-9999', password: 'admin', registeredAt: '2026-01-01T00:00:00.000Z' }
-    ];
-
-    let list: AdminCredentials[] = [];
-    if (savedList) {
+    if (savedList !== null) {
       try {
         const parsed = JSON.parse(savedList);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          list = parsed;
+        if (Array.isArray(parsed)) {
+          return parsed;
         }
       } catch {}
     }
 
-    if (list.length === 0) {
-      list = defaultList;
-      safeSetItem('salaoAdminCredentialsList', JSON.stringify(list));
-    } else {
-      // Ensure the permanent admin accounts (226.224.488-05 and 309.287.638-54) are always in the list
-      defaultList.forEach(def => {
-        const defCpfDigits = def.cpf ? def.cpf.replace(/\D/g, '') : '';
-        const exists = list.some(c => {
-          const cDigits = c.cpf ? c.cpf.replace(/\D/g, '') : '';
-          return (defCpfDigits && cDigits && cDigits === defCpfDigits);
-        });
-        if (!exists) {
-          list.push(def);
-        }
-      });
-    }
+    const defaultMaster = this.getAdminCredentials();
+    const defaultList: AdminCredentials[] = [
+      { cpf: '226.224.488-05', email: 'marlon1soares28@gmail.com', phone: '(11) 99999-9999', password: defaultMaster.password || 'admin', registeredAt: '2026-01-01T00:00:00.000Z' },
+      { cpf: '309.287.638-54', email: 'marlon1soares28@gmail.com', phone: '(11) 99999-8888', password: 'admin', registeredAt: '2026-01-01T00:00:00.000Z' }
+    ];
 
-    // Check single stored credential as well
-    const single = this.getAdminCredentials();
-    if (single && (single.cpf || single.email)) {
-      const idx = list.findIndex(c => 
-        (single.cpf && c.cpf && c.cpf.replace(/\D/g, '') === single.cpf.replace(/\D/g, '')) ||
-        (single.email && c.email && c.email.toLowerCase().trim() === (single.email || '').toLowerCase().trim())
-      );
-      if (idx === -1) {
-        list.push(single);
-      } else {
-        list[idx] = { ...list[idx], ...single };
-      }
-    }
-    return list;
+    safeSetItem('salaoAdminCredentialsList', JSON.stringify(defaultList));
+    return defaultList;
   },
   saveAdminCredentials(creds: AdminCredentials) {
     safeSetItem('salaoAdminCredentials', JSON.stringify(creds));
@@ -329,6 +297,12 @@ export const Storage = {
     });
 
     safeSetItem('salaoAdminCredentialsList', JSON.stringify(filtered));
+    try {
+      if (typeof window !== 'undefined' && window.sessionStorage) {
+        window.sessionStorage.setItem('salaoAdminCredentialsList', JSON.stringify(filtered));
+      }
+    } catch {}
+
     // If the main single cred was deleted, update it to the first available or default
     if (filtered.length > 0) {
       safeSetItem('salaoAdminCredentials', JSON.stringify(filtered[0]));

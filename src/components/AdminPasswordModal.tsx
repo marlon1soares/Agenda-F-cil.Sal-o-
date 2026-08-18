@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Lock, Key, Mail, Phone, X, Check, ShieldAlert, UserPlus, LogIn, FileText, Eye, EyeOff, ShieldCheck } from 'lucide-react';
+import { Lock, Key, X, ShieldAlert, LogIn, FileText, Eye, EyeOff, Crown } from 'lucide-react';
 import { Storage } from '../utils/storage';
 import { AdminCredentials, UserRole } from '../types';
 
@@ -17,39 +17,14 @@ export const AdminPasswordModal: React.FC<AdminPasswordModalProps> = ({
   isOpen,
   onClose,
   onSuccess,
-  simpleLoginOnly = false,
   targetRole = 'admin',
   isAlreadyAdmin = false,
 }) => {
-  const [activeTab, setActiveTab] = useState<'login' | 'register' | 'reset'>('login');
-
-  // Existing Stored Credentials
-  const [storedCreds, setStoredCreds] = useState<AdminCredentials>(() => Storage.getAdminCredentials());
-  const [credsList, setCredsList] = useState<AdminCredentials[]>(() => Storage.getAdminCredentialsList());
-
   // Login Form State
   const [loginCpf, setLoginCpf] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [loginError, setLoginError] = useState('');
-
-  // Register Form State
-  const [regCpf, setRegCpf] = useState('');
-  const [regEmail, setRegEmail] = useState('');
-  const [regPhone, setRegPhone] = useState('');
-  const [regPassword, setRegPassword] = useState('');
-  const [regConfirmPassword, setRegConfirmPassword] = useState('');
-  const [showRegPassword, setShowRegPassword] = useState(false);
-  const [regError, setRegError] = useState('');
-  const [regSuccess, setRegSuccess] = useState(false);
-
-  // Reset Password State
-  const [resetCpfOrEmail, setResetCpfOrEmail] = useState('');
-  const [resetPhone, setResetPhone] = useState('');
-  const [resetNewPassword, setResetNewPassword] = useState('');
-  const [resetConfirmPassword, setResetConfirmPassword] = useState('');
-  const [resetStep, setResetStep] = useState<'request' | 'newPassword'>('request');
-  const [feedbackMsg, setFeedbackMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   // CPF mask helper
   const maskCPF = (val: string) => {
@@ -61,54 +36,18 @@ export const AdminPasswordModal: React.FC<AdminPasswordModalProps> = ({
   };
 
   useEffect(() => {
-    const refreshCreds = () => {
-      const current = Storage.getAdminCredentials();
-      const list = Storage.getAdminCredentialsList();
-      setStoredCreds(current);
-      setCredsList(list);
-    };
-
     if (isOpen) {
-      refreshCreds();
-      const current = Storage.getAdminCredentials();
-      setRegCpf(current.cpf || '');
-      setRegEmail(current.email || '');
-      setRegPhone(current.phone || '');
-      
-      // Default to the first registered admin CPF if empty
+      const list = Storage.getAdminCredentialsList();
+      const current = list.length > 0 ? list[0] : Storage.getAdminCredentials();
       if (!loginCpf) {
         setLoginCpf(current.cpf || '226.224.488-05');
       }
       setLoginPassword('');
       setLoginError('');
-      setRegError('');
-      setRegSuccess(false);
-      setFeedbackMsg(null);
-      if (!isAlreadyAdmin) {
-        setActiveTab('login');
-      }
     }
-
-    window.addEventListener('salao_sync_data', refreshCreds);
-    window.addEventListener('storage', refreshCreds);
-    return () => {
-      window.removeEventListener('salao_sync_data', refreshCreds);
-      window.removeEventListener('storage', refreshCreds);
-    };
-  }, [isOpen, isAlreadyAdmin]);
+  }, [isOpen]);
 
   if (!isOpen) return null;
-
-  // Delete / Cancel a registered credential (only for already authenticated admins)
-  const handleDeleteCredential = (identifier: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!isAlreadyAdmin) return;
-    const updated = Storage.deleteAdminCredential(identifier);
-    setCredsList(updated);
-    if (loginCpf === identifier) {
-      setLoginCpf(updated.length > 0 ? (updated[0].cpf || updated[0].email || '') : '');
-    }
-  };
 
   // Handle Login Attempt with CPF/Email + Password verification
   const handleLogin = (e: React.FormEvent) => {
@@ -174,598 +113,122 @@ export const AdminPasswordModal: React.FC<AdminPasswordModalProps> = ({
       onSuccess(targetRole);
       return;
     } else {
-      setLoginError(`CPF ou Credencial "${loginCpf}" não autorizada. Verifique se o CPF digitado é o de um dos administradores.`);
+      setLoginError(`CPF ou Senha inválidos. Verifique se o CPF e a senha correspondem aos dados de administrador.`);
     }
-  };
-
-  // Handle New Admin Credentials Registration
-  const handleRegisterCredentials = (e: React.FormEvent) => {
-    e.preventDefault();
-    setRegError('');
-
-    const cleanCpfDigits = regCpf.replace(/\D/g, '');
-    if (!cleanCpfDigits || cleanCpfDigits.length < 11) {
-      setRegError('Por favor, insira um CPF válido com 11 dígitos.');
-      return;
-    }
-
-    if (!regPhone.trim() || regPhone.trim().length < 8) {
-      setRegError('Por favor, informe um número de telefone/celular válido com DDD.');
-      return;
-    }
-
-    if (!regPassword || regPassword.length < 4) {
-      setRegError('A senha deve conter pelo menos 4 caracteres.');
-      return;
-    }
-
-    if (regPassword !== regConfirmPassword) {
-      setRegError('As senhas digitadas não coincidem. Digite novamente.');
-      return;
-    }
-
-    // Save newly created admin credentials to Storage
-    const newCreds: AdminCredentials = {
-      cpf: maskCPF(regCpf),
-      email: regEmail.trim() || 'marlon1soares28@gmail.com',
-      phone: regPhone.trim(),
-      password: regPassword.trim(),
-      registeredAt: new Date().toISOString()
-    };
-
-    Storage.saveAdminCredentials(newCreds);
-    setStoredCreds(newCreds);
-    setCredsList(Storage.getAdminCredentialsList());
-    setLoginCpf(newCreds.cpf || '');
-    setRegSuccess(true);
-    try {
-      sessionStorage.setItem('salao_admin_authenticated', 'true');
-      localStorage.setItem('salao_admin_authenticated', 'true');
-    } catch {}
-
-    // Auto-grant access after successful registration
-    setTimeout(() => {
-      onSuccess();
-    }, 1200);
-  };
-
-  // Handle Password Reset Request
-  const handleVerifyResetData = () => {
-    const allCreds = Storage.getAdminCredentialsList();
-    const currentCreds = Storage.getAdminCredentials();
-    const targetClean = resetCpfOrEmail.trim().toLowerCase();
-    const targetDigits = resetCpfOrEmail.replace(/\D/g, '');
-    const targetPhone = resetPhone.trim().replace(/\D/g, '');
-
-    if (!targetClean && !targetPhone) {
-      setFeedbackMsg({ type: 'error', text: 'Preencha seu CPF, e-mail ou telefone cadastrado.' });
-      return;
-    }
-
-    const matched = allCreds.find(c => {
-      const cCpfDigits = c.cpf ? c.cpf.replace(/\D/g, '') : '';
-      const cEmail = (c.email || '').toLowerCase().trim();
-      const cPhoneDigits = c.phone ? c.phone.replace(/\D/g, '') : '';
-      return (targetDigits && cCpfDigits === targetDigits) ||
-        (targetClean && cEmail === targetClean) ||
-        (targetPhone && cPhoneDigits === targetPhone);
-    });
-
-    if (matched || currentCreds.password === '123456' || currentCreds.password === 'admin') {
-      setFeedbackMsg({
-        type: 'success',
-        text: 'Dados validados com sucesso! Defina a sua nova senha abaixo.'
-      });
-      setResetStep('newPassword');
-    } else {
-      setFeedbackMsg({
-        type: 'error',
-        text: 'Dados não encontrados! Verifique o CPF ou telefone digitado.'
-      });
-    }
-  };
-
-  const handleSaveNewResetPassword = () => {
-    if (!resetNewPassword || resetNewPassword.length < 4) {
-      setFeedbackMsg({ type: 'error', text: 'A nova senha precisa ter pelo menos 4 caracteres.' });
-      return;
-    }
-
-    if (resetNewPassword !== resetConfirmPassword) {
-      setFeedbackMsg({ type: 'error', text: 'As senhas não coincidem.' });
-      return;
-    }
-
-    const currentCreds = Storage.getAdminCredentials();
-    const updatedCreds: AdminCredentials = {
-      ...currentCreds,
-      cpf: resetCpfOrEmail.includes('@') ? currentCreds.cpf : (maskCPF(resetCpfOrEmail) || currentCreds.cpf),
-      email: resetCpfOrEmail.includes('@') ? resetCpfOrEmail.trim() : currentCreds.email,
-      phone: resetPhone.trim() || currentCreds.phone,
-      password: resetNewPassword.trim(),
-      registeredAt: new Date().toISOString()
-    };
-
-    Storage.saveAdminCredentials(updatedCreds);
-    setStoredCreds(updatedCreds);
-    setCredsList(Storage.getAdminCredentialsList());
-    setLoginCpf(updatedCreds.cpf || updatedCreds.email || '');
-    sessionStorage.setItem('salao_admin_authenticated', 'true');
-
-    setFeedbackMsg({
-      type: 'success',
-      text: 'Sua senha foi redefinida com sucesso! Você já tem acesso.'
-    });
-
-    setTimeout(() => {
-      onSuccess();
-    }, 1200);
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 w-full max-w-md text-white shadow-2xl relative animate-in fade-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
+      <div className="bg-[#0b1222] border border-slate-800 w-full max-w-md rounded-3xl shadow-2xl overflow-hidden flex flex-col p-6 sm:p-7 space-y-5">
         
         {/* Header Title */}
-        <div className="flex justify-between items-center border-b border-slate-800 pb-3 mb-4">
-          <div className="flex items-center gap-2 font-bold text-base text-sky-400">
-            <Lock className="w-5 h-5 text-sky-400" />
-            <span>{isAlreadyAdmin ? 'Gerenciar Senha do Administrador' : 'Acesso de Gestão'}</span>
+        <div className="flex items-center justify-between border-b border-slate-800/80 pb-3.5">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-blue-950/70 rounded-2xl border border-blue-500/40 text-blue-400 flex items-center justify-center shadow-inner">
+              <Lock className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-1.5">
+                <span className="bg-amber-950/90 text-amber-300 text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider border border-amber-500/40 flex items-center gap-1">
+                  <Crown className="w-2.5 h-2.5 text-amber-400" />
+                  ADMIN
+                </span>
+              </div>
+              <h2 className="text-lg font-black text-white mt-0.5">
+                {targetRole === 'admin' ? 'Acesso do Administrador' : 'Acesso de Gestão'}
+              </h2>
+            </div>
           </div>
+
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors"
+            className="p-2 rounded-full bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Tab Selection (Only shown when already logged in as Admin) */}
-        {isAlreadyAdmin && !simpleLoginOnly && (
-          <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800 mb-5 gap-1 text-xs font-bold">
-            <button
-              type="button"
-              onClick={() => {
-                setActiveTab('login');
-                setLoginError('');
-              }}
-              className={`flex-1 py-2 px-3 rounded-lg flex items-center justify-center gap-1.5 transition-all ${
-                activeTab === 'login'
-                  ? 'bg-blue-600 text-white shadow-md'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-900'
-              }`}
-            >
-              <LogIn className="w-3.5 h-3.5" />
-              <span>Entrar</span>
-            </button>
+        {/* Login Form: Pure CPF and Password matching user requirement */}
+        <form onSubmit={handleLogin} className="space-y-4">
+          
+          {loginError && (
+            <div className="bg-rose-950/90 border border-rose-700 p-3 rounded-2xl flex items-start gap-2 text-rose-200 text-xs animate-shake">
+              <ShieldAlert className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+              <span className="font-semibold leading-relaxed">{loginError}</span>
+            </div>
+          )}
 
-            <button
-              type="button"
-              onClick={() => {
-                setActiveTab('register');
-                setRegError('');
-              }}
-              className={`flex-1 py-2 px-3 rounded-lg flex items-center justify-center gap-1.5 transition-all ${
-                activeTab === 'register'
-                  ? 'bg-emerald-600 text-white shadow-md'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-900'
-              }`}
-            >
-              <UserPlus className="w-3.5 h-3.5" />
-              <span>Cadastrar Senha</span>
-            </button>
+          {/* FIELD 1: CPF */}
+          <div className="space-y-1.5">
+            <label className="block text-xs font-bold text-sky-400 flex items-center gap-1.5">
+              <FileText className="w-4 h-4 text-sky-400" />
+              <span>CPF:</span>
+            </label>
+            <div className="relative">
+              <input
+                id="input-admin-auth-cpf"
+                type="text"
+                value={loginCpf}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val.includes('@')) {
+                    setLoginCpf(val);
+                  } else {
+                    setLoginCpf(maskCPF(val));
+                  }
+                  setLoginError('');
+                }}
+                placeholder="000.000.000-00"
+                maxLength={14}
+                autoFocus
+                className="w-full bg-[#060a14] border border-sky-500/60 focus:border-sky-400 rounded-2xl px-4 py-3.5 pl-11 text-white font-mono text-sm placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-sky-400 transition-all shadow-inner"
+              />
+              <FileText className="w-4 h-4 text-slate-400 absolute left-3.5 top-4" />
+            </div>
           </div>
-        )}
 
-        {/* TAB 1: LOGIN MODE */}
-        {(activeTab === 'login' || !isAlreadyAdmin || simpleLoginOnly) && (
-          <form onSubmit={handleLogin} className="space-y-4">
-            
-            {/* Registered Credentials Selector */}
-            <div className="bg-slate-950/80 p-3 rounded-xl border border-sky-800/40 text-xs space-y-1.5">
-              <div className="flex items-center justify-between text-slate-300">
-                <span className="font-bold text-sky-400 flex items-center gap-1.5">
-                  <ShieldCheck className="w-3.5 h-3.5" />
-                  <span>Credenciais Registradas:</span>
-                </span>
-                <span className="text-[10px] text-slate-400 font-mono">
-                  {credsList.length} cadastrada(s)
-                </span>
-              </div>
-              <div className="flex items-center gap-1.5 flex-wrap pt-1">
-                {credsList.map((c, i) => {
-                  const identifier = c.cpf || c.email || '';
-                  const isSelected = (c.cpf && loginCpf === c.cpf) || (c.email && loginCpf.toLowerCase() === c.email.toLowerCase());
-                  return (
-                    <div
-                      key={i}
-                      className={`inline-flex items-center rounded-lg font-mono text-[11px] font-bold border transition-all overflow-hidden ${
-                        isSelected
-                          ? 'bg-sky-600 text-white border-sky-400 shadow-sm'
-                          : 'bg-slate-900 text-slate-300 border-slate-700 hover:border-slate-500'
-                      }`}
-                    >
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setLoginCpf(identifier);
-                          setLoginError('');
-                        }}
-                        className="px-2.5 py-1 hover:bg-white/10 transition-colors flex items-center gap-1 cursor-pointer"
-                        title={`Selecionar credencial ${identifier}`}
-                      >
-                        <span>{identifier}</span>
-                      </button>
-
-                      {isAlreadyAdmin && (
-                        <button
-                          type="button"
-                          onClick={(e) => handleDeleteCredential(identifier, e)}
-                          title={`Excluir / cancelar credencial (${identifier})`}
-                          className="px-1.5 py-1 text-slate-400 hover:text-white hover:bg-rose-600 border-l border-slate-700/60 transition-colors flex items-center justify-center cursor-pointer"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* FIELD 1: CPF do Administrador */}
-            <div>
-              <label className="block text-xs font-bold text-slate-300 mb-1 flex items-center gap-1.5">
-                <FileText className="w-3.5 h-3.5 text-sky-400" />
-                <span>CPF:</span>
-              </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  value={loginCpf}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    if (val.includes('@')) {
-                      setLoginCpf(val);
-                    } else {
-                      setLoginCpf(maskCPF(val));
-                    }
-                    setLoginError('');
-                  }}
-                  placeholder="000.000.000-00"
-                  required
-                  autoFocus
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-9 pr-3 py-2.5 text-xs sm:text-sm text-white focus:outline-none focus:border-sky-500 font-mono"
-                />
-                <FileText className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
-              </div>
-            </div>
-
-            {/* FIELD 2: Senha do Administrador */}
-            <div>
-              <label className="block text-xs font-bold text-slate-300 mb-1 flex items-center gap-1.5">
-                <Lock className="w-3.5 h-3.5 text-sky-400" />
-                <span>Senha:</span>
-              </label>
-              <div className="relative">
-                <input
-                  type={showLoginPassword ? 'text' : 'password'}
-                  value={loginPassword}
-                  onChange={(e) => {
-                    setLoginPassword(e.target.value);
-                    setLoginError('');
-                  }}
-                  placeholder="••••••••"
-                  required
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-9 pr-10 py-2.5 text-xs sm:text-sm text-white focus:outline-none focus:border-sky-500"
-                />
-                <Key className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
-                <button
-                  type="button"
-                  onClick={() => setShowLoginPassword(!showLoginPassword)}
-                  className="text-slate-400 hover:text-slate-200 absolute right-3 top-2.5 p-0.5"
-                >
-                  {showLoginPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              </div>
-
-              {loginError && (
-                <p className="text-rose-400 text-xs mt-2 flex items-start gap-1.5 font-medium leading-tight bg-rose-950/60 p-2.5 rounded-lg border border-rose-800 animate-in fade-in">
-                  <ShieldAlert className="w-4 h-4 shrink-0 text-rose-400 mt-0.5" />
-                  <span>{loginError}</span>
-                </p>
-              )}
-            </div>
-
-            <button
-              type="submit"
-              className="w-full bg-blue-600 hover:bg-blue-500 text-white font-extrabold py-2.5 rounded-xl text-sm shadow-md transition-all flex items-center justify-center gap-2 active:scale-95 cursor-pointer"
-            >
-              <LogIn className="w-4 h-4" />
-              <span>Entrar</span>
-            </button>
-
-            {/* Footer Registration / Reset links (Only shown if already Admin) */}
-            {isAlreadyAdmin && (
-              <div className="flex flex-col gap-1.5 text-center pt-2 text-xs">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setActiveTab('register');
-                    setRegError('');
-                  }}
-                  className="text-emerald-400 hover:text-emerald-300 font-bold transition-colors cursor-pointer"
-                >
-                  + Cadastrar novo CPF e Senha
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setActiveTab('reset');
-                    setResetStep('request');
-                    setFeedbackMsg(null);
-                  }}
-                  className="text-sky-400 hover:text-sky-300 underline font-medium transition-colors cursor-pointer"
-                >
-                  Esqueci a senha / Redefinir Senha
-                </button>
-              </div>
-            )}
-          </form>
-        )}
-
-        {/* TAB 2: REGISTER CPF & PASSWORD MODE (Only accessible to authenticated admins) */}
-        {isAlreadyAdmin && activeTab === 'register' && (
-          <form onSubmit={handleRegisterCredentials} className="space-y-3.5">
-            <p className="text-slate-400 text-xs">
-              Cadastre o seu <strong>CPF</strong> e crie uma senha para acesso exclusivo à administração do sistema:
-            </p>
-
-            {regSuccess && (
-              <div className="bg-emerald-950/90 border border-emerald-600 text-emerald-200 p-3 rounded-xl text-xs font-bold flex items-center gap-2 animate-in fade-in">
-                <Check className="w-4 h-4 text-emerald-400 shrink-0" />
-                <span>CPF e senha cadastrados com sucesso! Concedendo acesso...</span>
-              </div>
-            )}
-
-            {regError && (
-              <div className="bg-rose-950/90 border border-rose-600 text-rose-200 p-2.5 rounded-xl text-xs font-semibold flex items-center gap-2">
-                <ShieldAlert className="w-4 h-4 text-rose-400 shrink-0" />
-                <span>{regError}</span>
-              </div>
-            )}
-
-            <div>
-              <label className="block text-xs font-bold text-slate-300 mb-1 flex items-center gap-1.5">
-                <FileText className="w-3.5 h-3.5 text-emerald-400" />
-                <span>CPF do Administrador: *</span>
-              </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  value={regCpf}
-                  onChange={(e) => setRegCpf(maskCPF(e.target.value))}
-                  placeholder="000.000.000-00"
-                  required
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-9 pr-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono"
-                />
-                <FileText className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-300 mb-1 flex items-center gap-1.5">
-                <Phone className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Celular / WhatsApp (com DDD): *</span>
-              </label>
-              <div className="relative">
-                <input
-                  type="tel"
-                  value={regPhone}
-                  onChange={(e) => setRegPhone(e.target.value)}
-                  placeholder="(11) 99999-9999"
-                  required
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-9 pr-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
-                />
-                <Phone className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-300 mb-1 flex items-center gap-1.5">
-                <Mail className="w-3.5 h-3.5 text-slate-400" />
-                <span>E-mail do Administrador (Opcional):</span>
-              </label>
-              <div className="relative">
-                <input
-                  type="email"
-                  value={regEmail}
-                  onChange={(e) => setRegEmail(e.target.value)}
-                  placeholder="admin@salao.com"
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-9 pr-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
-                />
-                <Mail className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-300 mb-1 flex items-center gap-1.5">
-                <Key className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Cadastrar Nova Senha: *</span>
-              </label>
-              <div className="relative">
-                <input
-                  type={showRegPassword ? 'text' : 'password'}
-                  value={regPassword}
-                  onChange={(e) => setRegPassword(e.target.value)}
-                  placeholder="Crie sua senha..."
-                  required
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-9 pr-10 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
-                />
-                <Key className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
-                <button
-                  type="button"
-                  onClick={() => setShowRegPassword(!showRegPassword)}
-                  className="text-slate-400 hover:text-slate-200 absolute right-3 top-2 p-0.5"
-                >
-                  {showRegPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-300 mb-1 flex items-center gap-1.5">
-                <Lock className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Confirmar a Nova Senha: *</span>
-              </label>
-              <div className="relative">
-                <input
-                  type="password"
-                  value={regConfirmPassword}
-                  onChange={(e) => setRegConfirmPassword(e.target.value)}
-                  placeholder="Repita a senha..."
-                  required
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-9 pr-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
-                />
-                <Lock className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              disabled={regSuccess}
-              className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold py-3 rounded-xl text-xs shadow-md transition-all flex items-center justify-center gap-2 mt-2 cursor-pointer active:scale-95"
-            >
-              <Check className="w-4 h-4" />
-              <span>Cadastrar Senha e Acessar</span>
-            </button>
-          </form>
-        )}
-
-        {/* TAB 3: RESET PASSWORD MODE (Only accessible to authenticated admins) */}
-        {isAlreadyAdmin && activeTab === 'reset' && (
-          <div className="space-y-3.5">
-            <div className="flex justify-between items-center border-b border-slate-800 pb-2 mb-2">
-              <span className="text-xs font-bold text-amber-400 flex items-center gap-1.5">
-                <Key className="w-4 h-4" /> Redefinição de Senha
-              </span>
+          {/* FIELD 2: Senha */}
+          <div className="space-y-1.5">
+            <label className="block text-xs font-bold text-sky-400 flex items-center gap-1.5">
+              <Lock className="w-4 h-4 text-sky-400" />
+              <span>Senha:</span>
+            </label>
+            <div className="relative">
+              <input
+                id="input-admin-auth-password"
+                type={showLoginPassword ? 'text' : 'password'}
+                value={loginPassword}
+                onChange={(e) => {
+                  setLoginPassword(e.target.value);
+                  setLoginError('');
+                }}
+                placeholder="••••••••"
+                className="w-full bg-[#060a14] border border-slate-700/80 focus:border-sky-400 rounded-2xl px-4 py-3.5 pl-11 pr-11 text-white font-mono text-sm placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-sky-400 transition-all shadow-inner"
+              />
+              <Key className="w-4 h-4 text-slate-400 absolute left-3.5 top-4" />
               <button
                 type="button"
-                onClick={() => setActiveTab('login')}
-                className="text-xs text-slate-400 hover:text-white underline cursor-pointer"
+                onClick={() => setShowLoginPassword(!showLoginPassword)}
+                className="text-slate-400 hover:text-slate-200 absolute right-3.5 top-4 p-0.5 cursor-pointer"
+                title={showLoginPassword ? 'Ocultar' : 'Exibir'}
               >
-                Voltar ao Login
+                {showLoginPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
-
-            {feedbackMsg && (
-              <div
-                className={`p-3 rounded-xl text-xs font-semibold flex items-center gap-2 ${
-                  feedbackMsg.type === 'success'
-                    ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-700'
-                    : 'bg-rose-950/80 text-rose-300 border border-rose-700'
-                }`}
-              >
-                {feedbackMsg.type === 'success' ? (
-                  <Check className="w-4 h-4 shrink-0 text-emerald-400" />
-                ) : (
-                  <ShieldAlert className="w-4 h-4 shrink-0 text-rose-400" />
-                )}
-                <span>{feedbackMsg.text}</span>
-              </div>
-            )}
-
-            {resetStep === 'request' ? (
-              <>
-                <p className="text-slate-400 text-xs">
-                  Digite seu <strong>CPF</strong> ou telefone cadastrado para validar o acesso e redefinir sua senha:
-                </p>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1">
-                    CPF ou E-mail Cadastrado:
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      value={resetCpfOrEmail}
-                      onChange={(e) => {
-                        const v = e.target.value;
-                        setResetCpfOrEmail(v.includes('@') ? v : maskCPF(v));
-                      }}
-                      placeholder="000.000.000-00"
-                      className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-9 pr-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500 font-mono"
-                    />
-                    <FileText className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1">
-                    Celular Cadastrado:
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="tel"
-                      value={resetPhone}
-                      onChange={(e) => setResetPhone(e.target.value)}
-                      placeholder="(11) 99999-9999"
-                      className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-9 pr-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500"
-                    />
-                    <Phone className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={handleVerifyResetData}
-                  className="w-full bg-amber-600 hover:bg-amber-500 text-white font-bold py-2.5 px-3 rounded-xl text-xs flex items-center justify-center gap-2 shadow-sm transition-colors mt-2 cursor-pointer"
-                >
-                  <Key className="w-4 h-4" />
-                  <span>Validar e Redefinir Senha</span>
-                </button>
-              </>
-            ) : (
-              <>
-                <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1">
-                    Digite a Nova Senha:
-                  </label>
-                  <input
-                    type="password"
-                    value={resetNewPassword}
-                    onChange={(e) => setResetNewPassword(e.target.value)}
-                    placeholder="Nova senha..."
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1">
-                    Confirmar a Nova Senha:
-                  </label>
-                  <input
-                    type="password"
-                    value={resetConfirmPassword}
-                    onChange={(e) => setResetConfirmPassword(e.target.value)}
-                    placeholder="Repita a nova senha..."
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500"
-                  />
-                </div>
-
-                <button
-                  type="button"
-                  onClick={handleSaveNewResetPassword}
-                  className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 px-3 rounded-xl text-xs flex items-center justify-center gap-2 shadow-sm transition-colors mt-2 cursor-pointer"
-                >
-                  <Check className="w-4 h-4" />
-                  <span>Salvar Nova Senha e Acessar</span>
-                </button>
-              </>
-            )}
           </div>
-        )}
+
+          {/* Submit Button */}
+          <div className="pt-2">
+            <button
+              id="btn-submit-admin-auth"
+              type="submit"
+              className="w-full bg-blue-600 hover:bg-blue-500 text-white font-black py-4 rounded-2xl shadow-xl shadow-blue-950/50 flex items-center justify-center gap-2 transition-all active:scale-98 text-sm cursor-pointer"
+            >
+              <LogIn className="w-5 h-5 text-white" />
+              <span>Entrar</span>
+            </button>
+          </div>
+        </form>
 
       </div>
     </div>

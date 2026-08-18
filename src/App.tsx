@@ -9,6 +9,7 @@ import { ClientesView } from './components/ClientesView';
 import { CatalogoView } from './components/CatalogoView';
 import { ConfiguracoesModal } from './components/ConfiguracoesModal';
 import { AdminPasswordModal } from './components/AdminPasswordModal';
+import { AdminChangePasswordModal } from './components/AdminChangePasswordModal';
 import { AdminSalonsModal } from './components/AdminSalonsModal';
 import { BuyAppModal } from './components/BuyAppModal';
 import { ClientePortalView } from './components/ClientePortalView';
@@ -95,6 +96,7 @@ export function App() {
   const [isCatalogOpen, setIsCatalogOpen] = useState(false);
   const [isConfigOpen, setIsConfigOpen] = useState(false);
   const [isAdminAuthOpen, setIsAdminAuthOpen] = useState(false);
+  const [isAdminChangePasswordOpen, setIsAdminChangePasswordOpen] = useState(false);
   const [adminAuthTargetRole, setAdminAuthTargetRole] = useState<UserRole>('admin');
   const [isSalonAuthOpen, setIsSalonAuthOpen] = useState<boolean>(() => {
     try {
@@ -510,6 +512,7 @@ export function App() {
           onOpenClientLink={() => setIsClientLinkOpen(true)}
           onOpenSalonLink={() => setIsSalonLinkOpen(true)}
           onOpenSalonAccessLink={() => setIsSalonAccessLinkOpen(true)}
+          onOpenAdminChangePassword={() => setIsAdminChangePasswordOpen(true)}
           onOpenLiveHub={() => setIsLiveHubOpen(true)}
           isExpanded={isExpanded}
           onToggleExpand={() => setIsExpanded(!isExpanded)}
@@ -544,9 +547,9 @@ export function App() {
                   <div className="flex items-center gap-2 flex-wrap w-full md:w-auto justify-start md:justify-end">
                     <button
                       id="btn-admin-auth-settings"
-                      onClick={() => setIsAdminAuthOpen(true)}
+                      onClick={() => setIsAdminChangePasswordOpen(true)}
                       className="bg-slate-800 hover:bg-slate-700 text-emerald-300 font-extrabold text-xs px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 shadow-xs border border-emerald-500/30 active:scale-95 cursor-pointer"
-                      title="Cadastrar ou alterar CPF e senha de Administrador"
+                      title="Alterar Senha do Administrador e Gerenciar Acessos"
                     >
                       <Key className="w-3.5 h-3.5 text-emerald-300" />
                       <span>Alterar Senha Admin</span>
@@ -983,7 +986,14 @@ export function App() {
           setAdminAuthTargetRole('admin');
           setIsAdminAuthOpen(true);
         }}
+        onOpenAdminChangePassword={() => setIsAdminChangePasswordOpen(true)}
         onOpenLiveHub={() => setIsLiveHubOpen(true)}
+      />
+
+      {/* Admin Change Password & User Management Modal */}
+      <AdminChangePasswordModal
+        isOpen={isAdminChangePasswordOpen}
+        onClose={() => setIsAdminChangePasswordOpen(false)}
       />
 
       {/* Admin Receiving Payment Account Modal */}

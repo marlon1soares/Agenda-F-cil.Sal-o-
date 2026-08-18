@@ -22,6 +22,7 @@ interface AdminSalonsModalProps {
   onOpenSalonLink?: () => void;
   onOpenSalonAccessLink?: () => void;
   onOpenAdminAuth?: () => void;
+  onOpenAdminChangePassword?: () => void;
   onOpenLiveHub?: () => void;
 }
 
@@ -38,6 +39,7 @@ export const AdminSalonsModal: React.FC<AdminSalonsModalProps> = ({
   onOpenSalonLink,
   onOpenSalonAccessLink,
   onOpenAdminAuth,
+  onOpenAdminChangePassword,
   onOpenLiveHub,
 }) => {
   const [activeTab, setActiveTab] = useState<'cards' | 'pending' | 'connected' | 'inspector' | 'location_table'>('cards');
@@ -443,14 +445,14 @@ export const AdminSalonsModal: React.FC<AdminSalonsModalProps> = ({
               <span>+ Novo Salão</span>
             </button>
 
-            {onOpenAdminAuth && (
+            {onOpenAdminChangePassword && (
               <button
-                onClick={onOpenAdminAuth}
-                className="bg-slate-800 hover:bg-slate-700 text-sky-300 border border-sky-600/40 font-bold px-2.5 py-1.5 rounded-xl text-xs flex items-center gap-1.5 shadow-sm transition-all active:scale-95 cursor-pointer"
-                title="Cadastrar ou Alterar Senha e CPF do Administrador"
+                onClick={onOpenAdminChangePassword}
+                className="bg-slate-900 hover:bg-slate-800 text-emerald-400 border border-emerald-500/40 font-extrabold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1.5 shadow-sm transition-all active:scale-95 cursor-pointer"
+                title="Alterar Senha do Administrador e Gerenciar Usuários/Acessos"
               >
-                <Key className="w-3.5 h-3.5 text-sky-400 shrink-0" />
-                <span>Senha Admin</span>
+                <Key className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                <span>Alterar Senha Admin</span>
               </button>
             )}
 
