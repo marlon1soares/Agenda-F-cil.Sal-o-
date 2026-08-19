@@ -153,8 +153,27 @@ export const ClientePortalView: React.FC<ClientePortalViewProps> = ({
       origem: 'cliente'
     };
 
-    // Trigger parent callback to save in salon's appointments
+    // Trigger parent callback to save in salon's appointments (immediately synced to cloud)
     onAppointmentBooked(selectedDate, selectedTime, newAppointment);
+
+    // Push real-time booking alert message to chat and online feed
+    try {
+      Storage.addMessage({
+        id: `msg_book_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        salonId: safeSalon.id,
+        salonName: safeSalon.name,
+        fromRole: 'cliente',
+        toRole: 'salao',
+        senderName: clientName.trim(),
+        senderPhone: clientPhone.trim(),
+        clientPhone: clientPhone.trim(),
+        content: `📅 [Agendamento Confirmado] ${clientName.trim()} agendou "${selectedService.name}" para o dia ${selectedDate} às ${selectedTime} (${selectedProf ? selectedProf.name : 'Qualquer Profissional'}).`,
+        timestamp: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+        date: selectedDate,
+        createdAt: Date.now(),
+        type: 'chat'
+      });
+    } catch {}
 
     // Save client in salon's client list
     const currentClients = Storage.getClients();
@@ -177,14 +196,16 @@ export const ClientePortalView: React.FC<ClientePortalViewProps> = ({
 
   const handleShareWhatsapp = () => {
     if (!lastAppointment) return;
-    const msg = `Olá *${activeSalon.config.nomeSalao}*! Fiz um agendamento pelo *Agenda mais fácil.cliente*:\n\n` +
+    const salonNameStr = safeSalon?.config?.nomeSalao || safeSalon?.name || 'Salão';
+    const targetPhone = (safeSalon?.ownerPhone || '11999998888').replace(/\D/g, '');
+    const msg = `Olá *${salonNameStr}*! Fiz um agendamento pelo *Agenda mais fácil.cliente*:\n\n` +
       `📅 *Data:* ${lastAppointment.date} às ${lastAppointment.timeSlot}\n` +
       `✂️ *Serviço:* ${lastAppointment.serviceName}\n` +
       `👤 *Profissional:* ${lastAppointment.professionalName}\n` +
       `💰 *Valor:* R$ ${(Number(lastAppointment.price) || 0).toFixed(2)}\n` +
       `🙋‍♂️ *Cliente:* ${lastAppointment.clientName} (${lastAppointment.clientPhone})`;
     
-    window.open(`https://api.whatsapp.com/send?phone=55${activeSalon.ownerPhone.replace(/\D/g, '')}&text=${encodeURIComponent(msg)}`, '_blank');
+    window.open(`https://api.whatsapp.com/send?phone=55${targetPhone}&text=${encodeURIComponent(msg)}`, '_blank');
   };
 
   return (

@@ -129,10 +129,18 @@ export const Storage = {
   },
   saveAppointments(agenda: Record<string, Record<string, Appointment>>) {
     safeSetItem('salaoAgenda', JSON.stringify(agenda));
-    syncEngine.pushUpdate({ appointments: agenda });
+    syncEngine.pushUpdateImmediate({ appointments: agenda });
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('salao_sync_data', { detail: { key: 'salaoAgenda' } }));
     }
+  },
+  addAppointment(date: string, timeSlot: string, ap: Appointment): Record<string, Record<string, Appointment>> {
+    const current = this.getAppointments();
+    const updated = { ...current };
+    if (!updated[date]) updated[date] = {};
+    updated[date][timeSlot] = ap;
+    this.saveAppointments(updated);
+    return updated;
   },
 
   getTimeAdjustments(): Record<string, number> {

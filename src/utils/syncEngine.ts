@@ -44,8 +44,12 @@ class SyncEngine {
     // 2. Connect to Server-Sent Events for Real-time Streaming
     this.connectSSE();
 
-    // 3. Start Periodic Presence Heartbeat
+    // 3. Start Periodic Presence Heartbeat & Background Polling
     this.startPresenceHeartbeat();
+    this.startBackupPolling();
+
+    // 4. Send immediate presence on initialization
+    this.broadcastCurrentPresence();
 
     // 4. Listen to window focus or online to re-sync
     try {
@@ -88,16 +92,29 @@ class SyncEngine {
     } catch {}
   }
 
+  public broadcastCurrentPresence() {
+    try {
+      const role = (typeof localStorage !== 'undefined' && localStorage.getItem('salao_active_role')) || 'cliente';
+      const name = (typeof localStorage !== 'undefined' && (localStorage.getItem('salao_user_name') || localStorage.getItem('salao_cliente_name'))) || 'Usuário Online';
+      const activeSalonId = (typeof localStorage !== 'undefined' && localStorage.getItem('salao_active_id')) || 'salon-parcas';
+      this.sendPresence({ id: CLIENT_ID, name, role, salonId: activeSalonId });
+    } catch {}
+  }
+
   private startPresenceHeartbeat() {
     if (this.presenceInterval) clearInterval(this.presenceInterval);
     this.presenceInterval = setInterval(() => {
-      try {
-        const role = localStorage.getItem('salao_active_role') || 'cliente';
-        const name = localStorage.getItem('salao_user_name') || localStorage.getItem('salao_cliente_name') || 'Usuário Online';
-        const activeSalonId = localStorage.getItem('salao_active_id') || 'salon-parcas';
-        this.sendPresence({ id: CLIENT_ID, name, role, salonId: activeSalonId });
-      } catch {}
-    }, 25000);
+      this.broadcastCurrentPresence();
+    }, 15000);
+  }
+
+  private startBackupPolling() {
+    // Background polling fallback every 12 seconds in case SSE stream was paused by OS
+    setInterval(() => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        this.fetchServerState();
+      }
+    }, 12000);
   }
 
   public async fetchServerState(): Promise<FullSyncState | null> {
@@ -269,6 +286,36 @@ class SyncEngine {
       }
     } finally {
       this.isApplyingRemote = false;
+    }
+  }
+
+  public pushUpdateImmediate(partial: Partial<FullSyncState>) {
+    if (this.isApplyingRemote) return;
+
+    if (this.debounceTimer) {
+      clearTimeout(this.debounceTimer);
+    }
+
+    const toSend = {
+      ...this.pendingUpdates,
+      ...partial,
+      lastUpdated: Date.now()
+    };
+    this.pendingUpdates = {};
+
+    try {
+      fetch('/api/sync/state', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          updates: toSend,
+          clientId: CLIENT_ID,
+        }),
+      }).catch((e) => {
+        console.warn('[SyncEngine] Immediate push failed:', e);
+      });
+    } catch (e) {
+      console.warn('[SyncEngine] Immediate push error:', e);
     }
   }
 
