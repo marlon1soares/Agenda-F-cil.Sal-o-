@@ -231,13 +231,17 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
   };
 
   // Plan Price Helper based on Admin's configured prices
-  const availablePlans = getCalculatedLicensePlans(adminPaymentConfig);
+  const availablePlans = getCalculatedLicensePlans(adminPaymentConfig, true);
+  const trialPlan = availablePlans.find(p => p.numVal === 0);
+  const configuredTrialDays = trialPlan ? trialPlan.days : (adminPaymentConfig.diasGratuitos || 15);
+  const isTrialEnabled = Boolean(trialPlan && adminPaymentConfig.habilitarPlanoGratuito !== false);
 
   const getPlanPriceDetails = (days: number) => {
     return getLicensePlanByDays(days, adminPaymentConfig);
   };
 
   const currentPlan = getPlanPriceDetails(planDays);
+  const isTrialPlanSelected = isTrialEnabled && (planDays === configuredTrialDays || currentPlan.numVal === 0);
 
   useEffect(() => {
     if (isOpen) {
@@ -282,8 +286,8 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
     const finalNumero = numero.trim() || '100';
     const finalBairro = bairro.trim() || 'Centro';
 
-    // IF 15-DAY FREE TRIAL IS SELECTED
-    if (planDays === 15) {
+    // IF FREE TRIAL IS SELECTED
+    if (isTrialPlanSelected) {
       const eligibility = checkTrialEligibility(
         {
           cpf: finalCpf,
@@ -300,7 +304,7 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
 
       if (!eligibility.eligible) {
         setError(
-          `⚠️ Não foi possível ativar o teste gratuito: ${eligibility.reason}\n\nO período de 15 dias gratuitos é concedido 1 única vez por CPF. Administradores possuem liberação ilimitada. Selecione um dos planos de licença (30 Dias, 3 Meses, 6 Meses ou 1 Ano).`
+          `⚠️ Não foi possível ativar o teste gratuito: ${eligibility.reason}\n\nO período de teste gratuito (${configuredTrialDays} dias) é concedido 1 única vez por CPF. Administradores possuem liberação ilimitada. Selecione diretamente um dos 4 planos pagos (Plano 1, 2, 3 ou 4).`
         );
         return;
       }
@@ -310,7 +314,7 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
       const today = new Date();
       const purchaseDate = today.toISOString().split('T')[0];
       const expDate = new Date();
-      expDate.setDate(expDate.getDate() + 15);
+      expDate.setDate(expDate.getDate() + configuredTrialDays);
       const expiresAt = expDate.toISOString().split('T')[0];
 
       const appCode = Storage.getNextSalonCode();
@@ -347,7 +351,7 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
         createdAt: purchaseDate,
         purchaseDate: purchaseDate,
         expiresAt: expiresAt,
-        planDays: 15,
+        planDays: configuredTrialDays,
         isTrial: true,
         trialStartedAt: purchaseDate,
         status: 'trial',
@@ -362,11 +366,11 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
       setIsProcessing(false);
       setStep('success');
 
-      sendEmailNotification(newSalon, 'Grátis (15 Dias de Teste)');
+      sendEmailNotification(newSalon, `Grátis (${configuredTrialDays} Dias de Teste)`);
       return;
     }
 
-    // IF PAID PLAN IS SELECTED (30, 90, 180, 365 Days)
+    // IF PAID PLAN IS SELECTED (Plano 1: 30, Plano 2: 90, Plano 3: 180, Plano 4: 365 Days)
     setStep('payment');
   };
 
@@ -677,25 +681,35 @@ Salão: *${createdSalon.name}*
             )}
 
             {/* Plan Selector */}
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="font-bold text-slate-300 flex items-center gap-1.5">
+            <div className="space-y-1.5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                <label className="font-black text-slate-200 flex items-center gap-1.5 text-xs">
                   <Clock className="w-3.5 h-3.5 text-teal-400" />
-                  <span>Escolha o Prazo da Licença:</span>
+                  <span>Escolha o Prazo da Licença do App:</span>
                 </label>
-                <span className="text-[10px] bg-emerald-500/20 text-emerald-300 font-extrabold px-2.5 py-0.5 rounded-full border border-emerald-500/30">
-                  Economia nos planos estendidos
+                <span className="text-[10px] bg-emerald-500/20 text-emerald-300 font-extrabold px-2.5 py-0.5 rounded-full border border-emerald-500/30 w-fit">
+                  Pague e ative na hora ou use o teste grátis
                 </span>
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+              {/* Informative helper about skipping trial */}
+              <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-2 text-[11px] text-slate-300 flex items-center justify-between gap-2">
+                <span className="flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                  <span>
+                    Não é obrigatório usar o teste gratuito: você pode <strong>pular direto para os Planos Pagos (1, 2, 3 ou 4)</strong> e finalizar sua compra.
+                  </span>
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 pt-1">
                 {availablePlans.map((p) => {
-                  const isPlanTrial = p.days === 15;
+                  const isPlanTrial = p.numVal === 0;
                   const isDisabledTrial = isPlanTrial && isTrialAlreadyUsed;
 
                   return (
                     <button
-                      key={p.days}
+                      key={`${p.days}-${p.numVal}`}
                       type="button"
                       disabled={isDisabledTrial}
                       onClick={() => {
@@ -706,25 +720,25 @@ Salão: *${createdSalon.name}*
                       }}
                       title={
                         isDisabledTrial
-                          ? 'Período de teste gratuito de 15 dias já foi utilizado por este CPF/salão.'
+                          ? `Período de teste gratuito de ${p.days} dias já foi utilizado por este CPF/salão.`
                           : isUserAdmin && isPlanTrial
-                          ? '15 Dias Gratuitos (Uso Ilimitado para Administradores)'
+                          ? `${p.days} Dias Gratuitos (Uso Ilimitado para Administradores)`
                           : `${p.label} - ${p.priceStr}`
                       }
                       className={`p-2.5 rounded-2xl border text-center transition-all flex flex-col items-center justify-between select-none ${
                         isDisabledTrial
                           ? 'bg-slate-950/50 border-slate-800/60 text-slate-600 opacity-60 cursor-not-allowed'
-                          : planDays === p.days
-                          ? p.days === 15
-                            ? 'bg-blue-600/30 border-blue-400 text-white font-extrabold ring-2 ring-blue-400 shadow-md'
-                            : 'bg-emerald-600/30 border-emerald-500 text-white font-extrabold ring-2 ring-emerald-500 shadow-md'
-                          : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
+                          : planDays === p.days && (isPlanTrial ? isTrialPlanSelected : !isTrialPlanSelected)
+                          ? isPlanTrial
+                            ? 'bg-sky-600/30 border-sky-400 text-white font-extrabold ring-2 ring-sky-400 shadow-md scale-[1.02]'
+                            : 'bg-emerald-600/30 border-emerald-500 text-white font-extrabold ring-2 ring-emerald-500 shadow-md scale-[1.02]'
+                          : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200'
                       }`}
                     >
                       <div>
                         <span className="block text-xs font-black">{p.label}</span>
-                        <span className={`block text-[11px] font-bold mt-0.5 ${
-                          p.days === 15 ? 'text-sky-400' : 'text-emerald-400'
+                        <span className={`block text-[11px] font-black mt-0.5 ${
+                          isPlanTrial ? 'text-sky-400' : 'text-emerald-400'
                         }`}>
                           {p.priceStr}
                         </span>
@@ -733,7 +747,7 @@ Salão: *${createdSalon.name}*
                       <span className={`inline-block text-[8px] font-extrabold px-1.5 py-0.5 rounded-full border ${
                         isDisabledTrial
                           ? 'bg-slate-900 text-slate-500 border-slate-800'
-                          : p.days === 15
+                          : isPlanTrial
                           ? isUserAdmin
                             ? 'bg-emerald-950/90 text-emerald-300 border-emerald-500/40'
                             : 'bg-sky-950/90 text-sky-300 border-sky-500/40'
@@ -929,11 +943,11 @@ Salão: *${createdSalon.name}*
             </div>
 
             {/* Submit to Payment or Free Trial Activation */}
-            {planDays === 15 ? (
+            {isTrialPlanSelected ? (
               <button
                 type="submit"
                 disabled={isProcessing}
-                className="w-full bg-gradient-to-r from-blue-600 via-indigo-600 to-sky-600 hover:from-blue-500 hover:to-indigo-500 text-white font-black py-3.5 px-4 rounded-2xl text-xs sm:text-sm shadow-xl shadow-blue-950/60 border border-blue-400/50 flex items-center justify-center gap-2 transition-all active:scale-95 mt-2 cursor-pointer"
+                className="w-full bg-gradient-to-r from-sky-600 via-indigo-600 to-blue-600 hover:from-sky-500 hover:to-indigo-500 text-white font-black py-3.5 px-4 rounded-2xl text-xs sm:text-sm shadow-xl shadow-blue-950/60 border border-sky-400/50 flex items-center justify-center gap-2 transition-all active:scale-95 mt-2 cursor-pointer"
               >
                 {isProcessing ? (
                   <>
@@ -943,16 +957,16 @@ Salão: *${createdSalon.name}*
                 ) : (
                   <>
                     <Sparkles className="w-4 h-4 text-amber-300 animate-pulse" />
-                    <span>🚀 Iniciar Teste Gratuito de 15 Dias (Sem Custo)</span>
+                    <span>🚀 Iniciar Teste Gratuito de {configuredTrialDays} Dias (Sem Custo)</span>
                   </>
                 )}
               </button>
             ) : (
               <button
                 type="submit"
-                className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3 rounded-2xl text-xs sm:text-sm shadow-xl transition-all flex items-center justify-center gap-2 active:scale-95 mt-2 cursor-pointer"
+                className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black py-3.5 px-4 rounded-2xl text-xs sm:text-sm shadow-xl shadow-emerald-950/60 border border-emerald-400/50 transition-all flex items-center justify-center gap-2 active:scale-95 mt-2 cursor-pointer"
               >
-                <span>Avançar para Tela de Pagamento ({currentPlan.priceStr})</span>
+                <span>Avançar para Pagamento: {currentPlan.label} ({currentPlan.priceStr})</span>
                 <CreditCard className="w-4 h-4 text-yellow-300" />
               </button>
             )}

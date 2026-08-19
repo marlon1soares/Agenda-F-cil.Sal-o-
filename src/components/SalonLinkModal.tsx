@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { buildAppUrl, getPublicAppUrl } from '../utils/url';
-import { X, Link2, Copy, Check, Share2, ExternalLink } from 'lucide-react';
+import { Storage } from '../utils/storage';
+import { getCalculatedLicensePlans } from '../utils/pricing';
+import { X, Link2, Copy, Check, Share2, ExternalLink, Sparkles } from 'lucide-react';
 
 interface SalonLinkModalProps {
   isOpen: boolean;
@@ -14,18 +16,27 @@ export const SalonLinkModal: React.FC<SalonLinkModalProps> = ({
   onOpenBuyApp,
 }) => {
   const [copied, setCopied] = useState(false);
+  const [selectedPlanDays, setSelectedPlanDays] = useState<number | null>(null);
 
   if (!isOpen) return null;
+
+  const adminConfig = Storage.getAdminPaymentConfig();
+  const plans = getCalculatedLicensePlans(adminConfig, true);
 
   // The canonical purchase link for the salon owner
   const salonPurchaseUrl = buildAppUrl({
     action: 'comprar-licenca',
+    ...(selectedPlanDays ? { plano: selectedPlanDays } : {})
   });
+
+  const planObj = selectedPlanDays ? plans.find(p => p.days === selectedPlanDays) : null;
+  const planName = planObj ? `${planObj.label} (${planObj.priceStr})` : 'Todos os Planos / Tabela Geral';
 
   const defaultWhatsappMsg = `Olá! 💈✂️\n\n` +
     `Aqui está o link exclusivo para adquirir e ativar a licença do seu sistema de gestão e agendamentos *Agenda+Fácil.Salão*:\n\n` +
     `👉 ${salonPurchaseUrl}\n\n` +
-    `Ao clicar no link, você acessará diretamente a tabela de preços para escolher o plano, preencher os dados do salão e realizar o pagamento com liberação imediata!\n\n` +
+    `Plano selecionado: *${planName}*\n\n` +
+    `Ao clicar no link, você acessará diretamente a contratação com preenchimento rápido e liberação imediata!\n\n` +
     `Qualquer dúvida estamos à disposição! ✨`;
 
   const handleCopyLink = () => {
@@ -72,9 +83,46 @@ export const SalonLinkModal: React.FC<SalonLinkModalProps> = ({
           </button>
         </div>
 
-        {/* Modal Body - Focused only on the requested link & action buttons */}
+        {/* Modal Body */}
         <div className="p-4 sm:p-6 space-y-4 text-slate-200 text-xs">
           
+          {/* Plan filter shortcuts */}
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-bold text-slate-300 flex items-center gap-1">
+              <Sparkles className="w-3.5 h-3.5 text-violet-400" />
+              <span>Personalizar Link para um Plano Específico (Opcional):</span>
+            </label>
+            <div className="flex flex-wrap gap-1.5">
+              <button
+                type="button"
+                onClick={() => setSelectedPlanDays(null)}
+                className={`px-2.5 py-1.5 rounded-xl font-black text-[11px] border transition-all ${
+                  selectedPlanDays === null
+                    ? 'bg-violet-600 text-white border-violet-400 shadow-sm'
+                    : 'bg-slate-950 text-slate-400 border-slate-800 hover:border-slate-700'
+                }`}
+              >
+                Geral (Todos os Planos)
+              </button>
+              {plans.map((p) => (
+                <button
+                  key={`${p.days}-${p.numVal}`}
+                  type="button"
+                  onClick={() => setSelectedPlanDays(p.days)}
+                  className={`px-2.5 py-1.5 rounded-xl font-black text-[11px] border transition-all ${
+                    selectedPlanDays === p.days
+                      ? p.numVal === 0
+                        ? 'bg-sky-600 text-white border-sky-400 shadow-sm'
+                        : 'bg-emerald-600 text-white border-emerald-400 shadow-sm'
+                      : 'bg-slate-950 text-slate-400 border-slate-800 hover:border-slate-700'
+                  }`}
+                >
+                  {p.label} {p.numVal > 0 ? `(${p.priceStr})` : '(Grátis)'}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4 sm:p-5 space-y-3.5 shadow-inner">
             <div className="flex items-center justify-between">
               <label className="text-xs font-black uppercase text-slate-300 tracking-wider flex items-center gap-1.5">

@@ -18,6 +18,8 @@ export const AdminPaymentAccountModal: React.FC<AdminPaymentAccountModalProps> =
   const [p90Input, setP90Input] = useState<string>('75.00');
   const [p180Input, setP180Input] = useState<string>('135.00');
   const [p365Input, setP365Input] = useState<string>('240.00');
+  const [freeDaysInput, setFreeDaysInput] = useState<string>('15');
+  const [enableTrial, setEnableTrial] = useState<boolean>(true);
   const [successMsg, setSuccessMsg] = useState('');
 
   useEffect(() => {
@@ -28,6 +30,8 @@ export const AdminPaymentAccountModal: React.FC<AdminPaymentAccountModalProps> =
       setP90Input(String(current.precoPlano90Dias || 75));
       setP180Input(String(current.precoPlano180Dias || 135));
       setP365Input(String(current.precoPlano365Dias || 240));
+      setFreeDaysInput(String(current.diasGratuitos !== undefined && current.diasGratuitos !== null ? current.diasGratuitos : 15));
+      setEnableTrial(current.habilitarPlanoGratuito !== false);
     }
   }, [isOpen]);
 
@@ -37,6 +41,7 @@ export const AdminPaymentAccountModal: React.FC<AdminPaymentAccountModalProps> =
   const numP90 = Number(p90Input.replace(',', '.')) || (numP30 * 2.5);
   const numP180 = Number(p180Input.replace(',', '.')) || (numP30 * 4.5);
   const numP365 = Number(p365Input.replace(',', '.')) || (numP30 * 8);
+  const numFreeDays = Math.max(1, parseInt(freeDaysInput, 10) || 15);
 
   const handleRecalculateFrom30 = () => {
     const base = Number(p30Input.replace(',', '.')) || 30;
@@ -63,8 +68,10 @@ export const AdminPaymentAccountModal: React.FC<AdminPaymentAccountModalProps> =
     precoPlano30Dias: numP30,
     precoPlano90Dias: numP90,
     precoPlano180Dias: numP180,
-    precoPlano365Dias: numP365
-  });
+    precoPlano365Dias: numP365,
+    diasGratuitos: numFreeDays,
+    habilitarPlanoGratuito: enableTrial
+  }, true);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -73,10 +80,12 @@ export const AdminPaymentAccountModal: React.FC<AdminPaymentAccountModalProps> =
       precoPlano30Dias: numP30,
       precoPlano90Dias: numP90,
       precoPlano180Dias: numP180,
-      precoPlano365Dias: numP365
+      precoPlano365Dias: numP365,
+      diasGratuitos: numFreeDays,
+      habilitarPlanoGratuito: enableTrial
     };
     Storage.saveAdminPaymentConfig(updatedConfig);
-    setSuccessMsg('Valores das licenças e formas de pagamento salvos com sucesso!');
+    setSuccessMsg('Valores das licenças, dias gratuitos e formas de pagamento salvos com sucesso!');
     setTimeout(() => {
       setSuccessMsg('');
       onClose();
@@ -121,6 +130,93 @@ export const AdminPaymentAccountModal: React.FC<AdminPaymentAccountModalProps> =
               <span>{successMsg}</span>
             </div>
           )}
+
+          {/* FREE TRIAL DAYS CONFIGURATION */}
+          <div className="bg-slate-950 p-4 rounded-2xl border-2 border-sky-500/50 space-y-3 shadow-lg">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-2.5">
+              <label className="font-black text-sky-300 text-sm flex items-center gap-1.5">
+                <Sparkles className="w-4 h-4 text-amber-400 animate-pulse" />
+                <span>Configuração dos Dias Gratuitos (Teste Grátis):</span>
+              </label>
+
+              <div className="flex items-center gap-2">
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={enableTrial}
+                    onChange={(e) => setEnableTrial(e.target.checked)}
+                    className="w-4 h-4 accent-sky-500 rounded cursor-pointer"
+                  />
+                  <span className={`text-xs font-bold ${enableTrial ? 'text-sky-300' : 'text-slate-500'}`}>
+                    {enableTrial ? '✓ Teste Gratuito Ativo' : '✕ Teste Gratuito Desativado'}
+                  </span>
+                </label>
+              </div>
+            </div>
+
+            <p className="text-[11px] text-slate-300">
+              Defina quantos dias de degustação gratuita os novos salões recebem ao se cadastrar. Se desativado, o cliente irá direto para a escolha dos <strong>Planos Pagos (Plano 1, 2, 3 ou 4)</strong>:
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center pt-1">
+              <div className="space-y-1">
+                <label className="block text-[11px] font-bold text-slate-300 flex items-center gap-1">
+                  <Clock className="w-3.5 h-3.5 text-sky-400" />
+                  <span>Quantidade de Dias Gratuitos:</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    min="1"
+                    max="90"
+                    disabled={!enableTrial}
+                    value={freeDaysInput}
+                    onChange={(e) => setFreeDaysInput(e.target.value)}
+                    className="w-full bg-slate-900 border border-sky-500/60 rounded-xl px-3 py-2 text-white font-mono font-black text-sm focus:outline-none focus:border-sky-400 disabled:opacity-50 disabled:cursor-not-allowed"
+                    placeholder="15"
+                  />
+                  <span className="absolute inset-y-0 right-0 pr-3 flex items-center text-xs font-bold text-slate-400 pointer-events-none">
+                    Dias
+                  </span>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <span className="block text-[11px] font-bold text-slate-400">Atalhos Rápidos:</span>
+                <div className="flex items-center gap-1.5">
+                  {[7, 15, 30].map((days) => (
+                    <button
+                      key={days}
+                      type="button"
+                      disabled={!enableTrial}
+                      onClick={() => setFreeDaysInput(String(days))}
+                      className={`flex-1 py-2 px-2 rounded-xl text-xs font-black transition-all border ${
+                        numFreeDays === days && enableTrial
+                          ? 'bg-sky-600 text-white border-sky-400 shadow-md ring-1 ring-sky-300'
+                          : 'bg-slate-900 text-slate-300 border-slate-700 hover:border-slate-500'
+                      } disabled:opacity-40 disabled:cursor-not-allowed`}
+                    >
+                      {days} Dias
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Trial Callout info */}
+            <div className="bg-slate-900/80 p-2.5 rounded-xl border border-slate-800 flex items-center justify-between text-[11px]">
+              <span className="text-slate-300">
+                {enableTrial 
+                  ? `Os clientes verão o card: "${numFreeDays} Dias Grátis (R$ 0)" e podem usar ou pular para os planos pagos.`
+                  : 'O teste gratuito está desativado. Os clientes verão apenas os Planos Pagos 1, 2, 3 e 4.'}
+              </span>
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-black shrink-0 ${
+                enableTrial ? 'bg-sky-950 text-sky-300 border border-sky-500/40' : 'bg-rose-950 text-rose-300 border border-rose-500/40'
+              }`}>
+                {enableTrial ? `${numFreeDays} Dias Grátis` : 'Apenas Pagos'}
+              </span>
+            </div>
+          </div>
 
           {/* LICENSE PRICE CONFIGURATION SECTION */}
           <div className="bg-slate-950 p-4 rounded-2xl border-2 border-emerald-500/50 space-y-3 shadow-lg">
@@ -335,31 +431,35 @@ export const AdminPaymentAccountModal: React.FC<AdminPaymentAccountModalProps> =
             </div>
 
             {/* Bank / Processor & Card Receiver Account */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <label className="block font-bold text-slate-300 text-[11px]">
-                  Banco / Processador Pix:
-                </label>
-                <input
-                  type="text"
-                  value={config.bancoOuProcessador}
-                  onChange={(e) => setConfig({ ...config, bancoOuProcessador: e.target.value })}
-                  placeholder="Ex: Mercado Pago / Pix Instantâneo"
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-1.5 text-white text-xs"
-                />
-              </div>
-
+            <div className="space-y-3 pt-1">
               <div className="space-y-1">
                 <label className="block font-bold text-slate-300 text-[11px] flex items-center gap-1">
                   <CreditCard className="w-3.5 h-3.5 text-purple-400" />
-                  <span>Conta Destino (Cartão de Crédito):</span>
+                  <span>Conta Destino (Cartão de Crédito): *</span>
                 </label>
                 <input
                   type="text"
                   value={config.cartaoContaDestino}
                   onChange={(e) => setConfig({ ...config, cartaoContaDestino: e.target.value })}
-                  placeholder="Ex: Conta Mercado Pago (MP-883921)"
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-1.5 text-white text-xs"
+                  placeholder="Ex: Agência: 0001 | Conta: 12345-6 (Marlon Soares)"
+                  required
+                  className="w-full bg-slate-900 border-2 border-purple-500/60 focus:border-purple-400 rounded-xl px-3.5 py-2.5 text-white font-mono text-xs focus:outline-none shadow-inner"
+                />
+                <p className="text-[10px] text-purple-300/90 leading-relaxed">
+                  💡 <strong>Recebimento no Cartão:</strong> Insira aqui o <strong>número da Agência e Conta</strong> de destino. Todos os pagamentos realizados via Cartão de Crédito por salões e clientes estarão vinculados e serão creditados nesta conta.
+                </p>
+              </div>
+
+              <div className="space-y-1">
+                <label className="block font-bold text-slate-300 text-[11px]">
+                  Banco / Instituição / Processador (Pix e Cartão):
+                </label>
+                <input
+                  type="text"
+                  value={config.bancoOuProcessador}
+                  onChange={(e) => setConfig({ ...config, bancoOuProcessador: e.target.value })}
+                  placeholder="Ex: Mercado Pago / Banco Inter / Nubank"
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-amber-400"
                 />
               </div>
             </div>

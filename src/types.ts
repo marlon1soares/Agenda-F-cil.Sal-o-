@@ -185,10 +185,12 @@ export interface AdminPaymentConfig {
   cartaoContaDestino: string;
   instrucoesPagamento?: string;
   productionUrl?: string; // e.g. https://agenda-f-cil-sal-o.vercel.app
-  precoPlano30Dias?: number; // 30 Dias (padrão: 30.00)
-  precoPlano90Dias?: number; // 3 Meses (padrão: 75.00)
-  precoPlano180Dias?: number; // 6 Meses (padrão: 135.00)
-  precoPlano365Dias?: number; // 1 Ano (padrão: 240.00)
+  diasGratuitos?: number; // Configuração dos dias gratuitos (padrão: 15 dias, ex: 7, 15, 30)
+  habilitarPlanoGratuito?: boolean; // Habilitar ou desabilitar opção de teste gratuito
+  precoPlano30Dias?: number; // Plano 1: 30 Dias (padrão: 30.00)
+  precoPlano90Dias?: number; // Plano 2: 3 Meses / 90 Dias (padrão: 75.00)
+  precoPlano180Dias?: number; // Plano 3: 6 Meses / 180 Dias (padrão: 135.00)
+  precoPlano365Dias?: number; // Plano 4: 1 Ano / 365 Dias (padrão: 240.00)
 }
 
 export interface ChatMessage {

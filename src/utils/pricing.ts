@@ -43,6 +43,8 @@ export function getCalculatedLicensePlans(
   let p90 = 75;
   let p180 = 135;
   let p365 = 240;
+  let trialDays = 15;
+  let isTrialEnabled = true;
 
   if (typeof configOrBase === 'number') {
     const calculated = calculateDefaultPricesFromBase(configOrBase);
@@ -62,21 +64,28 @@ export function getCalculatedLicensePlans(
     p365 = (configOrBase.precoPlano365Dias !== undefined && configOrBase.precoPlano365Dias !== null && Number(configOrBase.precoPlano365Dias) > 0)
       ? Number(configOrBase.precoPlano365Dias)
       : Number((base * 8).toFixed(2));
+
+    if (configOrBase.diasGratuitos !== undefined && configOrBase.diasGratuitos !== null && Number(configOrBase.diasGratuitos) > 0) {
+      trialDays = Number(configOrBase.diasGratuitos);
+    }
+    if (configOrBase.habilitarPlanoGratuito === false) {
+      isTrialEnabled = false;
+    }
   }
 
   const plans: LicensePlan[] = [];
 
-  if (includeTrial) {
+  if (includeTrial && isTrialEnabled) {
     plans.push({
-      days: 15,
-      label: '15 Dias',
-      shortLabel: '15 Dias (Teste Grátis)',
+      days: trialDays,
+      label: `${trialDays} Dias`,
+      shortLabel: `${trialDays} Dias (Teste Grátis)`,
       priceStr: 'Grátis (R$ 0)',
       numVal: 0,
-      monthlyEquivalentStr: '15 Dias Sem Custo',
+      monthlyEquivalentStr: `${trialDays} Dias Sem Custo`,
       detail: 'Teste Gratuito',
       tag: '1x por Cadastro',
-      badge: '15 Dias Grátis',
+      badge: `${trialDays} Dias Grátis`,
       maxInstallments: 1,
     });
   }
@@ -84,50 +93,50 @@ export function getCalculatedLicensePlans(
   plans.push(
     {
       days: 30,
-      label: '30 Dias',
-      shortLabel: '30 Dias (Mensal)',
+      label: 'Plano 1 (30 Dias)',
+      shortLabel: 'Plano 1 - 30 Dias (Mensal)',
       priceStr: formatBRL(p30),
       numVal: p30,
       monthlyEquivalentStr: `${formatBRL(p30)} / mês`,
-      detail: 'Mensal',
-      tag: 'À vista',
-      badge: 'À vista',
+      detail: 'Mensal (À vista)',
+      tag: 'Plano 1',
+      badge: 'Plano 1 (30 Dias)',
       maxInstallments: 1,
     },
     {
       days: 90,
-      label: '3 Meses',
-      shortLabel: '3 Meses (Trimestral)',
+      label: 'Plano 2 (3 Meses)',
+      shortLabel: 'Plano 2 - 3 Meses (Trimestral)',
       priceStr: formatBRL(p90),
       numVal: p90,
       monthlyEquivalentStr: `${formatBRL(p90 / 3)} / mês`,
       detail: `${formatBRL(p90 / 3)} / mês`,
-      tag: 'À vista',
-      badge: 'À vista',
+      tag: 'Plano 2',
+      badge: 'Plano 2 (3 Meses)',
       maxInstallments: 1,
     },
     {
       days: 180,
-      label: '6 Meses',
-      shortLabel: '6 Meses (Semestral)',
+      label: 'Plano 3 (6 Meses)',
+      shortLabel: 'Plano 3 - 6 Meses (Semestral)',
       priceStr: formatBRL(p180),
       numVal: p180,
       monthlyEquivalentStr: `${formatBRL(p180 / 6)} / mês`,
       detail: `${formatBRL(p180 / 6)} / mês`,
-      tag: 'Até 6x (3x S/ Juros)',
-      badge: 'Até 6x (3x S/ Juros)',
+      tag: 'Plano 3 (Até 6x)',
+      badge: 'Plano 3 (6 Meses)',
       maxInstallments: 6,
     },
     {
       days: 365,
-      label: '1 Anual',
-      shortLabel: '1 Anual (12 Meses)',
+      label: 'Plano 4 (1 Ano)',
+      shortLabel: 'Plano 4 - 1 Ano (Anual)',
       priceStr: formatBRL(p365),
       numVal: p365,
       monthlyEquivalentStr: `${formatBRL(p365 / 12)} / mês`,
       detail: `${formatBRL(p365 / 12)} / mês`,
-      tag: 'Até 6x (3x S/ Juros)',
-      badge: 'Até 6x (3x S/ Juros)',
+      tag: 'Plano 4 (Até 6x)',
+      badge: 'Plano 4 (1 Ano)',
       maxInstallments: 6,
     }
   );
