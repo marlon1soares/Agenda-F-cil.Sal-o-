@@ -17,17 +17,22 @@ export const SalonLinkModal: React.FC<SalonLinkModalProps> = ({
 }) => {
   const [copied, setCopied] = useState(false);
   const [selectedPlanDays, setSelectedPlanDays] = useState<number | null>(null);
+  const [linkMode, setLinkMode] = useState<'live' | 'vercel'>('live');
 
   if (!isOpen) return null;
 
   const adminConfig = Storage.getAdminPaymentConfig();
   const plans = getCalculatedLicensePlans(adminConfig, true);
 
+  const targetBaseUrl = linkMode === 'live'
+    ? (typeof window !== 'undefined' ? `${window.location.origin}/` : getPublicAppUrl())
+    : 'https://agenda-f-cil-sal-o.vercel.app/';
+
   // The canonical purchase link for the salon owner
   const salonPurchaseUrl = buildAppUrl({
     action: 'comprar-licenca',
     ...(selectedPlanDays ? { plano: selectedPlanDays } : {})
-  });
+  }, targetBaseUrl);
 
   const planObj = selectedPlanDays ? plans.find(p => p.days === selectedPlanDays) : null;
   const planName = planObj ? `${planObj.label} (${planObj.priceStr})` : 'Todos os Planos / Tabela Geral';
@@ -124,16 +129,38 @@ export const SalonLinkModal: React.FC<SalonLinkModalProps> = ({
           </div>
 
           <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4 sm:p-5 space-y-3.5 shadow-inner">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <label className="text-xs font-black uppercase text-slate-300 tracking-wider flex items-center gap-1.5">
                 <Link2 className="w-4 h-4 text-violet-400" />
                 <span>LINK DE COMPRA GERADO (PRONTO PARA ENVIO):</span>
               </label>
-              {copied && (
-                <span className="text-[11px] font-bold text-emerald-400 flex items-center gap-1 animate-pulse">
-                  <Check className="w-3.5 h-3.5" /> Link copiado!
-                </span>
-              )}
+
+              {/* Destination Mode Selector */}
+              <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setLinkMode('live')}
+                  className={`text-[10px] font-black px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 ${
+                    linkMode === 'live'
+                      ? 'bg-emerald-600 text-white shadow-sm'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-ping"></span>
+                  <span>⚡ Ao Vivo (Celular ↔ PC)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLinkMode('vercel')}
+                  className={`text-[10px] font-bold px-2.5 py-1 rounded-lg transition-all ${
+                    linkMode === 'vercel'
+                      ? 'bg-purple-600 text-white shadow-sm'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <span>🌐 Vercel Oficial</span>
+                </button>
+              </div>
             </div>
 
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">

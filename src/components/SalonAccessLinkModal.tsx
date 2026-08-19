@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { buildAppUrl } from '../utils/url';
+import { buildAppUrl, getPublicAppUrl } from '../utils/url';
 import { SalonApp } from '../types';
 import { X, Link2, Copy, Check, Share2, Key, Scissors, ExternalLink, ShieldCheck, Building2 } from 'lucide-react';
 
@@ -20,16 +20,21 @@ export const SalonAccessLinkModal: React.FC<SalonAccessLinkModalProps> = ({
 }) => {
   const [selectedSalonId, setSelectedSalonId] = useState<string>('all');
   const [copied, setCopied] = useState(false);
+  const [linkMode, setLinkMode] = useState<'live' | 'vercel'>('live');
 
   if (!isOpen) return null;
 
   const selectedSalon = selectedSalonId !== 'all' ? salons.find(s => s.id === selectedSalonId) : null;
 
+  const targetBaseUrl = linkMode === 'live'
+    ? (typeof window !== 'undefined' ? `${window.location.origin}/` : getPublicAppUrl())
+    : 'https://agenda-f-cil-sal-o.vercel.app/';
+
   // The canonical direct access/login link for salon owners
   const salonAccessUrl = buildAppUrl({
     action: 'acesso-salao',
     ...(selectedSalon ? { salon: selectedSalon.code || selectedSalon.id } : {})
-  });
+  }, targetBaseUrl);
 
   const salonTitle = selectedSalon ? (selectedSalon.config?.nomeSalao || selectedSalon.name) : 'Salão / Barbearia';
 
@@ -108,16 +113,38 @@ export const SalonAccessLinkModal: React.FC<SalonAccessLinkModalProps> = ({
           )}
 
           <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4 sm:p-5 space-y-3.5 shadow-inner">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <label className="text-xs font-black uppercase text-slate-300 tracking-wider flex items-center gap-1.5">
                 <Link2 className="w-4 h-4 text-teal-400" />
                 <span>LINK DE ACESSO GERADO (PRONTO PARA ENVIO):</span>
               </label>
-              {copied && (
-                <span className="text-[11px] font-bold text-emerald-400 flex items-center gap-1 animate-pulse">
-                  <Check className="w-3.5 h-3.5" /> Link copiado!
-                </span>
-              )}
+
+              {/* Destination Mode Selector */}
+              <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setLinkMode('live')}
+                  className={`text-[10px] font-black px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 ${
+                    linkMode === 'live'
+                      ? 'bg-emerald-600 text-white shadow-sm'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-ping"></span>
+                  <span>⚡ Ao Vivo (Celular ↔ PC)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLinkMode('vercel')}
+                  className={`text-[10px] font-bold px-2.5 py-1 rounded-lg transition-all ${
+                    linkMode === 'vercel'
+                      ? 'bg-purple-600 text-white shadow-sm'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <span>🌐 Vercel Oficial</span>
+                </button>
+              </div>
             </div>
 
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">

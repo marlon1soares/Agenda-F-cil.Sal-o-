@@ -39,6 +39,7 @@ export const ClientLinkModal: React.FC<ClientLinkModalProps> = ({
   const [existingClients, setExistingClients] = useState<ClientRecord[]>([]);
   const [savedLinks, setSavedLinks] = useState<SavedClientLink[]>([]);
   const [copiedHistoryId, setCopiedHistoryId] = useState<string | null>(null);
+  const [linkMode, setLinkMode] = useState<'live' | 'vercel'>('live');
 
   useEffect(() => {
     if (isOpen) {
@@ -64,12 +65,16 @@ export const ClientLinkModal: React.FC<ClientLinkModalProps> = ({
 
   // Build client link for this specific salon and client's phone
   const salonSlug = getSalonSlug(activeSalon.config.nomeSalao || activeSalon.name);
+  const targetBaseUrl = linkMode === 'live'
+    ? (typeof window !== 'undefined' ? `${window.location.origin}/` : getPublicAppUrl())
+    : 'https://agenda-f-cil-sal-o.vercel.app/';
+
   const clientUrl = buildAppUrl({
     role: 'cliente',
     salon: salonSlug,
     phone: cleanPhone || undefined,
     name: clientName.trim() || undefined,
-  });
+  }, targetBaseUrl);
 
   // Pre-configured WhatsApp message for client
   const defaultWhatsappMsg = `Olá${clientName.trim() ? `, *${clientName.trim()}*` : ''}! 💈✂️\n\n` +
@@ -262,14 +267,40 @@ export const ClientLinkModal: React.FC<ClientLinkModalProps> = ({
 
           {/* Generated Personalized Link Box */}
           <div className="bg-slate-950 p-4 rounded-2xl border border-rose-500/50 space-y-2.5 shadow-inner">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <label className="text-[11px] font-extrabold text-rose-300 uppercase tracking-wider flex items-center gap-1.5">
                 <Sparkles className="w-3.5 h-3.5 text-amber-400" />
                 <span>Link Permanente Gerado para o Cliente:</span>
               </label>
-              <span className="bg-emerald-500/20 text-emerald-300 text-[10px] px-2 py-0.5 rounded-full font-bold border border-emerald-500/30">
-                {cleanPhone ? `Atrelado a: ${formattedPhone}` : 'Link Geral do Salão'}
-              </span>
+              
+              {/* Destination Mode Selector */}
+              <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setLinkMode('live')}
+                  title="Gera o link usando este servidor ativo para sincronizar ao vivo com seu computador"
+                  className={`text-[10px] font-black px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 ${
+                    linkMode === 'live'
+                      ? 'bg-emerald-600 text-white shadow-sm'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-ping"></span>
+                  <span>⚡ Ao Vivo (Celular ↔ PC)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLinkMode('vercel')}
+                  title="Gera o link com o domínio Vercel de produção"
+                  className={`text-[10px] font-bold px-2.5 py-1 rounded-lg transition-all ${
+                    linkMode === 'vercel'
+                      ? 'bg-purple-600 text-white shadow-sm'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <span>🌐 Vercel Oficial</span>
+                </button>
+              </div>
             </div>
 
             <div className="flex items-center gap-2">

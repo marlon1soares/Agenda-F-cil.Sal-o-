@@ -6,15 +6,11 @@ export const DEFAULT_PRODUCTION_URL = 'https://agenda-f-cil-sal-o.vercel.app';
  * when running inside dev/preview environments or when configured, ensuring shared links
  * can be opened by anyone on WhatsApp, Instagram, or external devices without 404 errors.
  */
-export function getPublicAppUrl(useLocalOriginIfAvailable = false): string {
+export function getPublicAppUrl(forceProductionVercel = false): string {
   if (typeof window === 'undefined') return DEFAULT_PRODUCTION_URL + '/';
 
-  if (useLocalOriginIfAvailable) {
-    const origin = window.location.origin;
-    const pathname = window.location.pathname || '/';
-    let base = origin + pathname;
-    if (!base.endsWith('/')) base += '/';
-    return base;
+  if (forceProductionVercel) {
+    return DEFAULT_PRODUCTION_URL + '/';
   }
 
   // 1. Check if custom production URL was explicitly set by user/admin
@@ -25,27 +21,14 @@ export function getPublicAppUrl(useLocalOriginIfAvailable = false): string {
       if (!trimmed.endsWith('/')) trimmed += '/';
       return trimmed;
     }
-    const paymentConfig = localStorage.getItem('salaoAdminPaymentConfig');
-    if (paymentConfig) {
-      const parsed = JSON.parse(paymentConfig);
-      if (parsed.productionUrl && typeof parsed.productionUrl === 'string' && parsed.productionUrl.trim().startsWith('http')) {
-        let trimmed = parsed.productionUrl.trim();
-        if (!trimmed.endsWith('/')) trimmed += '/';
-        return trimmed;
-      }
-    }
   } catch {}
 
-  // 2. If running directly on a custom production domain or Vercel
+  // 2. Use current active domain/origin so Computer <-> Mobile connect to the same live sync server
   const origin = window.location.origin;
-  if (origin.includes('vercel.app')) {
-    let base = origin + (window.location.pathname || '/');
-    if (!base.endsWith('/')) base += '/';
-    return base;
-  }
-
-  // 3. If running in AI Studio sandbox, Cloud Run preview, or localhost, default to the official Vercel app
-  return DEFAULT_PRODUCTION_URL + '/';
+  const pathname = window.location.pathname || '/';
+  let base = origin + pathname;
+  if (!base.endsWith('/')) base += '/';
+  return base;
 }
 
 /**
@@ -146,8 +129,11 @@ export function hasUrlAction(...actionNames: string[]): boolean {
 /**
  * Builds a clean canonical URL with query parameters
  */
-export function buildAppUrl(params: Record<string, string | number | boolean | undefined | null>): string {
-  const base = getPublicAppUrl();
+export function buildAppUrl(
+  params: Record<string, string | number | boolean | undefined | null>,
+  baseUrl?: string
+): string {
+  const base = baseUrl || getPublicAppUrl();
   const searchParams = new URLSearchParams();
 
   for (const [k, v] of Object.entries(params)) {

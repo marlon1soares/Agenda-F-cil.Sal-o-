@@ -11,6 +11,17 @@ dotenv.config();
 const app = express();
 app.use(express.json({ limit: "50mb" }));
 
+// Enable CORS for all origins (mobile phone, external links, desktop)
+app.use((_req, res, next) => {
+  res.header("Access-Control-Allow-Origin", "*");
+  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With");
+  if (_req.method === "OPTIONS") {
+    return res.sendStatus(200);
+  }
+  next();
+});
+
 const PORT = 3000;
 
 const getGenAI = () => {

@@ -76,27 +76,24 @@ export const LiveConnectionHubModal: React.FC<LiveConnectionHubModalProps> = ({
 
   // Filter messages relevant to current salon / role
   const relevantMessages = messages.filter(m => {
-    // 1. CLIENT: Only sees messages strictly between Client and Salon (or Salon booking alerts for this salon)
-    // NEVER sees messages to/from admin
+    // 1. CLIENT: Sees all messages sent to them, from their salon, from admin, or broadcast to todos
     if (userRole === 'cliente') {
-      if (m.fromRole === 'admin' || m.toRole === 'admin') return false;
-      if (m.salonId && m.salonId !== currentSalonId) return false;
-      return (
-        (m.fromRole === 'cliente' && m.toRole === 'salao') ||
-        (m.fromRole === 'salao' && (m.toRole === 'cliente' || m.toRole === 'todos')) ||
-        (m.fromRole === 'cliente' && m.toRole === 'todos')
-      );
+      if (m.toRole === 'todos' || m.toRole === 'cliente') return true;
+      if (m.fromRole === 'admin') return true;
+      if (m.fromRole === 'salao' || m.fromRole === 'cliente') {
+        if (!m.salonId || m.salonId === currentSalonId) return true;
+      }
+      return true;
     }
 
     // 2. SALON: Can communicate with Admin AND with Clients of this salon
     if (userRole === 'salao') {
-      if (m.salonId && m.salonId !== currentSalonId && m.fromRole !== 'admin') return false;
+      if (m.salonId && m.salonId !== currentSalonId && m.fromRole !== 'admin' && m.toRole !== 'todos') return false;
       return true;
     }
 
-    // 3. ADMIN: Sees admin-to-salon communication and system broadcast messages
+    // 3. ADMIN: Sees all communications across platform
     if (userRole === 'admin') {
-      // Admin monitors salons and communicates with salon owners
       return true;
     }
 
@@ -432,8 +429,9 @@ export const LiveConnectionHubModal: React.FC<LiveConnectionHubModalProps> = ({
                       onChange={(e) => setTargetRecipient(e.target.value as any)}
                       className="bg-slate-900 border border-slate-700 text-slate-200 text-xs rounded-lg px-2.5 py-1 focus:ring-1 focus:ring-emerald-400 outline-none font-medium cursor-pointer"
                     >
+                      <option value="todos">🌐 Todos (Salões e Clientes)</option>
+                      <option value="cliente">👤 Clientes do Salão ({currentSalonName})</option>
                       <option value="salao">💈 Proprietário do Salão ({currentSalonName})</option>
-                      <option value="todos">🌐 Todos os Salões</option>
                     </select>
                   )}
                 </div>
