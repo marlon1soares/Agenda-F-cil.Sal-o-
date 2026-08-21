@@ -17,6 +17,7 @@ export interface SyncDatabaseState {
   messages: any[];
   notices: any[];
   onlineUsers: any[];
+  paymentOrders?: Record<string, any>;
   lastUpdated: number;
 }
 
@@ -365,6 +366,46 @@ class SyncStore {
     });
 
     return this.updateState({ onlineUsers });
+  }
+
+  public createPaymentOrder(order: any): any {
+    const paymentOrders = { ...(this.state.paymentOrders || {}) };
+    paymentOrders[order.id] = {
+      ...order,
+      createdAt: order.createdAt || Date.now(),
+      status: order.status || 'WAITING_BANK_CONFIRMATION'
+    };
+    this.updateState({ paymentOrders });
+    return paymentOrders[order.id];
+  }
+
+  public getPaymentOrder(orderId: string): any {
+    return (this.state.paymentOrders || {})[orderId] || null;
+  }
+
+  public confirmPaymentOrder(orderId: string, bankDetails: {
+    bankTransactionId?: string;
+    bankReceiptCode?: string;
+    creditedToAccount?: any;
+    confirmedBy?: string;
+  }): any {
+    const paymentOrders = { ...(this.state.paymentOrders || {}) };
+    const current = paymentOrders[orderId];
+    if (!current) return null;
+
+    const confirmedOrder = {
+      ...current,
+      status: 'CONFIRMED_BY_BANK',
+      bankTransactionId: bankDetails.bankTransactionId || `PIX-BACEN-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`,
+      bankReceiptCode: bankDetails.bankReceiptCode || `REC-BANK-${Math.random().toString(36).substring(2, 9).toUpperCase()}`,
+      creditedToAccount: bankDetails.creditedToAccount || current.adminDestinationAccount,
+      confirmedBy: bankDetails.confirmedBy || 'bank_gateway',
+      confirmedAt: Date.now()
+    };
+
+    paymentOrders[orderId] = confirmedOrder;
+    this.updateState({ paymentOrders });
+    return confirmedOrder;
   }
 
   public addSseClient(res: Response) {

@@ -6,7 +6,8 @@ import {
   Building2, Plus, Search, Check, Trash2, Edit3, ExternalLink, 
   X, Sparkles, User, Mail, Phone, Palette, Scissors, Copy, ShieldCheck, Share2,
   Key, Calendar, Clock, CheckCircle2, AlertCircle, RefreshCw, Send, Lock, Settings,
-  MapPin, Globe, FileText, PieChart, Table, Map, Activity, ArrowRight, Eye, Link2
+  MapPin, Globe, FileText, PieChart, Table, Map, Activity, ArrowRight, Eye, Link2,
+  Play, Video
 } from 'lucide-react';
 
 interface AdminSalonsModalProps {
@@ -24,6 +25,8 @@ interface AdminSalonsModalProps {
   onOpenAdminAuth?: () => void;
   onOpenAdminChangePassword?: () => void;
   onOpenLiveHub?: () => void;
+  onOpenVideoTutorial?: () => void;
+  onOpenVideoConfig?: () => void;
 }
 
 export const AdminSalonsModal: React.FC<AdminSalonsModalProps> = ({
@@ -41,6 +44,8 @@ export const AdminSalonsModal: React.FC<AdminSalonsModalProps> = ({
   onOpenAdminAuth,
   onOpenAdminChangePassword,
   onOpenLiveHub,
+  onOpenVideoTutorial,
+  onOpenVideoConfig,
 }) => {
   const [activeTab, setActiveTab] = useState<'cards' | 'pending' | 'connected' | 'inspector' | 'location_table'>('cards');
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'active' | 'blocked'>('all');
@@ -422,6 +427,28 @@ export const AdminSalonsModal: React.FC<AdminSalonsModalProps> = ({
               >
                 <Key className="w-3.5 h-3.5 text-white shrink-0" />
                 <span className="tracking-tight">Link Acesso</span>
+              </button>
+            )}
+
+            {onOpenVideoTutorial && (
+              <button
+                onClick={onOpenVideoTutorial}
+                className="bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-extrabold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1.5 shadow-sm transition-all active:scale-95 border border-red-400/40 cursor-pointer"
+                title="Assistir à Demonstração & Vídeo Tutorial Interativo"
+              >
+                <Play className="w-3.5 h-3.5 fill-white shrink-0" />
+                <span className="tracking-tight">Vídeo Tutorial</span>
+              </button>
+            )}
+
+            {onOpenVideoConfig && (
+              <button
+                onClick={onOpenVideoConfig}
+                className="bg-slate-900 hover:bg-slate-800 text-rose-300 border border-rose-500/40 font-extrabold px-2.5 py-1.5 rounded-xl text-xs flex items-center gap-1.5 shadow-sm transition-all active:scale-95 cursor-pointer"
+                title="Configurar Link do Vídeo (YouTube/MP4) e Roteiro de Narração por Voz"
+              >
+                <Video className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+                <span>Config Vídeo/Voz</span>
               </button>
             )}
 

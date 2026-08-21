@@ -19,6 +19,8 @@ import { SalonLinkModal } from './components/SalonLinkModal';
 import { SalonAccessLinkModal } from './components/SalonAccessLinkModal';
 import { SalonAuthModal } from './components/SalonAuthModal';
 import { LiveConnectionHubModal } from './components/LiveConnectionHubModal';
+import { VideoTutorialModal } from './components/VideoTutorialModal';
+import { AdminVideoConfigModal } from './components/AdminVideoConfigModal';
 
 import { Transaction, Appointment, SalonConfig, UserRole, Professional, ServiceItem, ClientRecord, SalonApp } from './types';
 import { Storage } from './utils/storage';
@@ -27,7 +29,7 @@ import { DEFAULT_SALON_APPS, DEFAULT_CONFIG } from './data/mockData';
 import { getUrlParam, hasUrlAction } from './utils/url';
 import { getSalonLicenseInfo } from './utils/license';
 import { BlockedLicenseBanner } from './components/BlockedLicenseBanner';
-import { LayoutDashboard, CreditCard, Calendar, Users, Scissors, UserCheck, LogOut, RotateCcw, ShieldCheck, Building2, Store, Eye, CheckCircle2, AlertCircle, ShoppingCart, Sparkles, Plus, ExternalLink, Key, Link2, Settings } from 'lucide-react';
+import { LayoutDashboard, CreditCard, Calendar, Users, Scissors, UserCheck, LogOut, RotateCcw, ShieldCheck, Building2, Store, Eye, CheckCircle2, AlertCircle, ShoppingCart, Sparkles, Plus, ExternalLink, Key, Link2, Settings, Play, Video } from 'lucide-react';
 
 export function App() {
   // Check if opened via dedicated direct purchase / activation link
@@ -116,6 +118,13 @@ export function App() {
   const [isSalonLinkOpen, setIsSalonLinkOpen] = useState(false);
   const [isSalonAccessLinkOpen, setIsSalonAccessLinkOpen] = useState(false);
   const [isLiveHubOpen, setIsLiveHubOpen] = useState(false);
+  const [isVideoTutorialOpen, setIsVideoTutorialOpen] = useState<boolean>(() => {
+    try {
+      return hasUrlAction('video', 'tutorial', 'video-tutorial', 'video_tutorial');
+    } catch {}
+    return false;
+  });
+  const [isVideoConfigOpen, setIsVideoConfigOpen] = useState(false);
   const [salonAuthCredentials, setSalonAuthCredentials] = useState<{ cpf: string; token: string }>({ cpf: '', token: '' });
 
   const handleOpenSalonAuth = (creds?: { cpf?: string; token?: string }) => {
@@ -513,6 +522,7 @@ export function App() {
           onOpenSalonLink={() => setIsSalonLinkOpen(true)}
           onOpenSalonAccessLink={() => setIsSalonAccessLinkOpen(true)}
           onOpenAdminChangePassword={() => setIsAdminChangePasswordOpen(true)}
+          onOpenVideoTutorial={() => setIsVideoTutorialOpen(true)}
           onOpenLiveHub={() => setIsLiveHubOpen(true)}
           isExpanded={isExpanded}
           onToggleExpand={() => setIsExpanded(!isExpanded)}
@@ -553,6 +563,26 @@ export function App() {
                     >
                       <Key className="w-3.5 h-3.5 text-emerald-300" />
                       <span>Alterar Senha Admin</span>
+                    </button>
+
+                    <button
+                      id="btn-admin-video-tutorial"
+                      onClick={() => setIsVideoTutorialOpen(true)}
+                      className="bg-rose-600 hover:bg-rose-500 text-white font-extrabold text-xs px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 shadow-xs border border-rose-400/30 active:scale-95 cursor-pointer"
+                      title="Assistir Demonstração & Vídeo Tutorial"
+                    >
+                      <Play className="w-3.5 h-3.5 fill-white" />
+                      <span>Vídeo Tutorial</span>
+                    </button>
+
+                    <button
+                      id="btn-admin-video-config"
+                      onClick={() => setIsVideoConfigOpen(true)}
+                      className="bg-slate-800 hover:bg-slate-700 text-rose-300 font-extrabold text-xs px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 shadow-xs border border-rose-500/30 active:scale-95 cursor-pointer"
+                      title="Configurar Link do Vídeo (YouTube/MP4) e Narrações por Voz"
+                    >
+                      <Settings className="w-3.5 h-3.5 text-rose-400" />
+                      <span>Config Vídeo/Voz</span>
                     </button>
 
                     <button
@@ -988,6 +1018,8 @@ export function App() {
         }}
         onOpenAdminChangePassword={() => setIsAdminChangePasswordOpen(true)}
         onOpenLiveHub={() => setIsLiveHubOpen(true)}
+        onOpenVideoTutorial={() => setIsVideoTutorialOpen(true)}
+        onOpenVideoConfig={() => setIsVideoConfigOpen(true)}
       />
 
       {/* Admin Change Password & User Management Modal */}
@@ -1000,6 +1032,13 @@ export function App() {
       <AdminPaymentAccountModal
         isOpen={isAdminPaymentOpen}
         onClose={() => setIsAdminPaymentOpen(false)}
+      />
+
+      {/* Admin Video Tutorial and Narration Config Modal */}
+      <AdminVideoConfigModal
+        isOpen={isVideoConfigOpen}
+        onClose={() => setIsVideoConfigOpen(false)}
+        onOpenVideoTutorial={() => setIsVideoTutorialOpen(true)}
       />
 
       {/* Buy App & Generate Token Checkout Modal */}
@@ -1071,6 +1110,16 @@ export function App() {
         userRole={userRole}
         activeSalon={activeSalon}
         onSelectRole={handleSelectRole}
+      />
+
+      {/* Interactive Video Tutorial & Demonstration Modal */}
+      <VideoTutorialModal
+        isOpen={isVideoTutorialOpen}
+        onClose={() => setIsVideoTutorialOpen(false)}
+        salonName={activeSalon?.name || config.nomeSalao || 'Salão dos Parças'}
+        ownerName={activeSalon?.ownerName || 'Proprietário'}
+        onOpenAdminVideoConfig={userRole === 'admin' ? () => setIsVideoConfigOpen(true) : undefined}
+        isAdmin={userRole === 'admin'}
       />
 
 

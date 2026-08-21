@@ -3,7 +3,7 @@ import { SalonConfig, UserRole, ThemeConfig } from '../types';
 import { THEMES } from '../data/mockData';
 import { Storage } from '../utils/storage';
 import { formatBRL } from '../utils/pricing';
-import { Crown, Scissors, User, Minimize2, Maximize2, Settings, Image as ImageIcon, Sparkles, FolderOpen, ChevronDown, Building2, ShoppingCart, Link2, Key, Radio, Wifi, MessageSquare } from 'lucide-react';
+import { Crown, Scissors, User, Minimize2, Maximize2, Settings, Image as ImageIcon, Sparkles, FolderOpen, ChevronDown, Building2, ShoppingCart, Link2, Key, Radio, Wifi, MessageSquare, Play, Video } from 'lucide-react';
 
 interface NavbarProps {
   config: SalonConfig;
@@ -19,6 +19,7 @@ interface NavbarProps {
   onOpenSalonLink?: () => void;
   onOpenSalonAccessLink?: () => void;
   onOpenAdminChangePassword?: () => void;
+  onOpenVideoTutorial?: () => void;
   isExpanded: boolean;
   onToggleExpand: () => void;
   isMinimized: boolean;
@@ -39,6 +40,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenSalonLink,
   onOpenSalonAccessLink,
   onOpenAdminChangePassword,
+  onOpenVideoTutorial,
   isExpanded,
   onToggleExpand,
   isMinimized,

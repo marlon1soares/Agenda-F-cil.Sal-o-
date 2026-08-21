@@ -178,6 +178,25 @@ export interface PurchaseRequest {
   status: 'pending' | 'approved' | 'rejected';
 }
 
+export interface VideoTutorialChapterConfig {
+  id: number;
+  title: string;
+  shortTitle: string;
+  duration: number; // in seconds
+  badge: string;
+  headline: string;
+  narration: string;
+  points: string[];
+}
+
+export interface VideoTutorialConfig {
+  youtubeUrl: string; // e.g. https://www.youtube.com/watch?v=...
+  customVideoUrl?: string; // Direct mp4/video or embed link
+  videoTitle?: string;
+  useInteractivePlayer?: boolean; // Show simulated screen interactive video player
+  chapters?: VideoTutorialChapterConfig[];
+}
+
 export interface AdminPaymentConfig {
   chavePix: string;
   nomeBeneficiario: string;
@@ -191,6 +210,7 @@ export interface AdminPaymentConfig {
   precoPlano90Dias?: number; // Plano 2: 3 Meses / 90 Dias (padrão: 75.00)
   precoPlano180Dias?: number; // Plano 3: 6 Meses / 180 Dias (padrão: 135.00)
   precoPlano365Dias?: number; // Plano 4: 1 Ano / 365 Dias (padrão: 240.00)
+  videoTutorialConfig?: VideoTutorialConfig; // Configuração do Vídeo Tutorial & Narração pelo Administrador
 }
 
 export interface ChatMessage {
