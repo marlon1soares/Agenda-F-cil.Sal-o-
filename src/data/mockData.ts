@@ -23,8 +23,8 @@ export const DEFAULT_CONFIG: SalonConfig = {
     { id: "prof-1", nome: "Michael", porc: 70 },
     { id: "prof-2", nome: "Marlon", porc: 30 }
   ],
-  chavePix: "marlon1soares28@gmail.com",
-  tipoChavePix: "email",
+  chavePix: "11973395723",
+  tipoChavePix: "telefone",
   titularPix: "Marlon & Michael - Salão dos Parças",
   cidadePix: "São Paulo",
   bancoCartao: "Banco Nubank / Itaú",
@@ -70,8 +70,8 @@ export const DEFAULT_SALON_APPS: SalonApp[] = [
         { id: "prof-1", nome: "Michael", porc: 70 },
         { id: "prof-2", nome: "Marlon", porc: 30 }
       ],
-      chavePix: "marlon1soares28@gmail.com",
-      tipoChavePix: "email",
+      chavePix: "11973395723",
+      tipoChavePix: "telefone",
       titularPix: "Marlon & Michael - Salão dos Parças",
       cidadePix: "São Paulo",
       bancoCartao: "Banco Nubank / Itaú",

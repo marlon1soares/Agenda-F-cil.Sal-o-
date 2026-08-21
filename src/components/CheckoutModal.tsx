@@ -147,7 +147,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   useEffect(() => {
     if (!isOpen || !item) return;
 
-    const pixKey = salonConfig.chavePix || 'marlon1soares28@gmail.com';
+    const pixKey = salonConfig.chavePix || '11973395723';
     const beneficiaryName = salonConfig.titularPix || salonConfig.nomeSalao || 'AGENDA FACIL';
     const cityName = salonConfig.cidadePix || 'SAO PAULO';
 
@@ -496,12 +496,12 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                       <div className="min-w-0">
                         <span className="text-[10px] text-slate-400 block font-bold">Chave Pix da Loja:</span>
                         <span className="text-xs font-mono font-black text-purple-300 truncate block">
-                          {salonConfig.chavePix || 'marlon1soares28@gmail.com'}
+                          {salonConfig.chavePix || '11973395723'}
                         </span>
                       </div>
                       <button
                         type="button"
-                        onClick={() => handleCopy(salonConfig.chavePix || 'marlon1soares28@gmail.com', 'pix_key')}
+                        onClick={() => handleCopy(salonConfig.chavePix || '11973395723', 'pix_key')}
                         className="bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition-all flex items-center gap-1 shrink-0"
                       >
                         {copiedField === 'pix_key' ? (

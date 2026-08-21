@@ -92,8 +92,8 @@ const DEFAULT_STATE: SyncDatabaseState = {
           { id: "prof-1", nome: "Michael", porc: 70 },
           { id: "prof-2", nome: "Marlon", porc: 30 }
         ],
-        chavePix: "marlon1soares28@gmail.com",
-        tipoChavePix: "email",
+        chavePix: "11973395723",
+        tipoChavePix: "telefone",
         titularPix: "Marlon & Michael - Salão dos Parças",
         cidadePix: "São Paulo",
         bancoCartao: "Banco Nubank / Itaú",
@@ -117,8 +117,8 @@ const DEFAULT_STATE: SyncDatabaseState = {
       { id: "prof-1", nome: "Michael", porc: 70 },
       { id: "prof-2", nome: "Marlon", porc: 30 }
     ],
-    chavePix: "marlon1soares28@gmail.com",
-    tipoChavePix: "email",
+    chavePix: "11973395723",
+    tipoChavePix: "telefone",
     titularPix: "Marlon & Michael - Salão dos Parças",
     cidadePix: "São Paulo",
     bancoCartao: "Banco Nubank / Itaú",
@@ -200,11 +200,11 @@ const DEFAULT_STATE: SyncDatabaseState = {
     { id: "cli-3", nome: "Gabriel Santos", telefone: "(11) 99887-6655", totalVisitas: 8, totalGasto: 480.00, ultimoServico: "Combo Cabelo + Barba", ultimaVisita: "2026-02-12" }
   ],
   adminPaymentConfig: {
-    chavePix: "marlon1soares28@gmail.com",
-    nomeBeneficiario: "Agenda+Fácil.Salão Oficial",
-    bancoOuProcessador: "Mercado Pago / Pix Instantâneo",
-    cartaoContaDestino: "Conta Principal - Marlon Soares (MP-883921)",
-    instrucoesPagamento: "O valor do cartão ou Pix é creditado diretamente na conta cadastrada pelo Administrador.",
+    chavePix: "11973395723",
+    nomeBeneficiario: "Marlon Soares - Agenda Fácil Oficial",
+    bancoOuProcessador: "Mercado Pago (Ag: 0001 / CC: 7731871243-4)",
+    cartaoContaDestino: "Mercado Pago - Agência: 0001 / Conta: 7731871243-4 (Marlon Soares)",
+    instrucoesPagamento: "O valor do cartão ou Pix é creditado diretamente na conta Mercado Pago (Ag: 0001 / Conta: 7731871243-4) do Administrador.",
     precoPlano30Dias: 30.00,
     precoPlano90Dias: 75.00,
     precoPlano180Dias: 135.00,

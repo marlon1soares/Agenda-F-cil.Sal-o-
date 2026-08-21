@@ -208,10 +208,10 @@ app.post("/api/payment/orders", (req, res) => {
       amount: Number(amount) || 30.0,
       paymentMethod: paymentMethod || "pix",
       adminDestinationAccount: adminDestinationAccount || {
-        beneficiary: "Agenda Fácil - Oficial",
-        pixKey: "marlon1soares28@gmail.com",
-        bank: "Mercado Pago / Pix",
-        cardAccount: "Conta Principal - Marlon Soares"
+        beneficiary: "Marlon Soares - Agenda Fácil Oficial",
+        pixKey: "11973395723",
+        bank: "Mercado Pago (Ag: 0001 / CC: 7731871243-4)",
+        cardAccount: "Mercado Pago - Agência: 0001 / Conta: 7731871243-4"
       },
       status: "WAITING_BANK_CONFIRMATION",
       createdAt: Date.now()

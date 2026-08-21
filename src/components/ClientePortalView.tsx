@@ -625,7 +625,7 @@ export const ClientePortalView: React.FC<ClientePortalViewProps> = ({
                   <button
                     type="button"
                     onClick={() => {
-                      const pixKey = safeConfig.chavePix || 'marlon1soares28@gmail.com';
+                      const pixKey = safeConfig.chavePix || '11973395723';
                       navigator.clipboard.writeText(pixKey);
                       setCopiedPix(true);
                       setTimeout(() => setCopiedPix(false), 2500);
@@ -646,7 +646,7 @@ export const ClientePortalView: React.FC<ClientePortalViewProps> = ({
                   <button
                     type="button"
                     onClick={async () => {
-                      const pixKey = safeConfig.chavePix || 'marlon1soares28@gmail.com';
+                      const pixKey = safeConfig.chavePix || '11973395723';
                       const beneficiary = safeConfig.titularPix || safeConfig.nomeSalao;
                       const city = safeConfig.cidadePix || 'SAO PAULO';
                       const amount = lastAppointment?.price;
@@ -664,7 +664,7 @@ export const ClientePortalView: React.FC<ClientePortalViewProps> = ({
               </div>
 
               <div className="font-mono text-xs font-bold text-purple-200 break-all">
-                {safeConfig.chavePix || 'marlon1soares28@gmail.com'}
+                {safeConfig.chavePix || '11973395723'}
               </div>
 
               {safeConfig.titularPix && (
@@ -729,7 +729,7 @@ export const ClientePortalView: React.FC<ClientePortalViewProps> = ({
                 </div>
 
                 <div className="text-[10px] font-mono text-purple-200 bg-slate-950 p-2 rounded-xl border border-slate-800 break-all">
-                  {safeConfig.chavePix || 'marlon1soares28@gmail.com'}
+                  {safeConfig.chavePix || '11973395723'}
                 </div>
 
                 <button

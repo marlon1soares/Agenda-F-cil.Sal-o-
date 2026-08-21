@@ -465,7 +465,7 @@ export const CatalogoView: React.FC<CatalogoViewProps> = ({
     const numPrice = rawPrice ? (typeof rawPrice === 'string' ? parseFloat(rawPrice.replace(',', '.')) : Number(rawPrice)) : undefined;
     const validAmount = numPrice && !isNaN(numPrice) && numPrice > 0 ? numPrice : undefined;
 
-    const pixKey = currentConfig.chavePix || 'marlon1soares28@gmail.com';
+    const pixKey = currentConfig.chavePix || '11973395723';
     const beneficiaryName = currentConfig.titularPix || currentConfig.nomeSalao || 'AGENDA FACIL';
     const cityName = currentConfig.cidadePix || 'SAO PAULO';
 
@@ -490,7 +490,7 @@ export const CatalogoView: React.FC<CatalogoViewProps> = ({
     return num.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   };
 
-  const activePixKey = currentConfig.chavePix || 'marlon1soares28@gmail.com';
+  const activePixKey = currentConfig.chavePix || '11973395723';
   const activeTitularPix = currentConfig.titularPix || currentConfig.nomeSalao;
   const hasCardAccount = !!(currentConfig.bancoCartao || currentConfig.contaCartao || currentConfig.linkCartao);
 

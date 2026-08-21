@@ -1413,48 +1413,15 @@ Olá *${createdSalon.ownerName}*, seu acesso ao aplicativo *${createdSalon.name}
                       O sistema está monitorando o crédito na conta do administrador. <strong>Assim que o banco confirmar o recebimento do Pix, o sistema avançará automaticamente para a próxima etapa.</strong>
                     </p>
 
-                    {/* Primary Button to verify and confirm Pix payment */}
-                    <button
-                      type="button"
-                      onClick={handleSimulateBankPixDeposit}
-                      disabled={isSimulatingPix || isAutoAdvancing}
-                      className="w-full bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-500 hover:to-teal-500 disabled:bg-slate-800 text-white font-black py-3 px-4 rounded-xl text-xs sm:text-sm shadow-xl flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer"
-                    >
-                      {isSimulatingPix ? (
-                        <>
-                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                          <span>Consultando confirmação bancária do Pix...</span>
-                        </>
-                      ) : (
-                        <>
-                          <CheckCircle2 className="w-4 h-4 text-emerald-200" />
-                          <span>Já Paguei via Pix / Confirmar com o Banco</span>
-                        </>
-                      )}
-                    </button>
-
-                    {/* Simulation / Webhook Test Trigger */}
-                    <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between">
-                      <span className="text-[10px] text-slate-400">Ambiente de teste bancário:</span>
-                      <button
-                        type="button"
-                        onClick={handleSimulateBankPixDeposit}
-                        disabled={isSimulatingPix || isAutoAdvancing}
-                        className="bg-slate-800 hover:bg-emerald-700 text-slate-200 hover:text-white text-[10px] font-bold px-2.5 py-1 rounded-lg border border-slate-700 transition-all flex items-center gap-1 cursor-pointer"
-                        title="Simular confirmação automática enviada pelo banco"
-                      >
-                        {isSimulatingPix ? (
-                          <>
-                            <div className="w-2.5 h-2.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                            <span>Confirmando com o Banco...</span>
-                          </>
-                        ) : (
-                          <>
-                            <Sparkles className="w-3 h-3 text-amber-300" />
-                            <span>Simular Confirmação Bancária (Teste Pix)</span>
-                          </>
-                        )}
-                      </button>
+                    {/* Live Banking Instructions */}
+                    <div className="bg-slate-950/60 p-3 rounded-xl border border-slate-800 text-[11px] text-slate-300 space-y-1">
+                      <div className="flex items-center gap-1.5 text-emerald-400 font-bold">
+                        <Clock className="w-3.5 h-3.5" />
+                        <span>Confirmação Bancária Instantânea</span>
+                      </div>
+                      <p className="text-slate-400 text-[10px] leading-relaxed">
+                        Faça o Pix pelo aplicativo do seu banco. A confirmação do banco é automática e instantânea — não é necessário enviar comprovante. Assim que o valor for creditado na conta, sua liberação ocorrerá imediatamente.
+                      </p>
                     </div>
                   </div>
                 )}

@@ -390,11 +390,11 @@ export const Storage = {
   getAdminPaymentConfig(): AdminPaymentConfig {
     const saved = safeGetItem('salaoAdminPaymentConfig');
     const defaults: AdminPaymentConfig = {
-      chavePix: 'marlon1soares28@gmail.com',
-      nomeBeneficiario: 'Agenda+Fácil.Salão Oficial',
-      bancoOuProcessador: 'Mercado Pago / Pix Instantâneo',
-      cartaoContaDestino: 'Conta Principal - Marlon Soares (MP-883921)',
-      instrucoesPagamento: 'O valor do cartão ou Pix é creditado diretamente na conta cadastrada pelo Administrador.',
+      chavePix: '11973395723',
+      nomeBeneficiario: 'Marlon Soares - Agenda Fácil Oficial',
+      bancoOuProcessador: 'Mercado Pago (Ag: 0001 / CC: 7731871243-4)',
+      cartaoContaDestino: 'Mercado Pago - Agência: 0001 / Conta: 7731871243-4 (Marlon Soares)',
+      instrucoesPagamento: 'O valor do cartão ou Pix é creditado diretamente na conta Mercado Pago (Ag: 0001 / Conta: 7731871243-4) do Administrador.',
       productionUrl: 'https://agenda-f-cil-sal-o.vercel.app',
       precoPlano30Dias: 30.00,
       precoPlano90Dias: 75.00,

@@ -354,18 +354,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </button>
               )}
 
-              {userRole === 'salao' && (
-                <button
-                  id="btn-action-switch-admin"
-                  onClick={() => onSelectRole('admin')}
-                  title="Acesso ao Painel de Gestão do Administrador"
-                  className="bg-slate-900 hover:bg-slate-800 text-sky-400 font-extrabold text-xs px-3 py-1.5 rounded-xl shadow-sm flex items-center gap-1.5 transition-all active:scale-95 border border-sky-500/40 shrink-0 cursor-pointer"
-                >
-                  <Crown className="w-3.5 h-3.5 text-amber-400" />
-                  <span>👑 Mudar p/ Administrador</span>
-                </button>
-              )}
-
               {userRole === 'salao' && onOpenBuyApp && (
                 <div className="inline-flex items-center shrink-0">
                   <button
