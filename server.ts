@@ -193,101 +193,149 @@ app.post("/api/send-purchase-email", async (req, res) => {
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Compra Confirmada - Agenda Fácil</title>
+  <title>Compra Confirmada - Agenda Fácil Salão & Barbearia</title>
 </head>
-<body style="font-family: Arial, sans-serif; background-color: #0f172a; color: #f8fafc; margin: 0; padding: 20px;">
-  <div style="max-width: 600px; margin: 0 auto; background-color: #1e293b; border-radius: 16px; border: 1px solid #334155; padding: 30px; box-shadow: 0 10px 25px rgba(0,0,0,0.5);">
+<body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #0b1329; color: #f8fafc; margin: 0; padding: 20px;">
+  <div style="max-width: 620px; margin: 0 auto; background-color: #111e38; border-radius: 20px; border: 1px solid #1e3a8a; padding: 30px; box-shadow: 0 20px 40px rgba(0,0,0,0.6);">
     
     <!-- Header -->
-    <div style="text-align: center; border-bottom: 1px solid #334155; padding-bottom: 20px; margin-bottom: 20px;">
-      <h1 style="color: #38bdf8; font-size: 24px; margin: 0; font-weight: 800;">💈 Agenda Fácil - Salão & Barbearia</h1>
-      <p style="color: #94a3b8; font-size: 13px; margin-top: 5px;">Notificação de Pagamento & Liberação de Licença</p>
+    <div style="text-align: center; border-bottom: 1px solid #1e293b; padding-bottom: 22px; margin-bottom: 22px;">
+      <h1 style="color: #38bdf8; font-size: 26px; margin: 0; font-weight: 900; letter-spacing: -0.5px;">💈 Agenda Fácil - Salão & Barbearia</h1>
+      <p style="color: #94a3b8; font-size: 13px; margin-top: 6px; font-weight: 500;">Notificação de Pagamento Aprovado & Liberação do Aplicativo</p>
     </div>
 
     <!-- Status Banner -->
-    <div style="background-color: rgba(16, 185, 129, 0.15); border: 1px solid #10b981; border-radius: 12px; padding: 15px; text-align: center; margin-bottom: 25px;">
-      <h2 style="color: #34d399; font-size: 18px; margin: 0; font-weight: bold;">🎉 Pagamento Realizado com Sucesso!</h2>
-      <p style="color: #e2e8f0; font-size: 13px; margin: 5px 0 0 0;">Sua licença foi ativada e seu aplicativo já está liberado para uso.</p>
+    <div style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(6, 95, 70, 0.3)); border: 1.5px solid #10b981; border-radius: 14px; padding: 16px; text-align: center; margin-bottom: 25px;">
+      <h2 style="color: #34d399; font-size: 20px; margin: 0; font-weight: 800;">🎉 Pagamento Autorizado & Salão Liberado!</h2>
+      <p style="color: #e2e8f0; font-size: 13px; margin: 6px 0 0 0;">Parabéns <strong>${ownerName || "Cliente"}</strong>! O sistema do salão <strong>"${salonName || "Seu Salão"}"</strong> já está 100% ativo e pronto para uso.</p>
     </div>
 
     <!-- Credentials Box (CPF + TOKEN) -->
-    <div style="background-color: #020617; border: 2px solid #38bdf8; border-radius: 14px; padding: 20px; margin-bottom: 25px;">
-      <h3 style="color: #f59e0b; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; margin: 0 0 15px 0;">🔑 SUAS CREDENCIAIS OFICIAIS DE ACESSO:</h3>
+    <div style="background-color: #030712; border: 2px solid #38bdf8; border-radius: 16px; padding: 20px; margin-bottom: 25px; box-shadow: 0 4px 20px rgba(56, 189, 248, 0.15);">
+      <h3 style="color: #f59e0b; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; margin: 0 0 15px 0; font-weight: 800;">🔑 SUAS CREDENCIAIS OFICIAIS DE ACESSO:</h3>
       
-      <div style="margin-bottom: 12px; background-color: #0f172a; padding: 10px 14px; border-radius: 8px; border: 1px solid #334155;">
-        <span style="color: #94a3b8; font-size: 11px; text-transform: uppercase; display: block; font-weight: bold;">1. LOGIN (SEU CPF / E-MAIL):</span>
-        <strong style="color: #38bdf8; font-size: 16px; font-family: monospace;">${displayCpf}</strong>
-        <span style="color: #64748b; font-size: 11px; display: block; margin-top: 2px;">(E-mail: ${ownerEmail})</span>
+      <div style="margin-bottom: 12px; background-color: #0f172a; padding: 12px 16px; border-radius: 10px; border: 1px solid #334155;">
+        <span style="color: #94a3b8; font-size: 11px; text-transform: uppercase; display: block; font-weight: bold;">1. LOGIN DE ACESSO (SEU CPF):</span>
+        <strong style="color: #38bdf8; font-size: 18px; font-family: monospace; display: block; margin-top: 2px;">${displayCpf}</strong>
+        <span style="color: #64748b; font-size: 11px; display: block; margin-top: 2px;">(E-mail cadastrado: ${ownerEmail})</span>
       </div>
 
-      <div style="background-color: #0f172a; padding: 10px 14px; border-radius: 8px; border: 1px dashed #10b981;">
-        <span style="color: #94a3b8; font-size: 11px; text-transform: uppercase; display: block; font-weight: bold;">2. TOKEN DE ACESSO (SUA SENHA):</span>
-        <div style="font-family: monospace; font-size: 22px; font-weight: 900; color: #34d399; letter-spacing: 2px; text-align: center; margin-top: 5px;">
+      <div style="background-color: #0f172a; padding: 14px 16px; border-radius: 10px; border: 1.5px dashed #10b981; text-align: center;">
+        <span style="color: #94a3b8; font-size: 11px; text-transform: uppercase; display: block; font-weight: bold;">2. TOKEN DE LICENÇA (SUA SENHA):</span>
+        <div style="font-family: monospace; font-size: 24px; font-weight: 900; color: #34d399; letter-spacing: 2px; margin-top: 4px;">
           ${purchaseToken}
         </div>
       </div>
     </div>
 
-    <!-- Step by Step Access Guide -->
-    <div style="background-color: #0f172a; border-radius: 12px; padding: 18px; margin-bottom: 25px; border: 1px solid #38bdf8;">
-      <h3 style="color: #38bdf8; font-size: 14px; margin: 0 0 12px 0; border-bottom: 1px solid #334155; padding-bottom: 8px;">🚀 Passo a Passo para Acessar a Plataforma:</h3>
-      <ol style="margin: 0; padding-left: 20px; color: #e2e8f0; font-size: 13px; line-height: 1.7;">
-        <li>Abra o link do aplicativo no seu celular ou computador (<a href="${appUrl}" style="color: #38bdf8; text-decoration: underline;">Clique aqui para abrir</a>).</li>
-        <li>No menu inicial, clique em <strong>"Acessar Painel do Salão"</strong> ou <strong>"Entrar"</strong>.</li>
-        <li>Informe o seu <strong>CPF</strong> (<code style="background-color: #1e293b; padding: 2px 6px; border-radius: 4px; color: #38bdf8;">${displayCpf}</code>) e o <strong>Token de Licença</strong> (<code style="background-color: #1e293b; padding: 2px 6px; border-radius: 4px; color: #34d399;">${purchaseToken}</code>).</li>
-        <li>Pronto! Você entrará no painel de administração do seu salão (<strong>${salonName || "Seu Salão"}</strong>) para gerenciar agendamentos, serviços e faturamento.</li>
-      </ol>
+    <!-- Direct Access Button CTA -->
+    <div style="text-align: center; margin-bottom: 28px;">
+      <a href="${appUrl}" target="_blank" style="display: inline-block; background: linear-gradient(135deg, #2563eb, #1d4ed8); color: #ffffff; text-decoration: none; font-weight: 900; font-size: 16px; padding: 16px 36px; border-radius: 14px; box-shadow: 0 8px 24px rgba(37, 99, 235, 0.45); text-transform: uppercase; letter-spacing: 0.5px;">
+        🚀 ACESSAR O PAINEL DO SALÃO AGORA
+      </a>
+      <p style="color: #94a3b8; font-size: 11px; margin-top: 8px;">Link do seu aplicativo: <a href="${appUrl}" style="color: #38bdf8;">${appUrl}</a></p>
+    </div>
+
+    <!-- Video Explanatory Banner -->
+    <div style="background: linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(185, 28, 28, 0.25)); border: 2px solid #ef4444; border-radius: 14px; padding: 18px; margin-bottom: 25px;">
+      <div style="display: flex; align-items: center; margin-bottom: 8px;">
+        <span style="font-size: 20px; margin-right: 8px;">🎥</span>
+        <h3 style="color: #fca5a5; font-size: 15px; margin: 0; font-weight: 800; text-transform: uppercase;">VÍDEO EXPLICATIVO (COMO USAR TODAS AS FERRAMENTAS):</h3>
+      </div>
+      <p style="color: #f1f5f9; font-size: 13px; margin: 0 0 12px 0; line-height: 1.5;">
+        Assista ao vídeo tutorial completo e aprenda em menos de 3 minutos como cadastrar serviços, gerenciar sua equipe, controlar o caixa e receber agendamentos online:
+      </p>
+      <div style="text-align: center;">
+        <a href="https://www.youtube.com/watch?v=tutorial-agenda-facil-salao" target="_blank" style="display: inline-block; background-color: #dc2626; color: #ffffff; text-decoration: none; font-weight: bold; font-size: 13px; padding: 10px 22px; border-radius: 10px; box-shadow: 0 4px 12px rgba(220, 38, 38, 0.4);">
+          ▶ Assistir ao Vídeo Explicativo no YouTube
+        </a>
+      </div>
+    </div>
+
+    <!-- Step by Step Written Guide -->
+    <div style="background-color: #070d1e; border-radius: 14px; padding: 20px; margin-bottom: 25px; border: 1px solid #1e3a8a;">
+      <h3 style="color: #38bdf8; font-size: 15px; margin: 0 0 14px 0; border-bottom: 1px solid #1e293b; padding-bottom: 8px; font-weight: 800;">
+        📱 PASSO A PASSO COMPLETO: INSTALAÇÃO & USO DO SISTEMA
+      </h3>
+
+      <div style="margin-bottom: 16px;">
+        <h4 style="color: #fbbf24; font-size: 13px; margin: 0 0 6px 0; font-weight: bold;">
+          1️⃣ Como Fazer o Primeiro Acesso:
+        </h4>
+        <p style="color: #cbd5e1; font-size: 12.5px; margin: 0; line-height: 1.6;">
+          • Acesse o link: <a href="${appUrl}" style="color: #38bdf8;">${appUrl}</a><br>
+          • Na tela de login, informe seu CPF: <code style="background-color: #1e293b; color: #38bdf8; padding: 2px 6px; border-radius: 4px;">${displayCpf}</code><br>
+          • Digite seu Token de Licença: <code style="background-color: #1e293b; color: #34d399; padding: 2px 6px; border-radius: 4px;">${purchaseToken}</code><br>
+          • Clique em <strong>"Entrar no Painel do Salão"</strong>.
+        </p>
+      </div>
+
+      <div style="margin-bottom: 16px;">
+        <h4 style="color: #fbbf24; font-size: 13px; margin: 0 0 6px 0; font-weight: bold;">
+          2️⃣ Como Instalar o Aplicativo no Celular:
+        </h4>
+        <p style="color: #cbd5e1; font-size: 12.5px; margin: 0; line-height: 1.6;">
+          • <strong>Android (Chrome):</strong> Abra o link, toque nos 3 pontinhos no canto superior direito e selecione <em>"Instalar aplicativo"</em> ou <em>"Adicionar à tela inicial"</em>.<br>
+          • <strong>iPhone (Safari):</strong> Abra o link, toque no ícone de <em>Compartilhar</em> (quadrado com seta para cima) e toque em <em>"Adicionar à Tela de Início"</em>.
+        </p>
+      </div>
+
+      <div>
+        <h4 style="color: #fbbf24; font-size: 13px; margin: 0 0 6px 0; font-weight: bold;">
+          3️⃣ Como Utilizar as Ferramentas do Seu Salão:
+        </h4>
+        <ul style="color: #cbd5e1; font-size: 12.5px; margin: 0; padding-left: 18px; line-height: 1.6;">
+          <li><strong>✂️ Serviços:</strong> Cadastre seus cortes, barbas, tratamentos e valores.</li>
+          <li><strong>👥 Equipe:</strong> Cadastre profissionais e porcentagens de comissão.</li>
+          <li><strong>📅 Agenda em Tempo Real:</strong> Visualize todos os horários e atendimentos.</li>
+          <li><strong>💰 Caixa & Financeiro:</strong> Acompanhe faturamento diário, pagamentos em Pix/Cartão e relatórios.</li>
+          <li><strong>🔗 Link dos Clientes:</strong> Compartilhe o link exclusivo do seu salão no WhatsApp e Instagram para seus clientes agendarem sozinhos 24h por dia!</li>
+        </ul>
+      </div>
     </div>
 
     <!-- Purchase Details & Validity -->
-    <div style="background-color: #0f172a; border-radius: 12px; padding: 18px; margin-bottom: 25px; border: 1px solid #334155;">
-      <h3 style="color: #cbd5e1; font-size: 14px; margin: 0 0 12px 0; border-bottom: 1px solid #334155; padding-bottom: 8px;">📋 Resumo da Compra & Vigência do Plano:</h3>
-      <table style="width: 100%; font-size: 13px; color: #cbd5e1; border-collapse: collapse;">
+    <div style="background-color: #070d1e; border-radius: 14px; padding: 18px; margin-bottom: 25px; border: 1px solid #334155;">
+      <h3 style="color: #cbd5e1; font-size: 14px; margin: 0 0 12px 0; border-bottom: 1px solid #1e293b; padding-bottom: 8px; font-weight: bold;">📋 Resumo da Compra & Vigência:</h3>
+      <table style="width: 100%; font-size: 12.5px; color: #cbd5e1; border-collapse: collapse;">
         <tr>
-          <td style="padding: 6px 0; color: #94a3b8;">Salão / Barbearia:</td>
-          <td style="padding: 6px 0; font-weight: bold; text-align: right; color: #ffffff;">${salonName || "Salão"}</td>
+          <td style="padding: 5px 0; color: #94a3b8;">Salão / Barbearia:</td>
+          <td style="padding: 5px 0; font-weight: bold; text-align: right; color: #ffffff;">${salonName || "Salão"}</td>
         </tr>
         <tr>
-          <td style="padding: 6px 0; color: #94a3b8;">Proprietário:</td>
-          <td style="padding: 6px 0; font-weight: bold; text-align: right; color: #ffffff;">${ownerName || "Cliente"}</td>
+          <td style="padding: 5px 0; color: #94a3b8;">Proprietário Titular:</td>
+          <td style="padding: 5px 0; font-weight: bold; text-align: right; color: #ffffff;">${ownerName || "Cliente"}</td>
         </tr>
         <tr>
-          <td style="padding: 6px 0; color: #94a3b8;">CPF do Comprador:</td>
-          <td style="padding: 6px 0; font-weight: bold; text-align: right; color: #38bdf8;">${displayCpf}</td>
+          <td style="padding: 5px 0; color: #94a3b8;">CPF do Comprador:</td>
+          <td style="padding: 5px 0; font-weight: bold; text-align: right; color: #38bdf8;">${displayCpf}</td>
         </tr>
         <tr>
-          <td style="padding: 6px 0; color: #94a3b8;">Plano Adquirido:</td>
-          <td style="padding: 6px 0; font-weight: bold; text-align: right; color: #38bdf8;">${planDays || 30} Dias</td>
+          <td style="padding: 5px 0; color: #94a3b8;">Plano Contratado:</td>
+          <td style="padding: 5px 0; font-weight: bold; text-align: right; color: #38bdf8;">${planDays || 30} Dias</td>
         </tr>
         <tr>
-          <td style="padding: 6px 0; color: #94a3b8;">Forma de Pagamento:</td>
-          <td style="padding: 6px 0; font-weight: bold; text-align: right; color: #f59e0b;">${paymentMethodLabel}</td>
+          <td style="padding: 5px 0; color: #94a3b8;">Forma de Pagamento:</td>
+          <td style="padding: 5px 0; font-weight: bold; text-align: right; color: #f59e0b;">${paymentMethodLabel}</td>
         </tr>
         <tr>
-          <td style="padding: 6px 0; color: #94a3b8;">Valor Pago:</td>
-          <td style="padding: 6px 0; font-weight: bold; text-align: right; color: #34d399;">${priceStr || "R$ 0,00"}</td>
+          <td style="padding: 5px 0; color: #94a3b8;">Valor Autorizado:</td>
+          <td style="padding: 5px 0; font-weight: bold; text-align: right; color: #34d399;">${priceStr || "R$ 0,00"}</td>
         </tr>
         <tr>
-          <td style="padding: 6px 0; color: #94a3b8;">Data da Compra:</td>
-          <td style="padding: 6px 0; font-weight: bold; text-align: right; color: #ffffff;">${formattedDate}</td>
+          <td style="padding: 5px 0; color: #94a3b8;">Data de Aprovação:</td>
+          <td style="padding: 5px 0; font-weight: bold; text-align: right; color: #ffffff;">${formattedDate}</td>
         </tr>
         <tr>
-          <td style="padding: 6px 0; color: #94a3b8;">Término do Plano (Vencimento):</td>
-          <td style="padding: 6px 0; font-weight: bold; text-align: right; color: #34d399; font-size: 14px;">Até ${formattedExpiry}</td>
+          <td style="padding: 5px 0; color: #94a3b8;">Validade da Licença:</td>
+          <td style="padding: 5px 0; font-weight: bold; text-align: right; color: #34d399; font-size: 13.5px;">Até ${formattedExpiry}</td>
         </tr>
       </table>
     </div>
 
-    <!-- CTA Button -->
-    <div style="text-align: center; margin-bottom: 20px;">
-      <a href="${appUrl}" target="_blank" style="display: inline-block; background-color: #2563eb; color: #ffffff; text-decoration: none; font-weight: bold; font-size: 15px; padding: 14px 28px; border-radius: 12px; box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);">
-        🚀 Acessar a Plataforma do Salão Agora
-      </a>
-    </div>
-
     <!-- Footer -->
-    <div style="text-align: center; border-top: 1px solid #334155; padding-top: 15px; font-size: 11px; color: #64748b;">
-      <p style="margin: 0;">Este e-mail é gerado automaticamente após a confirmação de compra.</p>
+    <div style="text-align: center; border-top: 1px solid #1e293b; padding-top: 16px; font-size: 11px; color: #64748b;">
+      <p style="margin: 0;">E-mail gerado automaticamente após a autorização bancária do pagamento.</p>
       <p style="margin: 4px 0 0 0;">Guarde seu CPF e Token com segurança. Eles são suas chaves de acesso permanentes.</p>
     </div>
 

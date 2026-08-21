@@ -9,7 +9,7 @@ import {
   ShoppingCart, Check, Sparkles, Mail, User, ShieldCheck, Phone, 
   FileText, Building2, Key, Copy, Clock, Send, CreditCard, QrCode, 
   ArrowLeft, Settings, Lock, CheckCircle2, DollarSign, Wallet, MapPin, Map, Hash, Search,
-  Maximize2, X, RefreshCw, AlertTriangle, CheckCircle, Link2, ExternalLink
+  Maximize2, X, RefreshCw, AlertTriangle, CheckCircle, Link2, ExternalLink, Video, Smartphone, Play
 } from 'lucide-react';
 
 interface BuyAppModalProps {
@@ -537,27 +537,34 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
 
   const handleOpenEmailClient = () => {
     if (!createdSalon) return;
-    const subject = encodeURIComponent(`🎉 Suas Credenciais de Acesso - ${createdSalon.name} (Token: ${createdSalon.purchaseToken})`);
+    const subject = encodeURIComponent(`🎉 Pagamento Confirmado! Acesse seu Salão + Passo a Passo e Vídeo Explicativo - ${createdSalon.name}`);
     const body = encodeURIComponent(`Olá ${createdSalon.ownerName},
 
-Seu pagamento foi confirmado e a licença do seu aplicativo está liberada!
+O pagamento da sua licença do Agenda Fácil foi confirmado com sucesso!
+O seu salão "${createdSalon.name}" já está 100% liberado para uso.
 
-SUAS CREDENCIAIS OFICIAIS DE ACESSO:
-- Link de Acesso: ${salonAccessUrl}
-- Login (CPF do Proprietário): ${createdSalon.ownerCpf}
-- E-mail: ${createdSalon.ownerEmail}
-- Token de Acesso (Senha): ${createdSalon.purchaseToken}
+🔑 SUAS CREDENCIAIS OFICIAIS DE ACESSO:
+• Link de Acesso Direto: ${salonAccessUrl}
+• Login (Seu CPF): ${createdSalon.ownerCpf}
+• E-mail: ${createdSalon.ownerEmail}
+• Token de Licença (Senha): ${createdSalon.purchaseToken}
+• Vigência: ${createdSalon.planDays} Dias (Até ${createdSalon.expiresAt})
 
-DADOS DA COMPRA:
-- Salão: ${createdSalon.name}
-- Plano: ${createdSalon.planDays} Dias
-- Data da Compra: ${createdSalon.purchaseDate}
-- Término do Plano (Vencimento): Até ${createdSalon.expiresAt}
+🎥 VÍDEO EXPLICATIVO (COMO USAR TODAS AS FERRAMENTAS):
+👉 Assista ao vídeo tutorial aqui: https://www.youtube.com/watch?v=tutorial-agenda-facil-salao
 
-PASSO A PASSO PARA ACESSAR:
-1. Abra o link: ${salonAccessUrl}
-2. Digite seu CPF (${createdSalon.ownerCpf}) e seu Token (${createdSalon.purchaseToken}).
-3. Pronto! Configure seu salão e comece a receber agendamentos.
+📱 PASSO A PASSO PARA INSTALAR NO CELULAR E COMPUTADOR:
+1. Abra o link do salão: ${salonAccessUrl}
+2. No Android: toque nos 3 pontinhos e clique em "Instalar aplicativo" / "Adicionar à tela inicial".
+3. No iPhone: toque em Compartilhar e selecione "Adicionar à Tela de Início".
+4. Digite seu CPF e Token para acessar seu painel sempre que quiser.
+
+✂️ COMO UTILIZAR AS FERRAMENTAS:
+- Serviços: Cadastre cortes, barbas, químicas e valores.
+- Equipe: Cadastre profissionais e comissões.
+- Agenda: Visualize e receba agendamentos em tempo real.
+- Caixa & Financeiro: Acompanhe entradas, saídas e formas de pagamento.
+- Link do Cliente: Divulgue seu link para seus clientes agendarem sozinhos 24h por dia!
 
 Guarde este e-mail para consultas futuras.`);
 
@@ -566,21 +573,25 @@ Guarde este e-mail para consultas futuras.`);
 
   const handleShareWhatsappCredentials = () => {
     if (!createdSalon) return;
-    const msg = `🎉 *COMPRA CONFIRMADA - AGENDA FÁCIL*
-Salão: *${createdSalon.name}*
+    const msg = `🎉 *PAGAMENTO CONFIRMADO - SEU SALÃO ESTÁ LIBERADO!*
 
-🔗 *Link de Acesso:*
+Olá *${createdSalon.ownerName}*, seu acesso ao aplicativo *${createdSalon.name}* está pronto!
+
+🔑 *Suas Credenciais:*
+• *Login (CPF):* ${createdSalon.ownerCpf}
+• *Token de Acesso:* ${createdSalon.purchaseToken}
+• *Validade:* ${createdSalon.planDays} Dias (Até ${createdSalon.expiresAt})
+
+🔗 *Link de Acesso Direto:*
 👉 ${salonAccessUrl}
 
-🔑 *Credenciais de Acesso:*
-- Login (CPF): *${createdSalon.ownerCpf}*
-- Token de Acesso: *${createdSalon.purchaseToken}*
-- Vigência: *${createdSalon.planDays} Dias* (Até ${createdSalon.expiresAt})
+🎥 *Vídeo Tutorial (Como usar o sistema):*
+👉 https://www.youtube.com/watch?v=tutorial-agenda-facil-salao
 
-🚀 *Como Acessar:*
-1. Abra o link de acesso acima
-2. Informe o CPF e Token de Licença
-3. Comece a usar o sistema imediatamente!`;
+📲 *Como instalar no celular:*
+1. Abra o link acima no Chrome ou Safari.
+2. Clique em "Adicionar à Tela Principal / Instalar App".
+3. Entre com seu CPF e Token para começar a gerenciar sua agenda, equipe e caixa!`;
 
     const cleanPhone = (createdSalon.ownerPhone || '').replace(/\D/g, '');
     const url = cleanPhone 
@@ -1368,25 +1379,66 @@ Salão: *${createdSalon.name}*
               </div>
             </div>
 
-            {/* Passo a Passo para Acessar */}
-            <div className="bg-slate-950 p-4 rounded-2xl border border-sky-500/40 max-w-md mx-auto text-left space-y-2 shadow-lg">
-              <div className="flex items-center gap-2 border-b border-slate-800 pb-1.5">
-                <Sparkles className="w-4 h-4 text-sky-400" />
+            {/* Video Tutorial Explicativo Banner */}
+            <div className="bg-gradient-to-r from-red-950/90 via-slate-900 to-rose-950/90 p-4 rounded-2xl border-2 border-red-500/70 max-w-md mx-auto text-left shadow-2xl space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-rose-300">
+                  <Video className="w-5 h-5 text-rose-400 shrink-0" />
+                  <h4 className="text-xs font-black uppercase tracking-wide">
+                    Vídeo Explicativo do Sistema:
+                  </h4>
+                </div>
+                <span className="text-[10px] bg-red-500/20 text-red-300 px-2 py-0.5 rounded-full font-bold border border-red-500/30">
+                  Tutorial Rápido
+                </span>
+              </div>
+              <p className="text-xs text-rose-100/90 leading-relaxed">
+                Assista ao vídeo explicativo e aprenda em menos de 3 minutos como utilizar todas as ferramentas do aplicativo no seu salão:
+              </p>
+              <a
+                href="https://www.youtube.com/watch?v=tutorial-agenda-facil-salao"
+                target="_blank"
+                rel="noreferrer"
+                className="w-full bg-red-600 hover:bg-red-500 text-white font-bold py-2.5 px-3 rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg transition-all active:scale-95 cursor-pointer"
+              >
+                <Play className="w-4 h-4 fill-white text-white" />
+                <span>Assistir ao Vídeo Explicativo no YouTube ➔</span>
+              </a>
+            </div>
+
+            {/* Passo a Passo Completo de Instalação e Utilização das Ferramentas */}
+            <div className="bg-slate-950 p-4 rounded-2xl border border-sky-500/40 max-w-md mx-auto text-left space-y-3 shadow-lg">
+              <div className="flex items-center gap-2 border-b border-slate-800 pb-2">
+                <Smartphone className="w-4 h-4 text-sky-400" />
                 <h4 className="text-xs font-black text-sky-300 uppercase tracking-wide">
-                  Passo a Passo de Acesso:
+                  Passo a Passo de Instalação & Uso:
                 </h4>
               </div>
-              <ol className="text-xs text-slate-300 space-y-1.5 pl-4 list-decimal leading-relaxed">
-                <li>
-                  Copie o seu <strong>CPF</strong> (<span className="text-sky-300 font-mono font-bold">{createdSalon?.ownerCpf}</span>) e o seu <strong>Token de Licença</strong> (<span className="text-emerald-400 font-mono font-bold">{createdSalon?.purchaseToken}</span>).
-                </li>
-                <li>
-                  Cole nos campos de acesso abaixo ou clique no botão verde de acesso imediato.
-                </li>
-                <li>
-                  Clique em <strong>"Entrar no Painel do Salão"</strong> para liberar o acesso ao salão já cadastrado!
-                </li>
-              </ol>
+
+              {/* 1. Como Instalar no Celular */}
+              <div className="space-y-1">
+                <span className="text-[11px] font-black text-amber-300 uppercase tracking-wider block">
+                  📱 Como Instalar no seu Celular:
+                </span>
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  • <strong>Android (Chrome):</strong> Abra o link do salão, toque nos 3 pontinhos do navegador e escolha <em>"Instalar aplicativo"</em> ou <em>"Adicionar à tela inicial"</em>.<br />
+                  • <strong>iPhone (Safari):</strong> Abra o link, toque no botão de Compartilhar (ícone do quadrado com a setinha) e clique em <em>"Adicionar à Tela de Início"</em>.
+                </p>
+              </div>
+
+              {/* 2. Como Utilizar as Ferramentas */}
+              <div className="space-y-1 border-t border-slate-900 pt-2">
+                <span className="text-[11px] font-black text-emerald-300 uppercase tracking-wider block">
+                  ✂️ Como Utilizar as Ferramentas do Salão:
+                </span>
+                <ul className="text-xs text-slate-300 space-y-1 pl-4 list-disc leading-relaxed">
+                  <li><strong>Serviços:</strong> Cadastre serviços com valor e duração.</li>
+                  <li><strong>Equipe:</strong> Adicione barbeiros/cabeleireiros e porcentagem de comissão.</li>
+                  <li><strong>Agenda em Tempo Real:</strong> Controle horários e novos agendamentos.</li>
+                  <li><strong>Caixa & Financeiro:</strong> Acompanhe faturamento diário em Pix, Cartão e Dinheiro.</li>
+                  <li><strong>Link do Cliente:</strong> Compartilhe o link do seu salão no WhatsApp e Instagram para seus clientes agendarem 24h por dia sozinhos!</li>
+                </ul>
+              </div>
             </div>
 
             {/* Tela de Acesso Integrada (Formulário Direto com CPF e Token) */}
