@@ -211,6 +211,12 @@ export interface AdminPaymentConfig {
   precoPlano180Dias?: number; // Plano 3: 6 Meses / 180 Dias (padrão: 135.00)
   precoPlano365Dias?: number; // Plano 4: 1 Ano / 365 Dias (padrão: 240.00)
   videoTutorialConfig?: VideoTutorialConfig; // Configuração do Vídeo Tutorial & Narração pelo Administrador
+  // Webhook Security & Gateway Integration (HMAC-SHA256 & PCI-DSS)
+  webhookSecret?: string;
+  webhookUrl?: string;
+  gatewayProvider?: 'mercadopago' | 'asaas' | 'efi_bank' | 'bacen_pix_direct' | 'personalizado';
+  bacenPixClientId?: string;
+  bacenPixCertificateConfigured?: boolean;
 }
 
 export interface ChatMessage {

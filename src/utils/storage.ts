@@ -399,7 +399,12 @@ export const Storage = {
       precoPlano30Dias: 30.00,
       precoPlano90Dias: 75.00,
       precoPlano180Dias: 135.00,
-      precoPlano365Dias: 240.00
+      precoPlano365Dias: 240.00,
+      webhookSecret: '',
+      webhookUrl: '/api/webhook/payment',
+      gatewayProvider: 'mercadopago',
+      bacenPixClientId: '',
+      bacenPixCertificateConfigured: false
     };
     if (!saved) return defaults;
     try {

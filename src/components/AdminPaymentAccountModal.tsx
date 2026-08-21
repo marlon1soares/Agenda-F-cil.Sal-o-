@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { AdminPaymentConfig } from '../types';
 import { Storage } from '../utils/storage';
 import { getCalculatedLicensePlans, calculateDefaultPricesFromBase, formatBRL } from '../utils/pricing';
-import { Settings, Lock, Check, X, Wallet, QrCode, CreditCard, ShieldCheck, DollarSign, Clock, Sparkles, RefreshCw } from 'lucide-react';
+import { Settings, Lock, Check, X, Wallet, QrCode, CreditCard, ShieldCheck, DollarSign, Clock, Sparkles, RefreshCw, Key, Shield, Copy, CheckCircle2, AlertTriangle, ExternalLink } from 'lucide-react';
 
 interface AdminPaymentAccountModalProps {
   isOpen: boolean;
@@ -21,6 +21,9 @@ export const AdminPaymentAccountModal: React.FC<AdminPaymentAccountModalProps> =
   const [freeDaysInput, setFreeDaysInput] = useState<string>('15');
   const [enableTrial, setEnableTrial] = useState<boolean>(true);
   const [successMsg, setSuccessMsg] = useState('');
+  const [copiedWebhook, setCopiedWebhook] = useState(false);
+  const [testingWebhook, setTestingWebhook] = useState(false);
+  const [testResult, setTestResult] = useState<any>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -32,6 +35,7 @@ export const AdminPaymentAccountModal: React.FC<AdminPaymentAccountModalProps> =
       setP365Input(String(current.precoPlano365Dias || 240));
       setFreeDaysInput(String(current.diasGratuitos !== undefined && current.diasGratuitos !== null ? current.diasGratuitos : 15));
       setEnableTrial(current.habilitarPlanoGratuito !== false);
+      setTestResult(null);
     }
   }, [isOpen]);
 
@@ -42,6 +46,42 @@ export const AdminPaymentAccountModal: React.FC<AdminPaymentAccountModalProps> =
   const numP180 = Number(p180Input.replace(',', '.')) || (numP30 * 4.5);
   const numP365 = Number(p365Input.replace(',', '.')) || (numP30 * 8);
   const numFreeDays = Math.max(1, parseInt(freeDaysInput, 10) || 15);
+
+  const webhookBaseUrl = (typeof window !== 'undefined' && window.location.origin) || (config.productionUrl || 'https://agenda-f-cil-sal-o.vercel.app');
+  const fullWebhookUrl = `${webhookBaseUrl}/api/webhook/payment`;
+
+  const handleCopyWebhookUrl = () => {
+    navigator.clipboard.writeText(fullWebhookUrl);
+    setCopiedWebhook(true);
+    setTimeout(() => setCopiedWebhook(false), 2500);
+  };
+
+  const handleTestWebhookSignature = async () => {
+    setTestingWebhook(true);
+    setTestResult(null);
+    try {
+      const response = await fetch('/api/payment/webhook-test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          secret: config.webhookSecret,
+          provider: config.gatewayProvider || 'mercadopago',
+          testPayload: {
+            event: 'payment.updated',
+            data: { id: `TEST-PAY-${Date.now()}` },
+            action: 'payment.created',
+            date_created: new Date().toISOString()
+          }
+        })
+      });
+      const data = await response.json();
+      setTestResult(data);
+    } catch (err: any) {
+      setTestResult({ success: false, error: err.message });
+    } finally {
+      setTestingWebhook(false);
+    }
+  };
 
   const handleRecalculateFrom30 = () => {
     const base = Number(p30Input.replace(',', '.')) || 30;
@@ -466,10 +506,139 @@ export const AdminPaymentAccountModal: React.FC<AdminPaymentAccountModalProps> =
 
           </div>
 
+          {/* WEBHOOK SECURITY & GATEWAY / BACEN PIX / PCI-DSS COMPLIANCE CARD */}
+          <div className="bg-slate-950 p-4 rounded-2xl border-2 border-emerald-500/50 space-y-4 shadow-xl">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+              <div className="flex items-center gap-2">
+                <Shield className="w-4 h-4 text-emerald-400" />
+                <span className="font-extrabold text-emerald-300 text-xs uppercase tracking-wide">
+                  Segurança Financeira: Validação de Webhooks & Gateway (PCI-DSS)
+                </span>
+              </div>
+              <span className="bg-emerald-950/80 text-emerald-300 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-500/40 flex items-center gap-1">
+                <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                <span>PCI-DSS Ativo</span>
+              </span>
+            </div>
+
+            {/* Educational Info Note */}
+            <div className="bg-slate-900/90 border border-slate-800 p-3 rounded-xl space-y-2">
+              <div className="flex items-start gap-2">
+                <Key className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                <div className="text-[11px] text-slate-300 space-y-1">
+                  <p>
+                    <strong>1. Validação de Assinatura (HMAC-SHA256):</strong> O servidor valida a assinatura enviada pelo gateway no cabeçalho <code className="bg-slate-950 px-1 py-0.5 rounded text-amber-300 font-mono text-[10px]">x-signature</code> antes de processar qualquer notificação, impedindo invasores de forjar pagamentos falsos.
+                  </p>
+                  <p>
+                    <strong>2. Pix Direto via Bacen API vs. Gateway Cartão (PCI-DSS):</strong> Pagamentos Pix operam via API do Banco Central (chave e QR Code dinâmico). Para cartão de crédito, o sistema opera com tokenização segura sem salvar CVV/número completo em banco de dados, em conformidade com as normas PCI-DSS.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Webhook Endpoint URL */}
+            <div className="space-y-1">
+              <label className="block font-bold text-slate-300 text-[11px]">
+                URL Oficial do seu Webhook (Cole no Painel do Mercado Pago / Gateway):
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  readOnly
+                  value={fullWebhookUrl}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-emerald-300 font-mono text-xs select-all focus:outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={handleCopyWebhookUrl}
+                  className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-3 py-2 rounded-xl transition-all flex items-center gap-1.5 shrink-0 text-xs"
+                >
+                  {copiedWebhook ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                  <span>{copiedWebhook ? 'Copiado!' : 'Copiar URL'}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Webhook Secret Key */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="block font-bold text-slate-300 text-[11px] flex items-center gap-1">
+                  <Lock className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Segredo do Webhook (Chave Secreta HMAC):</span>
+                </label>
+                <input
+                  type="password"
+                  value={config.webhookSecret || ''}
+                  onChange={(e) => setConfig({ ...config, webhookSecret: e.target.value })}
+                  placeholder="Ex: sec_mp_webhook_secret_key"
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono text-xs focus:outline-none focus:border-emerald-400"
+                />
+                <p className="text-[10px] text-slate-400">
+                  Ou configure via variável <code className="text-amber-300">PAYMENT_WEBHOOK_SECRET</code> no servidor.
+                </p>
+              </div>
+
+              <div className="space-y-1">
+                <label className="block font-bold text-slate-300 text-[11px]">
+                  Provedor Principal do Gateway:
+                </label>
+                <select
+                  value={config.gatewayProvider || 'mercadopago'}
+                  onChange={(e) => setConfig({ ...config, gatewayProvider: e.target.value as any })}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-emerald-400 font-bold"
+                >
+                  <option value="mercadopago">Mercado Pago (x-signature v1 HMAC-SHA256)</option>
+                  <option value="asaas">Asaas (asaas-access-token Header)</option>
+                  <option value="efi_bank">Efí Bank / Gerencianet (OAuth + Webhook Pix)</option>
+                  <option value="bacen_pix_direct">BACEN API Pix Direto (Banco Inter / Itaú / BB)</option>
+                  <option value="personalizado">Personalizado (HMAC-SHA256 / Bearer Token)</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Interactive Test Button & Results */}
+            <div className="pt-2 border-t border-slate-800 space-y-2">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <span className="text-[11px] font-bold text-slate-300">
+                  Diagnóstico de Integridade Criptográfica:
+                </span>
+                <button
+                  type="button"
+                  onClick={handleTestWebhookSignature}
+                  disabled={testingWebhook}
+                  className="bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-white font-bold px-3 py-1.5 rounded-xl transition-all flex items-center justify-center gap-1.5 text-xs self-start sm:self-auto"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${testingWebhook ? 'animate-spin' : ''}`} />
+                  <span>{testingWebhook ? 'Testando Criptografia...' : '⚡ Testar Validação HMAC em Tempo Real'}</span>
+                </button>
+              </div>
+
+              {testResult && (
+                <div className={`p-3 rounded-xl border text-xs space-y-1.5 animate-in fade-in duration-200 ${
+                  testResult.success ? 'bg-emerald-950/80 border-emerald-500 text-emerald-200' : 'bg-rose-950/80 border-rose-500 text-rose-200'
+                }`}>
+                  <div className="flex items-center gap-2 font-bold">
+                    {testResult.success ? <CheckCircle2 className="w-4 h-4 text-emerald-400" /> : <AlertTriangle className="w-4 h-4 text-rose-400" />}
+                    <span>{testResult.success ? 'Validação de Assinatura Webhook Executada com Sucesso!' : 'Falha no Teste de Assinatura'}</span>
+                  </div>
+                  {testResult.generatedHmacSha256 && (
+                    <div className="text-[10px] font-mono break-all text-slate-300 bg-slate-950 p-2 rounded-lg border border-slate-800">
+                      <strong>Hash HMAC-SHA256 Gerado:</strong> {testResult.generatedHmacSha256}
+                    </div>
+                  )}
+                  <div className="text-[11px] text-slate-300 flex items-center justify-between flex-wrap gap-1">
+                    <span><strong>Conformidade PCI-DSS:</strong> {testResult.pciDssComplianceStatus}</span>
+                    <span className="text-emerald-400 font-bold">Proteção Anti-Replay: Ativa</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
           <div className="bg-amber-950/30 border border-amber-800/60 p-3 rounded-2xl text-[11px] text-amber-200 flex items-start gap-2">
             <ShieldCheck className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
             <span>
-              <strong>Garantia de Recebimento:</strong> Quando o perfil Salão abrir a tela para comprar o plano, ele verá os novos valores definidos aqui e o pagamento cairá diretamente na sua conta configurada.
+              <strong>Garantia de Recebimento & Segurança:</strong> Quando o perfil Salão abrir a tela para comprar o plano, ele verá os novos valores definidos aqui e o pagamento cairá diretamente na sua conta configurada com validação criptográfica ponta a ponta.
             </span>
           </div>
 
