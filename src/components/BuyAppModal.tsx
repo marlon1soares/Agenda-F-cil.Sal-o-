@@ -59,85 +59,57 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
     userRole === 'admin' ||
     isSessionAdmin ||
     isAdminCpf(cpf) ||
-    isAdminIdentifier({ cpf, email, phone }) ||
-    (activeSalon?.ownerCpf && isAdminCpf(activeSalon.ownerCpf))
+    isAdminIdentifier({ cpf, email, phone })
   );
 
-  // Check if current salon/context has already used the 15-day trial (Only restricts non-admin regular users)
+  // Check if current CPF has already used the 15-day trial (Only restricts non-admin regular users)
   // Administradores possuem liberação total e ilimitada dos 15 dias gratuitos sempre que precisarem!
   const isTrialAlreadyUsed = !isUserAdmin && Boolean(
-    (activeSalon && (
-      activeSalon.isTrial ||
-      activeSalon.planDays === 15 ||
-      activeSalon.trialStartedAt ||
-      activeSalon.status === 'blocked' ||
-      activeSalon.status === 'expired'
-    )) ||
-    (cpf.trim().length >= 11 && hasCpfUsedTrial(cpf, activeSalon?.id, userRole))
+    (cpf.trim().length >= 11 && hasCpfUsedTrial(cpf, undefined, userRole))
   );
 
-  // Auto-populate from URL query params or activeSalon if opened from a direct link / renewal
+  // Ensure all form fields ALWAYS start completely blank for every new buyer
   useEffect(() => {
     if (isOpen) {
       setStep('form');
       setError('');
 
-      if (activeSalon) {
-        setName(activeSalon.ownerName || '');
-        setRg(activeSalon.ownerRg || '');
-        setCpf(activeSalon.ownerCpf || '');
-        setEmail(activeSalon.ownerEmail || '');
-        setPhone(activeSalon.ownerPhone || '');
-        setSalonName(activeSalon.name || '');
-        setCep(activeSalon.cep || '');
-        setLogradouro(activeSalon.logradouro || '');
-        setNumero(activeSalon.numero || '');
-        setBairro(activeSalon.bairro || '');
-        setCidade(activeSalon.cidade || '');
-        setUf(activeSalon.uf || '');
+      // Form MUST be completely blank for new salon buyers - no previous data
+      setName('');
+      setRg('');
+      setCpf('');
+      setEmail('');
+      setPhone('');
+      setSalonName('');
+      setCep('');
+      setLogradouro('');
+      setNumero('');
+      setBairro('');
+      setCidade('');
+      setUf('');
+      setCardNumber('');
+      setCardHolder('');
+      setCardExpiry('');
+      setCardCvv('');
 
-        if (isTrialAlreadyUsed && !isUserAdmin) {
-          setPlanDays(30);
-        } else {
-          setPlanDays(15);
-        }
-      } else {
-        setPlanDays(15);
-      }
-
+      // Default plan selection (respects optional query param e.g. ?plano=30, otherwise default to 15)
       try {
         const planParam = getUrlParam('plano') || getUrlParam('plan') || getUrlParam('dias');
         if (planParam) {
           const days = parseInt(planParam, 10);
           if ([15, 30, 90, 180, 365].includes(days)) {
-            if (days === 15 && isTrialAlreadyUsed && !isUserAdmin) {
-              setPlanDays(30);
-            } else {
-              setPlanDays(days);
-            }
+            setPlanDays(days);
+          } else {
+            setPlanDays(15);
           }
-        }
-        const salonNameParam = getUrlParam('salao') || getUrlParam('nome_salao') || getUrlParam('salon_name');
-        if (salonNameParam && !salonName) {
-          setSalonName(decodeURIComponent(salonNameParam));
-        }
-        const ownerNameParam = getUrlParam('nome') || getUrlParam('comprador') || getUrlParam('owner');
-        if (ownerNameParam && !name) {
-          setName(decodeURIComponent(ownerNameParam));
-        }
-        const phoneParam = getUrlParam('phone') || getUrlParam('whatsapp') || getUrlParam('telefone') || getUrlParam('celular');
-        if (phoneParam && !phone) {
-          setPhone(phoneParam);
-        }
-        const emailParam = getUrlParam('email');
-        if (emailParam && !email) {
-          setEmail(emailParam);
+        } else {
+          setPlanDays(15);
         }
       } catch {
-        // silence URL parsing error
+        setPlanDays(15);
       }
     }
-  }, [isOpen, activeSalon]);
+  }, [isOpen]);
 
   // Auto-fill CEP via ViaCEP
   const handleCepChange = async (val: string) => {
@@ -298,7 +270,7 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
           logradouro: finalLogradouro,
           numero: finalNumero
         },
-        activeSalon?.id,
+        undefined,
         userRole
       );
 
@@ -413,11 +385,11 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
       const currentSalons = Storage.getSalons();
       const cleanReqCpf = cpf.replace(/\D/g, '').trim();
 
-      // Check if we are unblocking/renewing an existing salon
-      const existingSalon = activeSalon || currentSalons.find(s => {
+      // Check if we are unblocking/renewing an existing salon by matching the buyer's CPF
+      const existingSalon = cleanReqCpf ? currentSalons.find(s => {
         const sCpf = (s.ownerCpf || '').replace(/\D/g, '').trim();
         return sCpf && sCpf === cleanReqCpf;
-      });
+      }) : undefined;
 
       const currentPlanDetails = getPlanPriceDetails(planDays);
 
