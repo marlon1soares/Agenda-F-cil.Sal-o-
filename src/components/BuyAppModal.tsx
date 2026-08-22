@@ -10,8 +10,8 @@ import { VideoTutorialModal } from './VideoTutorialModal';
 import { 
   ShoppingCart, Check, Sparkles, Mail, User, ShieldCheck, Phone, 
   FileText, Building2, Key, Copy, Clock, Send, CreditCard, QrCode, 
-  ArrowLeft, Settings, Lock, CheckCircle2, DollarSign, Wallet, MapPin, Map, Hash, Search,
-  Maximize2, X, RefreshCw, AlertTriangle, CheckCircle, Link2, ExternalLink, Video, Smartphone, Play
+  ArrowLeft, Settings, Lock, Unlock, CheckCircle2, DollarSign, Wallet, MapPin, Map, Hash, Search,
+  Maximize2, X, RefreshCw, AlertTriangle, CheckCircle, Link2, ExternalLink, Video, Smartphone, Play, Radio
 } from 'lucide-react';
 
 interface BuyAppModalProps {
@@ -383,36 +383,57 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
     }
   };
 
-  // Real-Time Polling for Bank Confirmation (Pix)
+  // Real-Time Polling & SSE Listener for Direct Bank Notification (Pix & Card Webhooks)
   useEffect(() => {
     let interval: any = null;
 
-    if (isOpen && step === 'payment' && paymentMethod === 'pix' && activeOrderId && bankOrderStatus === 'waiting_bank' && !isAutoAdvancing) {
+    const handleBankNotificationReceived = (confirmedOrder: any) => {
+      if (interval) clearInterval(interval);
+      setBankOrderStatus('bank_confirmed');
+      setBankReceipt(confirmedOrder);
+      setIsAutoAdvancing(true);
+
+      // Auto-advance after 1.8 seconds displaying the official bank authorization code
+      setTimeout(() => {
+        executeSalonActivationAndAdvance(confirmedOrder);
+      }, 1800);
+    };
+
+    // 1. Polling interval to query bank order status from server
+    if (isOpen && step === 'payment' && activeOrderId && bankOrderStatus === 'waiting_bank' && !isAutoAdvancing) {
       interval = setInterval(async () => {
         try {
           const res = await fetch(`/api/payment/orders/${activeOrderId}`);
           if (res.ok) {
             const data = await res.json();
             if (data.isConfirmed || (data.order && data.order.status === 'CONFIRMED_BY_BANK')) {
-              clearInterval(interval);
-              setBankOrderStatus('bank_confirmed');
-              setBankReceipt(data.order);
-              setIsAutoAdvancing(true);
-
-              // Auto-advance after 1.5 seconds displaying the bank receipt
-              setTimeout(() => {
-                executeSalonActivationAndAdvance(data.order);
-              }, 1500);
+              handleBankNotificationReceived(data.order);
             }
           }
         } catch (err) {
           // Keep polling silently
         }
-      }, 2000);
+      }, 1500);
     }
+
+    // 2. Window SSE Event listener for instant notification when bank webhook lands
+    const handleSyncEvent = (e: any) => {
+      try {
+        const state = e.detail?.state;
+        if (state && state.paymentOrders && activeOrderId && state.paymentOrders[activeOrderId]) {
+          const order = state.paymentOrders[activeOrderId];
+          if (order.status === 'CONFIRMED_BY_BANK' && bankOrderStatus === 'waiting_bank') {
+            handleBankNotificationReceived(order);
+          }
+        }
+      } catch {}
+    };
+
+    window.addEventListener('salao_sync_data', handleSyncEvent);
 
     return () => {
       if (interval) clearInterval(interval);
+      window.removeEventListener('salao_sync_data', handleSyncEvent);
     };
   }, [isOpen, step, paymentMethod, activeOrderId, bankOrderStatus, isAutoAdvancing]);
 
@@ -1386,19 +1407,32 @@ Olá *${createdSalon.ownerName}*, seu acesso ao aplicativo *${createdSalon.name}
 
                 {/* AUTOMATED BANK CONFIRMATION RADAR */}
                 {bankOrderStatus === 'bank_confirmed' ? (
-                  <div className="bg-emerald-950/90 border-2 border-emerald-400 p-4 rounded-2xl text-center space-y-2 shadow-2xl animate-pulse">
+                  <div className="bg-emerald-950/90 border-2 border-emerald-400 p-4 rounded-2xl text-center space-y-2.5 shadow-2xl animate-pulse">
                     <div className="flex items-center justify-center gap-2 text-emerald-300 font-black text-sm sm:text-base">
                       <CheckCircle2 className="w-6 h-6 text-emerald-400" />
-                      <span>PAGAMENTO CONFIRMADO PELO BANCO!</span>
+                      <span>NOTIFICAÇÃO RECEBIDA: PAGAMENTO CONFIRMADO PELO BANCO!</span>
                     </div>
                     <p className="text-xs text-emerald-100 font-medium">
-                      O banco confirmou o recebimento de <strong>{currentPlan.priceStr}</strong> creditado na conta de <strong>{adminPaymentConfig.nomeBeneficiario}</strong>.
+                      O Banco Central / Gateway notificou e confirmou o crédito de <strong>{currentPlan.priceStr}</strong> na conta de <strong>{adminPaymentConfig.nomeBeneficiario}</strong>.
                     </p>
                     {bankReceipt?.bankReceiptCode && (
-                      <div className="text-[10px] font-mono bg-slate-950/80 px-2 py-1 rounded text-emerald-400 border border-emerald-800/60 inline-block">
-                        Autenticação Bancária: {bankReceipt.bankReceiptCode}
+                      <div className="text-[10px] font-mono bg-slate-950/80 px-2.5 py-1 rounded-xl text-emerald-400 border border-emerald-800/60 inline-block font-bold">
+                        Código de Autorização Bancária: {bankReceipt.bankReceiptCode}
                       </div>
                     )}
+
+                    {/* Botão Oficial Desbloqueado pelo Banco */}
+                    <div className="pt-2">
+                      <button
+                        type="button"
+                        onClick={() => executeSalonActivationAndAdvance(bankReceipt)}
+                        className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3.5 px-4 rounded-2xl text-xs sm:text-sm shadow-xl shadow-emerald-950/60 transition-all flex items-center justify-center gap-2 active:scale-95 cursor-pointer border-2 border-emerald-400"
+                      >
+                        <Unlock className="w-5 h-5 text-white" />
+                        <span>🔓 LIBERADO PELO BANCO: Acessar Meu Salão Agora</span>
+                      </button>
+                    </div>
+
                     <p className="text-xs text-amber-300 font-bold animate-bounce pt-1">
                       🚀 Avançando automaticamente para a liberação do seu Salão...
                     </p>
@@ -1411,54 +1445,52 @@ Olá *${createdSalon.ownerName}*, seu acesso ao aplicativo *${createdSalon.name}
                           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                           <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
                         </span>
-                        <span>Aguardando Confirmação do Banco...</span>
+                        <span>Aguardando Notificação Bancária Automática...</span>
                       </div>
-                      <span className="text-[10px] text-slate-400 font-mono">Status: Monitorando</span>
+                      <span className="text-[10px] text-emerald-400/90 font-mono bg-emerald-950/60 px-2 py-0.5 rounded-md border border-emerald-800/50 flex items-center gap-1">
+                        <Radio className="w-3 h-3 animate-pulse text-emerald-400" />
+                        <span>Radar Bacen Ativo</span>
+                      </span>
                     </div>
 
                     <p className="text-[11px] text-slate-300 leading-relaxed">
-                      O sistema está monitorando o crédito na conta do administrador. <strong>Assim que o banco confirmar o recebimento do Pix, o sistema avançará automaticamente para a próxima etapa.</strong>
+                      O sistema está conectado em tempo real aguardando a notificação do banco. <strong>Assim que o banco registrar o crédito na conta do administrador, o código de comunicação do banco liberará o botão e seu salão automaticamente.</strong>
                     </p>
 
-                    {/* Live Banking Instructions */}
-                    <div className="bg-slate-950/60 p-3 rounded-xl border border-slate-800 text-[11px] text-slate-300 space-y-1">
-                      <div className="flex items-center gap-1.5 text-emerald-400 font-bold">
-                        <Clock className="w-3.5 h-3.5" />
-                        <span>Confirmação Bancária Instantânea</span>
-                      </div>
-                      <p className="text-slate-400 text-[10px] leading-relaxed">
-                        Faça o Pix pelo aplicativo do seu banco. A confirmação do banco é automática e instantânea — não é necessário enviar comprovante. Assim que o valor for creditado na conta, sua liberação ocorrerá imediatamente.
-                      </p>
-                    </div>
-
-                    {/* Botão de Confirmação Imediata do Pagamento */}
-                    <div className="pt-2">
+                    {/* Botão Travado / Bloqueado para o Cliente */}
+                    <div className="pt-1">
                       <button
                         type="button"
-                        onClick={handleSimulateBankPixDeposit}
-                        disabled={isSimulatingPix || isAutoAdvancing}
-                        className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-800 text-white font-black py-3.5 px-4 rounded-2xl text-xs sm:text-sm shadow-xl shadow-emerald-950/60 transition-all flex items-center justify-center gap-2 active:scale-95 cursor-pointer border border-emerald-400/50"
+                        disabled={true}
+                        className="w-full bg-slate-950/90 border-2 border-slate-800 text-slate-400 font-bold py-3.5 px-4 rounded-2xl text-xs sm:text-sm shadow-inner flex flex-col items-center justify-center gap-1 cursor-not-allowed opacity-90 select-none"
                       >
-                        {isSimulatingPix || isAutoAdvancing ? (
-                          <>
-                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                            <span>Validando Crédito com o Banco e Liberando Salão...</span>
-                          </>
-                        ) : (
-                          <>
-                            <CheckCircle2 className="w-5 h-5 text-white" />
-                            <span>✅ Já Fiz o Pix / Confirmar com o Banco (Validar Crédito)</span>
-                          </>
-                        )}
+                        <div className="flex items-center gap-2 text-slate-300 font-black">
+                          <Lock className="w-4 h-4 text-amber-400" />
+                          <span>🔒 Botão Bloqueado: Aguardando Notificação do Banco...</span>
+                        </div>
+                        <span className="text-[10px] text-slate-400 font-normal text-center">
+                          Liberado automaticamente pela comunicação do banco assim que cair o Pix na conta
+                        </span>
                       </button>
                     </div>
 
-                    {/* Link de Confirmação Direto */}
+                    {/* Instruções Oficiais de Segurança Bancária */}
+                    <div className="bg-slate-950/80 p-3 rounded-xl border border-slate-800 text-[11px] text-slate-300 space-y-1">
+                      <div className="flex items-center gap-1.5 text-amber-400 font-bold">
+                        <ShieldCheck className="w-3.5 h-3.5" />
+                        <span>Liberação Exclusiva por Notificação Bancária</span>
+                      </div>
+                      <p className="text-slate-400 text-[10px] leading-relaxed">
+                        Faça o Pix pelo aplicativo do seu banco. O cliente e o administrador não liberam este botão manualmente: a liberação é acionada instantaneamente pela notificação direta do banco quando o valor de <strong>{currentPlan.priceStr}</strong> é creditado na conta de <strong>{adminPaymentConfig.nomeBeneficiario}</strong>.
+                      </p>
+                    </div>
+
+                    {/* Link de Acompanhamento Direto */}
                     <div className="bg-slate-950/90 p-3 rounded-xl border border-slate-800 text-[11px] space-y-1.5">
                       <div className="flex items-center justify-between text-[10px] text-slate-400 font-bold uppercase">
                         <span className="flex items-center gap-1 text-slate-300">
                           <Link2 className="w-3.5 h-3.5 text-emerald-400" />
-                          <span>Link de Confirmação Direto do Pedido:</span>
+                          <span>Link de Acompanhamento do Pedido:</span>
                         </span>
                         {copiedConfirmLink && <span className="text-emerald-400 font-bold">Copiado!</span>}
                       </div>
@@ -1482,6 +1514,21 @@ Olá *${createdSalon.ownerName}*, seu acesso ao aplicativo *${createdSalon.name}
                         </button>
                       </div>
                     </div>
+
+                    {/* Ferramenta de Teste de Webhook (Apenas para Testes/Administração) */}
+                    {(userRole === 'admin' || isAdminCpf(cpf) || Boolean(getUrlParam('teste-banco'))) && (
+                      <div className="pt-1 border-t border-slate-800/80">
+                        <button
+                          type="button"
+                          onClick={handleSimulateBankPixDeposit}
+                          disabled={isSimulatingPix || isAutoAdvancing}
+                          className="w-full bg-slate-900 hover:bg-slate-800 border border-slate-700 text-sky-300 text-[10px] py-1.5 px-2 rounded-xl flex items-center justify-center gap-1 cursor-pointer transition-colors"
+                        >
+                          <Radio className="w-3 h-3 text-sky-400 animate-pulse" />
+                          <span>🧪 [Ambiente de Teste] Enviar Notificação Webhook do Banco Central para Desbloquear Botão</span>
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -1597,37 +1644,61 @@ Olá *${createdSalon.ownerName}*, seu acesso ao aplicativo *${createdSalon.name}
 
                 {/* Card Confirmation Status or Action Button */}
                 {bankOrderStatus === 'bank_confirmed' ? (
-                  <div className="bg-emerald-950/90 border-2 border-emerald-400 p-4 rounded-2xl text-center space-y-2 shadow-2xl animate-pulse">
+                  <div className="bg-emerald-950/90 border-2 border-emerald-400 p-4 rounded-2xl text-center space-y-2.5 shadow-2xl animate-pulse">
                     <div className="flex items-center justify-center gap-2 text-emerald-300 font-black text-sm sm:text-base">
                       <CheckCircle2 className="w-6 h-6 text-emerald-400" />
-                      <span>TRANSAÇÃO DE CARTÃO AUTORIZADA PELO BANCO!</span>
+                      <span>AUTORIZAÇÃO BANCÁRIA CONFIRMADA: CARTÃO APROVADO!</span>
                     </div>
                     <p className="text-xs text-emerald-100 font-medium">
-                      O valor de <strong>{currentPlan.priceStr}</strong> foi creditado com sucesso na conta do Administrador (<strong>{adminPaymentConfig.nomeBeneficiario}</strong>).
+                      O valor de <strong>{currentPlan.priceStr}</strong> foi processado e creditado com sucesso na conta do Administrador (<strong>{adminPaymentConfig.nomeBeneficiario}</strong>).
                     </p>
+                    {bankReceipt?.bankReceiptCode && (
+                      <div className="text-[10px] font-mono bg-slate-950/80 px-2.5 py-1 rounded-xl text-emerald-400 border border-emerald-800/60 inline-block font-bold">
+                        Código de Autorização Bancária: {bankReceipt.bankReceiptCode}
+                      </div>
+                    )}
+                    <div className="pt-2">
+                      <button
+                        type="button"
+                        onClick={() => executeSalonActivationAndAdvance(bankReceipt)}
+                        className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3.5 px-4 rounded-2xl text-xs sm:text-sm shadow-xl shadow-emerald-950/60 transition-all flex items-center justify-center gap-2 active:scale-95 cursor-pointer border-2 border-emerald-400"
+                      >
+                        <Unlock className="w-5 h-5 text-white" />
+                        <span>🔓 LIBERADO PELO BANCO: Acessar Meu Salão Agora</span>
+                      </button>
+                    </div>
                     <p className="text-xs text-amber-300 font-bold animate-bounce pt-1">
                       🚀 Avançando automaticamente para a liberação do seu Salão...
                     </p>
                   </div>
                 ) : (
-                  <button
-                    type="button"
-                    onClick={handleProcessCardPayment}
-                    disabled={isProcessingCard || isAutoAdvancing}
-                    className="w-full bg-blue-600 hover:bg-blue-500 disabled:bg-slate-800 text-white font-black py-3 rounded-2xl text-xs sm:text-sm shadow-xl transition-all flex items-center justify-center gap-2 active:scale-95 cursor-pointer mt-2"
-                  >
-                    {isProcessingCard ? (
-                      <>
-                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                        <span>Validando com o Banco e Confirmando Crédito...</span>
-                      </>
-                    ) : (
-                      <>
-                        <CreditCard className="w-4 h-4 text-blue-200" />
-                        <span>Processar Pagamento de {currentPlan.priceStr} com o Banco</span>
-                      </>
-                    )}
-                  </button>
+                  <div className="space-y-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={handleProcessCardPayment}
+                      disabled={isProcessingCard || isAutoAdvancing}
+                      className="w-full bg-blue-600 hover:bg-blue-500 disabled:bg-slate-800 text-white font-black py-3.5 px-4 rounded-2xl text-xs sm:text-sm shadow-xl transition-all flex items-center justify-center gap-2 active:scale-95 cursor-pointer border border-blue-400/40"
+                    >
+                      {isProcessingCard ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          <span>Comunicando com o Banco e Validando Crédito na Conta...</span>
+                        </>
+                      ) : (
+                        <>
+                          <CreditCard className="w-4 h-4 text-blue-200" />
+                          <span>Enviar ao Banco para Autorização e Liberação</span>
+                        </>
+                      )}
+                    </button>
+
+                    <div className="bg-slate-950/80 p-2.5 rounded-xl border border-slate-800 text-[10px] text-slate-400 flex items-center gap-2">
+                      <ShieldCheck className="w-4 h-4 text-blue-400 shrink-0" />
+                      <span>
+                        A liberação do sistema é acionada estritamente pela resposta de autorização bancária que confirma o crédito do valor.
+                      </span>
+                    </div>
+                  </div>
                 )}
 
               </div>
