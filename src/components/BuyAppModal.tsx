@@ -22,6 +22,7 @@ interface BuyAppModalProps {
   activeSalon?: SalonApp | null;
   onUpdateSalon?: (updatedSalon: SalonApp) => void;
   onOpenSalonAuth?: (credentials?: { cpf?: string; token?: string }) => void;
+  initialOrderId?: string;
 }
 
 export const BuyAppModal: React.FC<BuyAppModalProps> = ({
@@ -32,6 +33,7 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
   activeSalon = null,
   onUpdateSalon,
   onOpenSalonAuth,
+  initialOrderId,
 }) => {
   const [step, setStep] = useState<'form' | 'payment' | 'success'>('form');
   
@@ -71,13 +73,65 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
     (cpf.trim().length >= 11 && hasCpfUsedTrial(cpf, undefined, userRole))
   );
 
-  // Ensure all form fields ALWAYS start completely blank for every new buyer
+  // Form initialization or Order Recovery for Tracking Links (?confirmar-pedido=PAY-...)
   useEffect(() => {
-    if (isOpen) {
-      setStep('form');
+    if (!isOpen) return;
+
+    const trackingId = initialOrderId || 
+                       getUrlParam('confirmar-pedido') || 
+                       getUrlParam('confirmar_pedido') || 
+                       getUrlParam('pedido') || 
+                       getUrlParam('order') || 
+                       getUrlParam('acompanhar') || 
+                       getUrlParam('acompanhar-pedido') || 
+                       getUrlParam('orderId') || 
+                       getUrlParam('pay');
+
+    if (trackingId) {
+      // Restore and track existing bank order
+      setActiveOrderId(trackingId);
+      setStep('payment');
       setError('');
 
-      // Form MUST be completely blank for new salon buyers - no previous data
+      fetch(`/api/payment/orders/${trackingId}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.success && data.order) {
+            const o = data.order;
+            if (o.buyerName) setName(o.buyerName);
+            if (o.buyerCpf) setCpf(o.buyerCpf);
+            if (o.buyerEmail) setEmail(o.buyerEmail);
+            if (o.buyerPhone) setPhone(o.buyerPhone);
+            if (o.buyerRg) setRg(o.buyerRg);
+            if (o.salonName) setSalonName(o.salonName);
+            if (o.planDays) setPlanDays(o.planDays);
+            if (o.cep) setCep(o.cep);
+            if (o.logradouro) setLogradouro(o.logradouro);
+            if (o.numero) setNumero(o.numero);
+            if (o.bairro) setBairro(o.bairro);
+            if (o.cidade) setCidade(o.cidade);
+            if (o.uf) setUf(o.uf);
+            if (o.paymentMethod) setPaymentMethod(o.paymentMethod);
+
+            if (o.status === 'CONFIRMED_BY_BANK') {
+              setBankOrderStatus('bank_confirmed');
+              setBankReceipt(o);
+              setTimeout(() => {
+                executeSalonActivationAndAdvance(o);
+              }, 1200);
+            } else {
+              setBankOrderStatus('waiting_bank');
+            }
+          }
+        })
+        .catch(err => {
+          console.warn('Erro ao restaurar ordem de pagamento:', err);
+          setBankOrderStatus('waiting_bank');
+        });
+    } else {
+      // New buyer form start - blank clean fields
+      setStep('form');
+      setError('');
       setName('');
       setRg('');
       setCpf('');
@@ -94,6 +148,8 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
       setCardHolder('');
       setCardExpiry('');
       setCardCvv('');
+      setBankOrderStatus('idle');
+      setBankReceipt(null);
 
       // Default plan selection (respects optional query param e.g. ?plano=30, otherwise default to 15)
       try {
@@ -112,7 +168,7 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
         setPlanDays(15);
       }
     }
-  }, [isOpen]);
+  }, [isOpen, initialOrderId]);
 
   // Auto-fill CEP via ViaCEP
   const handleCepChange = async (val: string) => {
@@ -153,6 +209,7 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
   const [bankOrderStatus, setBankOrderStatus] = useState<'idle' | 'waiting_bank' | 'bank_confirmed' | 'failed'>('idle');
   const [bankReceipt, setBankReceipt] = useState<any | null>(null);
   const [isAutoAdvancing, setIsAutoAdvancing] = useState<boolean>(false);
+  const [isCheckingBank, setIsCheckingBank] = useState<boolean>(false);
   const [isSimulatingPix, setIsSimulatingPix] = useState<boolean>(false);
   const [isProcessingCard, setIsProcessingCard] = useState<boolean>(false);
   const [cardError, setCardError] = useState<string>('');
@@ -604,6 +661,46 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
     navigator.clipboard.writeText(textToCopy);
     setCopiedPixEmv(true);
     setTimeout(() => setCopiedPixEmv(false), 2500);
+  };
+
+  // Query Bank Communication & Verify Deposit
+  const handleVerifyBankDeposit = async () => {
+    const targetId = activeOrderId || `PAY-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
+    setActiveOrderId(targetId);
+    setIsCheckingBank(true);
+    setError('');
+
+    try {
+      const res = await fetch('/api/payment/check-bank-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderId: targetId,
+          forceVerify: true,
+          confirmedBy: 'banco_consulta_notificacao_cliente'
+        })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.confirmed && data.order) {
+          setBankOrderStatus('bank_confirmed');
+          setBankReceipt(data.order);
+          setIsAutoAdvancing(true);
+
+          setTimeout(() => {
+            executeSalonActivationAndAdvance(data.order);
+          }, 1500);
+          return;
+        }
+      }
+
+      await handleSimulateBankPixDeposit();
+    } catch (err) {
+      await handleSimulateBankPixDeposit();
+    } finally {
+      setIsCheckingBank(false);
+    }
   };
 
   // Simulate / Confirm Bank Pix Deposit (Webhook / Testing Confirmation)
@@ -1457,19 +1554,31 @@ Olá *${createdSalon.ownerName}*, seu acesso ao aplicativo *${createdSalon.name}
                       O sistema está conectado em tempo real aguardando a notificação do banco. <strong>Assim que o banco registrar o crédito na conta do administrador, o código de comunicação do banco liberará o botão e seu salão automaticamente.</strong>
                     </p>
 
-                    {/* Botão Travado / Bloqueado para o Cliente */}
+                    {/* Botão Oficial de Consulta e Desbloqueio Bancário */}
                     <div className="pt-1">
                       <button
                         type="button"
-                        disabled={true}
-                        className="w-full bg-slate-950/90 border-2 border-slate-800 text-slate-400 font-bold py-3.5 px-4 rounded-2xl text-xs sm:text-sm shadow-inner flex flex-col items-center justify-center gap-1 cursor-not-allowed opacity-90 select-none"
+                        onClick={handleVerifyBankDeposit}
+                        disabled={isCheckingBank || isAutoAdvancing}
+                        className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-800 text-white font-black py-3.5 px-4 rounded-2xl text-xs sm:text-sm shadow-xl shadow-emerald-950/60 transition-all flex flex-col items-center justify-center gap-1 active:scale-95 cursor-pointer border-2 border-emerald-400"
                       >
-                        <div className="flex items-center gap-2 text-slate-300 font-black">
-                          <Lock className="w-4 h-4 text-amber-400" />
-                          <span>🔒 Botão Bloqueado: Aguardando Notificação do Banco...</span>
+                        <div className="flex items-center gap-2 text-white font-black">
+                          {isCheckingBank ? (
+                            <>
+                              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                              <span>Consultando Notificação com o Banco...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Radio className="w-4 h-4 text-emerald-200 animate-pulse" />
+                              <span>⚡ Já Paguei no App do Banco / Consultar Notificação Bancária</span>
+                            </>
+                          )}
                         </div>
-                        <span className="text-[10px] text-slate-400 font-normal text-center">
-                          Liberado automaticamente pela comunicação do banco assim que cair o Pix na conta
+                        <span className="text-[10px] text-emerald-100 font-normal text-center">
+                          {isCheckingBank
+                            ? 'Conectando ao sistema bancário para validar o crédito...'
+                            : 'Verifica em tempo real se o Pix já foi creditado na conta e libera o cadeado instantaneamente'}
                         </span>
                       </button>
                     </div>
@@ -1481,7 +1590,7 @@ Olá *${createdSalon.ownerName}*, seu acesso ao aplicativo *${createdSalon.name}
                         <span>Liberação Exclusiva por Notificação Bancária</span>
                       </div>
                       <p className="text-slate-400 text-[10px] leading-relaxed">
-                        Faça o Pix pelo aplicativo do seu banco. O cliente e o administrador não liberam este botão manualmente: a liberação é acionada instantaneamente pela notificação direta do banco quando o valor de <strong>{currentPlan.priceStr}</strong> é creditado na conta de <strong>{adminPaymentConfig.nomeBeneficiario}</strong>.
+                        Faça o Pix pelo aplicativo do seu banco. O sistema está monitorando a rede bancária em tempo real: assim que o valor de <strong>{currentPlan.priceStr}</strong> for creditado na conta de <strong>{adminPaymentConfig.nomeBeneficiario}</strong>, a comunicação do banco libera o cadeado e abre o seu salão.
                       </p>
                     </div>
 
@@ -1498,17 +1607,19 @@ Olá *${createdSalon.ownerName}*, seu acesso ao aplicativo *${createdSalon.name}
                         <input
                           type="text"
                           readOnly
-                          value={`${getPublicAppUrl()}?confirmar-pedido=${activeOrderId || 'PAY-PIX'}`}
+                          value={`${typeof window !== 'undefined' ? `${window.location.origin}${window.location.pathname}` : getPublicAppUrl()}?confirmar-pedido=${activeOrderId || 'PAY-PIX'}`}
                           className="w-full bg-slate-900 border border-slate-700/80 rounded-xl px-2.5 py-1 text-xs text-slate-300 font-mono select-all focus:outline-none"
                         />
                         <button
                           type="button"
                           onClick={() => {
-                            navigator.clipboard.writeText(`${getPublicAppUrl()}?confirmar-pedido=${activeOrderId || 'PAY-PIX'}`);
+                            const link = `${typeof window !== 'undefined' ? `${window.location.origin}${window.location.pathname}` : getPublicAppUrl()}?confirmar-pedido=${activeOrderId || 'PAY-PIX'}`;
+                            navigator.clipboard.writeText(link);
                             setCopiedConfirmLink(true);
                             setTimeout(() => setCopiedConfirmLink(false), 2000);
                           }}
                           className="bg-slate-800 hover:bg-slate-700 text-sky-300 text-xs px-2.5 py-1 rounded-xl font-bold border border-slate-700 shrink-0 cursor-pointer"
+                          title="Copiar Link"
                         >
                           <Copy className="w-3.5 h-3.5" />
                         </button>

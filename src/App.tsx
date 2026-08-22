@@ -125,6 +125,19 @@ export function App() {
     return false;
   });
   const [isVideoConfigOpen, setIsVideoConfigOpen] = useState(false);
+  const [initialPaymentOrderId, setInitialPaymentOrderId] = useState<string | null>(() => {
+    try {
+      return getUrlParam('confirmar-pedido') || 
+             getUrlParam('confirmar_pedido') || 
+             getUrlParam('pedido') || 
+             getUrlParam('order') || 
+             getUrlParam('acompanhar') || 
+             getUrlParam('acompanhar-pedido') || 
+             getUrlParam('orderId') ||
+             getUrlParam('pay');
+    } catch {}
+    return null;
+  });
   const [salonAuthCredentials, setSalonAuthCredentials] = useState<{ cpf: string; token: string }>({ cpf: '', token: '' });
 
   const handleOpenSalonAuth = (creds?: { cpf?: string; token?: string }) => {
@@ -142,7 +155,19 @@ export function App() {
     const resolveUrlParams = () => {
       try {
         const isBuying = hasUrlAction('comprar-licenca', 'comprar', 'comprar_licenca', 'licenca', 'buy', 'compra', 'contratar');
-        if (isBuying) {
+        const orderTrackingParam = getUrlParam('confirmar-pedido') || 
+                                   getUrlParam('confirmar_pedido') || 
+                                   getUrlParam('pedido') || 
+                                   getUrlParam('order') || 
+                                   getUrlParam('acompanhar') || 
+                                   getUrlParam('acompanhar-pedido') || 
+                                   getUrlParam('orderId') ||
+                                   getUrlParam('pay');
+
+        if (orderTrackingParam) {
+          setInitialPaymentOrderId(orderTrackingParam);
+          setIsBuyAppOpen(true);
+        } else if (isBuying) {
           setIsBuyAppOpen(true);
         }
 
@@ -1074,7 +1099,11 @@ export function App() {
       {/* Buy App & Generate Token Checkout Modal */}
       <BuyAppModal
         isOpen={isBuyAppOpen}
-        onClose={() => setIsBuyAppOpen(false)}
+        onClose={() => {
+          setIsBuyAppOpen(false);
+          setInitialPaymentOrderId(null);
+        }}
+        initialOrderId={initialPaymentOrderId || undefined}
         userRole={userRole}
         activeSalon={activeSalon}
         onUpdateSalon={handleUpdateSalon}

@@ -596,6 +596,24 @@ export const AdminPaymentAccountModal: React.FC<AdminPaymentAccountModalProps> =
               </div>
             </div>
 
+            {/* Optional Access Token for Automated Pix/Card Generation & Direct Bank Polling */}
+            <div className="space-y-1 pt-1">
+              <label className="block font-bold text-slate-300 text-[11px] flex items-center gap-1">
+                <Key className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Access Token Oficial do Gateway (Mercado Pago / Asaas - Opcional):</span>
+              </label>
+              <input
+                type="password"
+                value={config.mercadopagoAccessToken || ''}
+                onChange={(e) => setConfig({ ...config, mercadopagoAccessToken: e.target.value })}
+                placeholder="Ex: APP_USR-xxxxxx-xxxxxx-xxxxxx (Token de Produção do Mercado Pago)"
+                className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-emerald-300 font-mono text-xs focus:outline-none focus:border-emerald-400"
+              />
+              <p className="text-[10px] text-slate-400 leading-relaxed">
+                Permite a consulta e verificação de crédito em tempo real diretamente na API do Gateway bancário.
+              </p>
+            </div>
+
             {/* Interactive Test Button & Results */}
             <div className="pt-2 border-t border-slate-800 space-y-2">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">

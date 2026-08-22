@@ -215,6 +215,8 @@ export interface AdminPaymentConfig {
   webhookSecret?: string;
   webhookUrl?: string;
   gatewayProvider?: 'mercadopago' | 'asaas' | 'efi_bank' | 'bacen_pix_direct' | 'personalizado';
+  mercadopagoAccessToken?: string; // Access Token Oficial do Mercado Pago para gerar Pix Dinâmico e receber baixa bancária instantânea
+  asaasApiKey?: string; // Chave de API do Asaas para recebimento Pix e baixa automática
   bacenPixClientId?: string;
   bacenPixCertificateConfigured?: boolean;
 }
