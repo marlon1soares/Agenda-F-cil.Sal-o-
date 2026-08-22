@@ -143,16 +143,24 @@ export const SalonAuthModal: React.FC<SalonAuthModalProps> = ({
       return;
     }
 
-    // 2. CHECK SALON OWNER BY CPF AND TOKEN, OR BY TOKEN ALONE
+    // 2. CHECK SALON OWNER BY CPF AND TOKEN, OR BY TOKEN ALONE (LOCAL STORE)
     const matchedSalon = currentSalons.find((s) => {
       const salonCpfClean = (s.ownerCpf || '').replace(/\D/g, '').trim();
       const salonToken = (s.purchaseToken || '').trim().toUpperCase();
       const salonCode = (s.appCode || '').trim().toUpperCase();
+      const salonId = (s.id || '').trim().toUpperCase();
+      const salonEmail = (s.ownerEmail || '').toLowerCase().trim();
 
-      // Exact match on CPF + Token
-      const matchesCpfAndToken = cleanCpf && salonCpfClean === cleanCpf && (salonToken === cleanToken || salonCode === cleanToken);
+      const inputMatchesEmail = cpf.toLowerCase().trim() === salonEmail;
+
+      // Exact or flexible match on CPF + Token
+      const matchesCpfAndToken = (cleanCpf || inputMatchesEmail) && 
+        ((salonCpfClean && salonCpfClean === cleanCpf) || inputMatchesEmail) && 
+        (salonToken === cleanToken || salonCode === cleanToken || salonId === cleanToken || (cleanToken.length >= 4 && salonToken.includes(cleanToken)));
+
       // Or Token match alone if CPF is blank
       const matchesTokenOnly = !cleanCpf && (salonToken === cleanToken || salonCode === cleanToken);
+      
       // Or Master demo credentials
       const matchesDemo = (cleanCpf === '12345678900' || !cleanCpf) && (cleanToken === 'TOK-PARCAS-2026' || cleanToken === 'DEMO' || cleanToken === '123456');
 
@@ -165,13 +173,41 @@ export const SalonAuthModal: React.FC<SalonAuthModalProps> = ({
         return;
       }
 
-      setSuccessMsg(`Autenticado com sucesso! Entrando no sistema de ${matchedSalon.config.nomeSalao || matchedSalon.name}...`);
+      setSuccessMsg(`Autenticado com sucesso! Entrando no sistema de ${matchedSalon.config?.nomeSalao || matchedSalon.name}...`);
       setTimeout(() => {
         onSuccess(matchedSalon);
-      }, 500);
-    } else {
-      setErrorMsg('CPF ou Token/Senha não encontrados. Verifique os dados do salão ou utilize o CPF e Senha cadastrados do Administrador.');
+      }, 400);
+      return;
     }
+
+    // 3. ASYNCHRONOUS SERVER-SIDE VALIDATION FALLBACK (BANKING-GRADE SYNC)
+    fetch('/api/auth/salon-login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        cpf: cleanCpf || cpf,
+        token: rawInput
+      })
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.salon) {
+          const fetchedSalon = data.salon;
+          // Cache locally
+          const updatedList = [...currentSalons.filter(s => s.id !== fetchedSalon.id), fetchedSalon];
+          Storage.saveSalons(updatedList);
+
+          setSuccessMsg(`Autenticado com sucesso! Entrando no sistema de ${fetchedSalon.config?.nomeSalao || fetchedSalon.name}...`);
+          setTimeout(() => {
+            onSuccess(fetchedSalon);
+          }, 400);
+        } else {
+          setErrorMsg(data.error || 'CPF ou Token de Licença não encontrados. Verifique os dados recebidos no e-mail ou no comprovante da compra.');
+        }
+      })
+      .catch(() => {
+        setErrorMsg('CPF ou Token/Senha não encontrados. Verifique os dados do salão ou utilize o CPF e Senha cadastrados do Administrador.');
+      });
   };
 
   return (

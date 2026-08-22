@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { SalonApp, SalonConfig, AdminPaymentConfig, UserRole } from '../types';
 import { Storage } from '../utils/storage';
+import { syncEngine } from '../utils/syncEngine';
 import { generatePixEMVPayload, generateQrCodeDataUrl } from '../utils/pix';
 import { getCalculatedLicensePlans, getLicensePlanByDays, formatBRL } from '../utils/pricing';
 import { checkTrialEligibility, isAdminCpf, isAdminIdentifier, hasCpfUsedTrial } from '../utils/license';
@@ -173,6 +174,7 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
   const [copiedToken, setCopiedToken] = useState(false);
   const [copiedCpf, setCopiedCpf] = useState(false);
   const [copiedAccessLink, setCopiedAccessLink] = useState(false);
+  const [copiedConfirmLink, setCopiedConfirmLink] = useState(false);
   const [copiedAllInfo, setCopiedAllInfo] = useState(false);
   const [emailStatusMsg, setEmailStatusMsg] = useState<string>('');
   const [isSendingEmail, setIsSendingEmail] = useState<boolean>(false);
@@ -307,11 +309,12 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
         emailSentAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
 
+      const updatedList = currentSalons.map(s => s.id === updatedSalon.id ? updatedSalon : s);
+      Storage.saveSalons(updatedList);
+      syncEngine.pushUpdateImmediate({ salons: updatedList });
+
       if (onUpdateSalon) {
         onUpdateSalon(updatedSalon);
-      } else {
-        const updatedList = currentSalons.map(s => s.id === updatedSalon.id ? updatedSalon : s);
-        Storage.saveSalons(updatedList);
       }
 
       setCreatedSalon(updatedSalon);
@@ -365,6 +368,10 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
         emailSentAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         config: initialConfig
       };
+
+      const updatedList = [...currentSalons.filter(s => s.id !== newSalon.id), newSalon];
+      Storage.saveSalons(updatedList);
+      syncEngine.pushUpdateImmediate({ salons: updatedList });
 
       setCreatedSalon(newSalon);
       onPurchaseComplete(newSalon);
@@ -1422,6 +1429,58 @@ Olá *${createdSalon.ownerName}*, seu acesso ao aplicativo *${createdSalon.name}
                       <p className="text-slate-400 text-[10px] leading-relaxed">
                         Faça o Pix pelo aplicativo do seu banco. A confirmação do banco é automática e instantânea — não é necessário enviar comprovante. Assim que o valor for creditado na conta, sua liberação ocorrerá imediatamente.
                       </p>
+                    </div>
+
+                    {/* Botão de Confirmação Imediata do Pagamento */}
+                    <div className="pt-2">
+                      <button
+                        type="button"
+                        onClick={handleSimulateBankPixDeposit}
+                        disabled={isSimulatingPix || isAutoAdvancing}
+                        className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-800 text-white font-black py-3.5 px-4 rounded-2xl text-xs sm:text-sm shadow-xl shadow-emerald-950/60 transition-all flex items-center justify-center gap-2 active:scale-95 cursor-pointer border border-emerald-400/50"
+                      >
+                        {isSimulatingPix || isAutoAdvancing ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            <span>Validando Crédito com o Banco e Liberando Salão...</span>
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle2 className="w-5 h-5 text-white" />
+                            <span>✅ Já Fiz o Pix / Confirmar com o Banco (Validar Crédito)</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+
+                    {/* Link de Confirmação Direto */}
+                    <div className="bg-slate-950/90 p-3 rounded-xl border border-slate-800 text-[11px] space-y-1.5">
+                      <div className="flex items-center justify-between text-[10px] text-slate-400 font-bold uppercase">
+                        <span className="flex items-center gap-1 text-slate-300">
+                          <Link2 className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>Link de Confirmação Direto do Pedido:</span>
+                        </span>
+                        {copiedConfirmLink && <span className="text-emerald-400 font-bold">Copiado!</span>}
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          type="text"
+                          readOnly
+                          value={`${getPublicAppUrl()}?confirmar-pedido=${activeOrderId || 'PAY-PIX'}`}
+                          className="w-full bg-slate-900 border border-slate-700/80 rounded-xl px-2.5 py-1 text-xs text-slate-300 font-mono select-all focus:outline-none"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText(`${getPublicAppUrl()}?confirmar-pedido=${activeOrderId || 'PAY-PIX'}`);
+                            setCopiedConfirmLink(true);
+                            setTimeout(() => setCopiedConfirmLink(false), 2000);
+                          }}
+                          className="bg-slate-800 hover:bg-slate-700 text-sky-300 text-xs px-2.5 py-1 rounded-xl font-bold border border-slate-700 shrink-0 cursor-pointer"
+                        >
+                          <Copy className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 )}

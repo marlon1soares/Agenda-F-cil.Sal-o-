@@ -131,8 +131,7 @@ export function App() {
     if (creds) {
       setSalonAuthCredentials({ cpf: creds.cpf || '', token: creds.token || '' });
     }
-    setAdminAuthTargetRole('salao');
-    setIsAdminAuthOpen(true);
+    setIsSalonAuthOpen(true);
   };
 
   // Initialize Real-time synchronization and detect URL parameters
@@ -147,8 +146,39 @@ export function App() {
           setIsBuyAppOpen(true);
         }
 
-        const isAccessLink = hasUrlAction('acesso-salao', 'acesso', 'login-salao', 'acessar-salao');
-        if (isAccessLink) {
+        const isAccessLink = hasUrlAction('acesso-salao', 'acesso', 'login-salao', 'acessar-salao', 'painel-salao');
+        const tokenParam = getUrlParam('token') || getUrlParam('senha') || getUrlParam('tok') || getUrlParam('chave');
+        const cpfParam = getUrlParam('cpf') || getUrlParam('login') || getUrlParam('doc');
+
+        if (tokenParam || cpfParam) {
+          setSalonAuthCredentials({ cpf: cpfParam || '', token: tokenParam || '' });
+          
+          // Auto-authenticate if credentials match
+          const cleanCpf = (cpfParam || '').replace(/\D/g, '').trim();
+          const cleanToken = (tokenParam || '').trim().toUpperCase();
+          const currentList = Storage.getSalons();
+          
+          const matched = currentList.find(s => {
+            const sCpf = (s.ownerCpf || '').replace(/\D/g, '').trim();
+            const sTok = (s.purchaseToken || '').trim().toUpperCase();
+            const sCode = (s.appCode || '').trim().toUpperCase();
+            const sId = (s.id || '').trim().toUpperCase();
+            
+            const matchCpf = cleanCpf && sCpf === cleanCpf;
+            const matchTok = cleanToken && (sTok === cleanToken || sCode === cleanToken || sId === cleanToken);
+            return (matchCpf && matchTok) || (cleanToken && matchTok);
+          });
+          
+          if (matched) {
+            setActiveSalonId(matched.id);
+            setConfig(matched.config);
+            setUserRole('salao');
+            setIsSalonAuthOpen(false);
+          } else if (isAccessLink) {
+            setIsSalonAuthOpen(true);
+            setUserRole('salao');
+          }
+        } else if (isAccessLink) {
           setIsSalonAuthOpen(true);
           setUserRole('salao');
         }
