@@ -704,11 +704,16 @@ app.post("/api/webhook/payment", (req, res) => {
   }
 });
 
-// Mercado Pago Official Webhook Endpoint (Validates x-signature header)
-app.post("/api/webhook/mercadopago", (req, res) => {
+// Mercado Pago Official Webhook Endpoint (Validates x-signature header and fetches payment status)
+app.all("/api/webhook/mercadopago", async (req, res) => {
+  if (req.method === "GET") {
+    return res.status(200).json({ status: "ok", message: "Mercado Pago Webhook Endpoint Ativo" });
+  }
+
   try {
     const adminConfig = syncStore.getState().adminPaymentConfig || {};
     const secret = adminConfig.webhookSecret || process.env.MERCADO_PAGO_WEBHOOK_SECRET || process.env.PAYMENT_WEBHOOK_SECRET;
+    const mpToken = adminConfig.mercadopagoAccessToken || process.env.MERCADO_PAGO_ACCESS_TOKEN;
 
     const verification = WebhookSecurity.verifyWebhookSignature({
       headers: req.headers as Record<string, string | string[] | undefined>,
@@ -726,8 +731,37 @@ app.post("/api/webhook/mercadopago", (req, res) => {
     const paymentId = (data && data.id) || req.query['data.id'] || req.query.id;
 
     if (paymentId) {
-      syncStore.confirmPaymentOrder(String(paymentId), {
-        bankTransactionId: `MP-${paymentId}`,
+      const pidStr = String(paymentId);
+      
+      // 1. If we have the access token, fetch authoritative payment status from Mercado Pago
+      if (mpToken) {
+        try {
+          const mpRes = await fetch(`https://api.mercadopago.com/v1/payments/${pidStr}`, {
+            headers: { 'Authorization': `Bearer ${mpToken}` }
+          });
+          if (mpRes.ok) {
+            const paymentItem: any = await mpRes.json();
+            const extRef = paymentItem.external_reference;
+            const isApproved = paymentItem.status === 'approved' || paymentItem.status_detail === 'accredited';
+            
+            if (isApproved) {
+              const targetId = extRef || pidStr;
+              syncStore.confirmPaymentOrder(targetId, {
+                bankTransactionId: String(paymentItem.id || `MP-${pidStr}`),
+                bankReceiptCode: `REC-MP-${paymentItem.id || pidStr}`,
+                confirmedBy: "mercadopago_webhook_oficial_aprovado",
+                creditedToAccount: adminConfig.cartaoContaDestino || "Mercado Pago"
+              });
+            }
+          }
+        } catch (fetchErr) {
+          console.warn("[MERCADO PAGO WEBHOOK FETCH ERROR]:", fetchErr);
+        }
+      }
+
+      // 2. Also attempt direct confirmation by ID
+      syncStore.confirmPaymentOrder(pidStr, {
+        bankTransactionId: `MP-${pidStr}`,
         confirmedBy: "mercadopago_webhook_v1"
       });
     }

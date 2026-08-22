@@ -596,22 +596,75 @@ export const AdminPaymentAccountModal: React.FC<AdminPaymentAccountModalProps> =
               </div>
             </div>
 
-            {/* Optional Access Token for Automated Pix/Card Generation & Direct Bank Polling */}
-            <div className="space-y-1 pt-1">
-              <label className="block font-bold text-slate-300 text-[11px] flex items-center gap-1">
-                <Key className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Access Token Oficial do Gateway (Mercado Pago / Asaas - Opcional):</span>
-              </label>
-              <input
-                type="password"
-                value={config.mercadopagoAccessToken || ''}
-                onChange={(e) => setConfig({ ...config, mercadopagoAccessToken: e.target.value })}
-                placeholder="Ex: APP_USR-xxxxxx-xxxxxx-xxxxxx (Token de Produção do Mercado Pago)"
-                className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-emerald-300 font-mono text-xs focus:outline-none focus:border-emerald-400"
-              />
-              <p className="text-[10px] text-slate-400 leading-relaxed">
-                Permite a consulta e verificação de crédito em tempo real diretamente na API do Gateway bancário.
-              </p>
+            {/* Mercado Pago Official Credentials Section */}
+            <div className="space-y-3 pt-1 border-t border-slate-800">
+              <div className="flex items-center gap-2">
+                <Key className="w-4 h-4 text-sky-400" />
+                <span className="font-extrabold text-sky-300 text-xs uppercase tracking-wide">
+                  Credenciais Oficiais Mercado Pago (API Produção)
+                </span>
+              </div>
+
+              {/* Public Key */}
+              <div className="space-y-1">
+                <label className="block font-bold text-slate-300 text-[11px] flex items-center gap-1">
+                  <span>Public Key (Chave Pública):</span>
+                </label>
+                <input
+                  type="text"
+                  value={config.mercadopagoPublicKey || ''}
+                  onChange={(e) => setConfig({ ...config, mercadopagoPublicKey: e.target.value })}
+                  placeholder="APP_USR-43be1eb0-8bed-4707-9bdb-91183e3192b2"
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sky-300 font-mono text-xs focus:outline-none focus:border-sky-400"
+                />
+              </div>
+
+              {/* Access Token */}
+              <div className="space-y-1">
+                <label className="block font-bold text-slate-300 text-[11px] flex items-center gap-1">
+                  <Lock className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Access Token Oficial (Token de Produção): *</span>
+                </label>
+                <input
+                  type="password"
+                  value={config.mercadopagoAccessToken || ''}
+                  onChange={(e) => setConfig({ ...config, mercadopagoAccessToken: e.target.value })}
+                  placeholder="APP_USR-5794522915444902-082217-76cb38c546c7ce4c69b66b82f4612629-1919398594"
+                  className="w-full bg-slate-900 border-2 border-emerald-500/60 rounded-xl px-3 py-2 text-emerald-300 font-mono text-xs focus:outline-none focus:border-emerald-400"
+                />
+                <p className="text-[10px] text-slate-400 leading-relaxed">
+                  Permite gerar o Pix Dinâmico e receber a confirmação bancária instantânea na conta.
+                </p>
+              </div>
+
+              {/* Client ID & Client Secret */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="block font-bold text-slate-300 text-[11px]">
+                    Client ID:
+                  </label>
+                  <input
+                    type="text"
+                    value={config.mercadopagoClientId || ''}
+                    onChange={(e) => setConfig({ ...config, mercadopagoClientId: e.target.value })}
+                    placeholder="5794522915444902"
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono text-xs focus:outline-none focus:border-emerald-400"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="block font-bold text-slate-300 text-[11px]">
+                    Client Secret:
+                  </label>
+                  <input
+                    type="password"
+                    value={config.mercadopagoClientSecret || ''}
+                    onChange={(e) => setConfig({ ...config, mercadopagoClientSecret: e.target.value })}
+                    placeholder="ziCC7svN4c0MnvYruGEGMFQ7tcGu5P0q"
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono text-xs focus:outline-none focus:border-emerald-400"
+                  />
+                </div>
+              </div>
             </div>
 
             {/* Interactive Test Button & Results */}

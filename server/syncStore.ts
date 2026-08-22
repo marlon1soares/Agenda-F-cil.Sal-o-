@@ -201,14 +201,24 @@ const DEFAULT_STATE: SyncDatabaseState = {
   ],
   adminPaymentConfig: {
     chavePix: "11973395723",
-    nomeBeneficiario: "Marlon Soares - Agenda Fácil Oficial",
+    nomeBeneficiario: "Agenda+Fácil.Salão Oficial",
     bancoOuProcessador: "Mercado Pago (Ag: 0001 / CC: 7731871243-4)",
-    cartaoContaDestino: "Mercado Pago - Agência: 0001 / Conta: 7731871243-4 (Marlon Soares)",
+    cartaoContaDestino: "Agência:0001/Conta:7731871243-4",
     instrucoesPagamento: "O valor do cartão ou Pix é creditado diretamente na conta Mercado Pago (Ag: 0001 / Conta: 7731871243-4) do Administrador.",
+    productionUrl: "https://agendamaisfacil.vercel.app",
     precoPlano30Dias: 30.00,
     precoPlano90Dias: 75.00,
     precoPlano180Dias: 135.00,
-    precoPlano365Dias: 240.00
+    precoPlano365Dias: 240.00,
+    diasGratuitos: 15,
+    habilitarPlanoGratuito: true,
+    gatewayProvider: "mercadopago",
+    mercadopagoPublicKey: "APP_USR-43be1eb0-8bed-4707-9bdb-91183e3192b2",
+    mercadopagoAccessToken: "APP_USR-5794522915444902-082217-76cb38c546c7ce4c69b66b82f4612629-1919398594",
+    mercadopagoClientId: "5794522915444902",
+    mercadopagoClientSecret: "ziCC7svN4c0MnvYruGEGMFQ7tcGu5P0q",
+    webhookSecret: "ae043f22ecf5be4ebb36625d10f92b6ae689578cde0152721c211351fc73a241",
+    webhookUrl: "https://agendamaisfacil.vercel.app/api/webhook/mercadopago"
   },
   messages: [
     {
