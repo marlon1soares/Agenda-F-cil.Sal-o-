@@ -755,13 +755,13 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
     }
 
     const cleanCard = cardNumber.replace(/\D/g, '');
-    if (cleanCard.length < 13) {
-      setCardError('Número de cartão de crédito inválido (mínimo 13 dígitos).');
+    if (cleanCard.length < 13 || cleanCard.length > 19) {
+      setCardError('Número de cartão de crédito inválido (mínimo 13 a 19 dígitos).');
       return;
     }
 
     const cleanCvv = cardCvv.replace(/\D/g, '');
-    if (cleanCvv.length < 3) {
+    if (cleanCvv.length < 3 || cleanCvv.length > 4) {
       setCardError('Código CVV inválido (3 ou 4 dígitos no verso do cartão).');
       return;
     }
@@ -789,60 +789,21 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
         })
       });
 
-      let confirmedData: any = null;
-      if (res.ok) {
-        const data = await res.json();
-        if (data.success && data.confirmed) {
-          confirmedData = data.order;
-        } else if (data.error) {
-          setCardError(data.error);
-          return;
-        }
+      const data = await res.json();
+      if (res.ok && data.success && data.confirmed && data.order) {
+        setBankOrderStatus('bank_confirmed');
+        setBankReceipt(data.order);
+        setIsAutoAdvancing(true);
+
+        // Auto-advance automatically after 1.5 seconds showing approval
+        setTimeout(() => {
+          executeSalonActivationAndAdvance(data.order);
+        }, 1500);
+      } else {
+        setCardError(data.error || 'Transação não autorizada pelo banco emissor do cartão de crédito.');
       }
-
-      if (!confirmedData) {
-        confirmedData = {
-          id: targetId,
-          status: 'CONFIRMED_BY_BANK',
-          bankReceiptCode: `AUTH-VISA-MC-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`,
-          confirmedAt: Date.now(),
-          priceStr: currentPlan.priceStr,
-          adminDestinationAccount: {
-            beneficiary: adminPaymentConfig.nomeBeneficiario,
-            bank: adminPaymentConfig.bancoOuProcessador,
-            cardAccount: adminPaymentConfig.cartaoContaDestino,
-          }
-        };
-      }
-
-      setBankOrderStatus('bank_confirmed');
-      setBankReceipt(confirmedData);
-      setIsAutoAdvancing(true);
-
-      // Auto-advance automatically after 1.5 seconds showing approval
-      setTimeout(() => {
-        executeSalonActivationAndAdvance(confirmedData);
-      }, 1500);
     } catch (err: any) {
-      const fallbackData = {
-        id: targetId,
-        status: 'CONFIRMED_BY_BANK',
-        bankReceiptCode: `AUTH-VISA-MC-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`,
-        confirmedAt: Date.now(),
-        priceStr: currentPlan.priceStr,
-        adminDestinationAccount: {
-          beneficiary: adminPaymentConfig.nomeBeneficiario,
-          bank: adminPaymentConfig.bancoOuProcessador,
-          cardAccount: adminPaymentConfig.cartaoContaDestino,
-        }
-      };
-      setBankOrderStatus('bank_confirmed');
-      setBankReceipt(fallbackData);
-      setIsAutoAdvancing(true);
-
-      setTimeout(() => {
-        executeSalonActivationAndAdvance(fallbackData);
-      }, 1500);
+      setCardError(err.message || 'Falha na comunicação com o banco. Verifique os dados ou tente novamente.');
     } finally {
       setIsProcessingCard(false);
     }
@@ -1583,12 +1544,25 @@ Olá *${createdSalon.ownerName}*, seu acesso ao aplicativo *${createdSalon.name}
                   )}
                 </div>
 
-                {/* Secure Environment Banner (Destination Account Hidden for Buyer) */}
-                <div className="bg-slate-900/90 p-2.5 rounded-xl border border-slate-800 text-[11px] text-slate-300 flex items-center gap-2">
-                  <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-                  <span>
-                    <strong>Ambiente Seguro:</strong> Transação validada e creditada diretamente na conta cadastrada do Administrador. A liberação só prossegue após autorização bancária.
-                  </span>
+                {/* Radar Bancário Ativo para Cartão */}
+                <div className="bg-slate-900/90 border border-blue-500/40 p-3.5 rounded-2xl space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-blue-400 font-black text-xs">
+                      <span className="relative flex h-3 w-3">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-3 w-3 bg-blue-500"></span>
+                      </span>
+                      <span>Comunicação Bancária com a Operadora Ativa</span>
+                    </div>
+                    <span className="text-[10px] text-blue-400/90 font-mono bg-blue-950/60 px-2 py-0.5 rounded-md border border-blue-800/50 flex items-center gap-1">
+                      <Radio className="w-3 h-3 animate-pulse text-blue-400" />
+                      <span>Gateway Conectado</span>
+                    </span>
+                  </div>
+
+                  <p className="text-xs text-slate-300 leading-relaxed">
+                    Preencha os dados do cartão abaixo e envie para a operadora bancária. <strong>Assim que a operadora e o banco confirmarem o débito e o crédito na conta de {adminPaymentConfig.nomeBeneficiario || 'Administrador'}, o banco enviará a notificação de aprovação e o seu salão será liberado instantaneamente.</strong>
+                  </p>
                 </div>
 
                 {cardError && (
@@ -1599,7 +1573,7 @@ Olá *${createdSalon.ownerName}*, seu acesso ao aplicativo *${createdSalon.name}
 
                 {/* Card Number */}
                 <div>
-                  <label className="block text-slate-300 font-bold mb-1">Número do Cartão de Crédito:</label>
+                  <label className="block text-slate-300 font-bold mb-1 text-xs">Número do Cartão de Crédito:</label>
                   <input
                     type="text"
                     value={cardNumber}
@@ -1612,7 +1586,7 @@ Olá *${createdSalon.ownerName}*, seu acesso ao aplicativo *${createdSalon.name}
 
                 {/* Card Holder Name */}
                 <div>
-                  <label className="block text-slate-300 font-bold mb-1">Nome impresso no Cartão:</label>
+                  <label className="block text-slate-300 font-bold mb-1 text-xs">Nome impresso no Cartão:</label>
                   <input
                     type="text"
                     value={cardHolder}
@@ -1625,7 +1599,7 @@ Olá *${createdSalon.ownerName}*, seu acesso ao aplicativo *${createdSalon.name}
                 {/* Expiry, CVV & Installments */}
                 <div className="grid grid-cols-3 gap-2">
                   <div>
-                    <label className="block text-slate-300 font-bold mb-1">Validade:</label>
+                    <label className="block text-slate-300 font-bold mb-1 text-xs">Validade:</label>
                     <input
                       type="text"
                       value={cardExpiry}
@@ -1637,7 +1611,7 @@ Olá *${createdSalon.ownerName}*, seu acesso ao aplicativo *${createdSalon.name}
                   </div>
 
                   <div>
-                    <label className="block text-slate-300 font-bold mb-1">CVV:</label>
+                    <label className="block text-slate-300 font-bold mb-1 text-xs">CVV:</label>
                     <input
                       type="text"
                       value={cardCvv}
@@ -1649,7 +1623,7 @@ Olá *${createdSalon.ownerName}*, seu acesso ao aplicativo *${createdSalon.name}
                   </div>
 
                   <div>
-                    <label className="block text-slate-300 font-bold mb-1">Parcelamento:</label>
+                    <label className="block text-slate-300 font-bold mb-1 text-xs">Parcelamento:</label>
                     <select
                       value={cardInstallments}
                       onChange={(e) => setCardInstallments(e.target.value)}
@@ -1686,22 +1660,23 @@ Olá *${createdSalon.ownerName}*, seu acesso ao aplicativo *${createdSalon.name}
                         Código de Autorização Bancária: {bankReceipt.bankReceiptCode}
                       </div>
                     )}
-                    <div className="pt-2">
-                      <button
-                        type="button"
-                        onClick={() => executeSalonActivationAndAdvance(bankReceipt)}
-                        className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3.5 px-4 rounded-2xl text-xs sm:text-sm shadow-xl shadow-emerald-950/60 transition-all flex items-center justify-center gap-2 active:scale-95 cursor-pointer border-2 border-emerald-400"
-                      >
-                        <Unlock className="w-5 h-5 text-white" />
-                        <span>🔓 LIBERADO PELO BANCO: Acessar Meu Salão Agora</span>
-                      </button>
-                    </div>
                     <p className="text-xs text-amber-300 font-bold animate-bounce pt-1">
                       🚀 Avançando automaticamente para a liberação do seu Salão...
                     </p>
                   </div>
                 ) : (
-                  <div className="space-y-2 pt-1">
+                  <div className="space-y-2.5 pt-1">
+                    {/* Indicador de Cadeado Fechado - Somente o banco pode liberar */}
+                    <div className="bg-slate-950/90 border-2 border-slate-800 p-3.5 rounded-xl flex flex-col items-center justify-center gap-1.5 text-center shadow-inner">
+                      <div className="flex items-center gap-2 text-amber-400 font-black text-xs sm:text-sm">
+                        <Lock className="w-4 h-4 text-amber-400 animate-pulse" />
+                        <span>🔒 Cadeado Fechado: Aguardando Autorização e Notificação do Banco</span>
+                      </div>
+                      <p className="text-[10px] text-slate-400 leading-relaxed max-w-sm">
+                        O salão só é liberado quando a operadora bancária processar a cobrança e notificar a aprovação do crédito.
+                      </p>
+                    </div>
+
                     <button
                       type="button"
                       onClick={handleProcessCardPayment}
@@ -1711,22 +1686,30 @@ Olá *${createdSalon.ownerName}*, seu acesso ao aplicativo *${createdSalon.name}
                       {isProcessingCard ? (
                         <>
                           <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                          <span>Comunicando com o Banco e Validando Crédito na Conta...</span>
+                          <span>Comunicando com o Banco e Validando Notificação de Crédito...</span>
                         </>
                       ) : (
                         <>
                           <CreditCard className="w-4 h-4 text-blue-200" />
-                          <span>Enviar ao Banco para Autorização e Liberação</span>
+                          <span>Processar Cartão com a Operadora Bancária</span>
                         </>
                       )}
                     </button>
 
-                    <div className="bg-slate-950/80 p-2.5 rounded-xl border border-slate-800 text-[10px] text-slate-400 flex items-center gap-2">
-                      <ShieldCheck className="w-4 h-4 text-blue-400 shrink-0" />
-                      <span>
-                        A liberação do sistema é acionada estritamente pela resposta de autorização bancária que confirma o crédito do valor.
-                      </span>
-                    </div>
+                    {/* Ferramenta de Teste de Webhook para Cartão (Ambiente de Testes) */}
+                    {adminPaymentConfig.ativarAmbienteTestes && (
+                      <div className="pt-1">
+                        <button
+                          type="button"
+                          onClick={handleSimulateBankPixDeposit}
+                          disabled={isSimulatingPix || isAutoAdvancing}
+                          className="w-full bg-slate-900 hover:bg-slate-800 border border-slate-700 text-sky-300 text-[10px] py-1.5 px-2 rounded-xl flex items-center justify-center gap-1 cursor-pointer transition-colors"
+                        >
+                          <Radio className="w-3 h-3 text-sky-400 animate-pulse" />
+                          <span>🧪 [Ambiente de Teste Adm] Simular Notificação Webhook da Operadora de Cartão</span>
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
 

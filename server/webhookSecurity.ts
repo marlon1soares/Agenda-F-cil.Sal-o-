@@ -170,6 +170,51 @@ export class WebhookSecurity {
   }
 
   /**
+   * Validates credit card number with Luhn algorithm (Mod 10)
+   */
+  public static validateLuhn(cardNumber: string): boolean {
+    const clean = (cardNumber || '').replace(/\D/g, '');
+    if (clean.length < 13 || clean.length > 19) return false;
+    let sum = 0;
+    let shouldDouble = false;
+    for (let i = clean.length - 1; i >= 0; i--) {
+      let digit = parseInt(clean.charAt(i), 10);
+      if (isNaN(digit)) return false;
+      if (shouldDouble) {
+        digit *= 2;
+        if (digit > 9) digit -= 9;
+      }
+      sum += digit;
+      shouldDouble = !shouldDouble;
+    }
+    return sum % 10 === 0;
+  }
+
+  /**
+   * Validates expiration date (MM/YY or MM/YYYY)
+   */
+  public static validateExpiry(expiryStr: string): boolean {
+    if (!expiryStr || !expiryStr.includes('/')) return false;
+    const [mStr, yStr] = expiryStr.trim().split('/');
+    const month = parseInt(mStr, 10);
+    if (isNaN(month) || month < 1 || month > 12) return false;
+
+    let year = parseInt(yStr, 10);
+    if (isNaN(year)) return false;
+    if (year < 100) year += 2000;
+
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth() + 1;
+
+    if (year < currentYear) return false;
+    if (year === currentYear && month < currentMonth) return false;
+    if (year > currentYear + 25) return false;
+
+    return true;
+  }
+
+  /**
    * Sanitizes credit card payloads for PCI-DSS compliance
    * Never stores or logs PAN (Primary Account Number) or CVV in cleartext
    */
@@ -185,16 +230,18 @@ export class WebhookSecurity {
     
     // Determine card brand
     let brand = 'Desconhecida';
-    if (/^4/.test(rawNumber)) brand = 'Visa';
-    else if (/^5[1-5]/.test(rawNumber) || /^2[2-7]/.test(rawNumber)) brand = 'Mastercard';
-    else if (/^3[47]/.test(rawNumber)) brand = 'American Express';
-    else if (/^(606282|3841)/.test(rawNumber) || /^65/.test(rawNumber)) brand = 'Hipercard';
-    else if (/^(4011|4389|4514|4576|5041|5066|5067|6277|6362|6363)/.test(rawNumber)) brand = 'Elo';
+    let brandId = 'credit_card';
+    if (/^4/.test(rawNumber)) { brand = 'Visa'; brandId = 'visa'; }
+    else if (/^5[1-5]/.test(rawNumber) || /^2[2-7]/.test(rawNumber)) { brand = 'Mastercard'; brandId = 'master'; }
+    else if (/^3[47]/.test(rawNumber)) { brand = 'American Express'; brandId = 'amex'; }
+    else if (/^(606282|3841)/.test(rawNumber) || /^65/.test(rawNumber)) { brand = 'Hipercard'; brandId = 'hipercard'; }
+    else if (/^(4011|4389|4514|4576|5041|5066|5067|6277|6362|6363)/.test(rawNumber)) { brand = 'Elo'; brandId = 'elo'; }
 
     return {
       maskedNumber: `${first6.slice(0, 4)} **** **** ${last4}`,
       last4,
       brand,
+      brandId,
       cardHolder: cardData.cardHolder,
       cardExpiry: cardData.cardExpiry,
       pciCompliant: true,
