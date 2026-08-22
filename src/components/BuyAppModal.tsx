@@ -209,7 +209,6 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
   const [bankOrderStatus, setBankOrderStatus] = useState<'idle' | 'waiting_bank' | 'bank_confirmed' | 'failed'>('idle');
   const [bankReceipt, setBankReceipt] = useState<any | null>(null);
   const [isAutoAdvancing, setIsAutoAdvancing] = useState<boolean>(false);
-  const [isCheckingBank, setIsCheckingBank] = useState<boolean>(false);
   const [isSimulatingPix, setIsSimulatingPix] = useState<boolean>(false);
   const [isProcessingCard, setIsProcessingCard] = useState<boolean>(false);
   const [cardError, setCardError] = useState<string>('');
@@ -231,7 +230,6 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
   const [copiedToken, setCopiedToken] = useState(false);
   const [copiedCpf, setCopiedCpf] = useState(false);
   const [copiedAccessLink, setCopiedAccessLink] = useState(false);
-  const [copiedConfirmLink, setCopiedConfirmLink] = useState(false);
   const [copiedAllInfo, setCopiedAllInfo] = useState(false);
   const [emailStatusMsg, setEmailStatusMsg] = useState<string>('');
   const [isSendingEmail, setIsSendingEmail] = useState<boolean>(false);
@@ -638,6 +636,16 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
         const data = await res.json();
         if (data.success && data.order) {
           setActiveOrderId(data.order.id);
+          if (data.order.gatewayQrCode) {
+            setPixEmvPayload(data.order.gatewayQrCode);
+            if (data.order.gatewayQrCodeBase64) {
+              setPixQrDataUrl(`data:image/png;base64,${data.order.gatewayQrCodeBase64}`);
+            } else {
+              generateQrCodeDataUrl(data.order.gatewayQrCode).then(url => {
+                if (url) setPixQrDataUrl(url);
+              });
+            }
+          }
         }
       }
     } catch (err) {
@@ -661,46 +669,6 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
     navigator.clipboard.writeText(textToCopy);
     setCopiedPixEmv(true);
     setTimeout(() => setCopiedPixEmv(false), 2500);
-  };
-
-  // Query Bank Communication & Verify Deposit
-  const handleVerifyBankDeposit = async () => {
-    const targetId = activeOrderId || `PAY-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
-    setActiveOrderId(targetId);
-    setIsCheckingBank(true);
-    setError('');
-
-    try {
-      const res = await fetch('/api/payment/check-bank-status', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          orderId: targetId,
-          forceVerify: true,
-          confirmedBy: 'banco_consulta_notificacao_cliente'
-        })
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        if (data.confirmed && data.order) {
-          setBankOrderStatus('bank_confirmed');
-          setBankReceipt(data.order);
-          setIsAutoAdvancing(true);
-
-          setTimeout(() => {
-            executeSalonActivationAndAdvance(data.order);
-          }, 1500);
-          return;
-        }
-      }
-
-      await handleSimulateBankPixDeposit();
-    } catch (err) {
-      await handleSimulateBankPixDeposit();
-    } finally {
-      setIsCheckingBank(false);
-    }
   };
 
   // Simulate / Confirm Bank Pix Deposit (Webhook / Testing Confirmation)
@@ -1535,95 +1503,45 @@ Olá *${createdSalon.ownerName}*, seu acesso ao aplicativo *${createdSalon.name}
                     </p>
                   </div>
                 ) : (
-                  <div className="bg-slate-900/90 border border-emerald-500/40 p-3.5 rounded-2xl space-y-2.5">
+                  <div className="bg-slate-900/90 border border-emerald-500/40 p-4 rounded-2xl space-y-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2 text-emerald-400 font-black text-xs">
                         <span className="relative flex h-3 w-3">
                           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                           <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
                         </span>
-                        <span>Aguardando Notificação Bancária Automática...</span>
+                        <span>Comunicação com o Banco Ativa (Aguardando Notificação)</span>
                       </div>
                       <span className="text-[10px] text-emerald-400/90 font-mono bg-emerald-950/60 px-2 py-0.5 rounded-md border border-emerald-800/50 flex items-center gap-1">
                         <Radio className="w-3 h-3 animate-pulse text-emerald-400" />
-                        <span>Radar Bacen Ativo</span>
+                        <span>Radar Bacen Conectado</span>
                       </span>
                     </div>
 
-                    <p className="text-[11px] text-slate-300 leading-relaxed">
-                      O sistema está conectado em tempo real aguardando a notificação do banco. <strong>Assim que o banco registrar o crédito na conta do administrador, o código de comunicação do banco liberará o botão e seu salão automaticamente.</strong>
+                    <p className="text-xs text-slate-300 leading-relaxed">
+                      Abra o aplicativo do seu banco no celular e efetue o pagamento do QR Code Pix acima. <strong>Assim que o seu banco registrar o crédito de {currentPlan.priceStr} na conta de {adminPaymentConfig.nomeBeneficiario || 'Administrador'}, o banco enviará a notificação para o sistema e o seu salão será liberado instantaneamente.</strong>
                     </p>
 
-                    {/* Botão Oficial de Consulta e Desbloqueio Bancário */}
-                    <div className="pt-1">
-                      <button
-                        type="button"
-                        onClick={handleVerifyBankDeposit}
-                        disabled={isCheckingBank || isAutoAdvancing}
-                        className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-800 text-white font-black py-3.5 px-4 rounded-2xl text-xs sm:text-sm shadow-xl shadow-emerald-950/60 transition-all flex flex-col items-center justify-center gap-1 active:scale-95 cursor-pointer border-2 border-emerald-400"
-                      >
-                        <div className="flex items-center gap-2 text-white font-black">
-                          {isCheckingBank ? (
-                            <>
-                              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                              <span>Consultando Notificação com o Banco...</span>
-                            </>
-                          ) : (
-                            <>
-                              <Radio className="w-4 h-4 text-emerald-200 animate-pulse" />
-                              <span>⚡ Já Paguei no App do Banco / Consultar Notificação Bancária</span>
-                            </>
-                          )}
-                        </div>
-                        <span className="text-[10px] text-emerald-100 font-normal text-center">
-                          {isCheckingBank
-                            ? 'Conectando ao sistema bancário para validar o crédito...'
-                            : 'Verifica em tempo real se o Pix já foi creditado na conta e libera o cadeado instantaneamente'}
-                        </span>
-                      </button>
-                    </div>
-
-                    {/* Instruções Oficiais de Segurança Bancária */}
-                    <div className="bg-slate-950/80 p-3 rounded-xl border border-slate-800 text-[11px] text-slate-300 space-y-1">
-                      <div className="flex items-center gap-1.5 text-amber-400 font-bold">
-                        <ShieldCheck className="w-3.5 h-3.5" />
-                        <span>Liberação Exclusiva por Notificação Bancária</span>
+                    {/* Indicador de Cadeado Fechado - Somente o banco pode liberar */}
+                    <div className="bg-slate-950/90 border-2 border-slate-800 p-3.5 rounded-xl flex flex-col items-center justify-center gap-1.5 text-center shadow-inner">
+                      <div className="flex items-center gap-2 text-amber-400 font-black text-xs sm:text-sm">
+                        <Lock className="w-4 h-4 text-amber-400 animate-pulse" />
+                        <span>🔒 Cadeado Fechado: Aguardando Notificação de Pagamento do Banco</span>
                       </div>
-                      <p className="text-slate-400 text-[10px] leading-relaxed">
-                        Faça o Pix pelo aplicativo do seu banco. O sistema está monitorando a rede bancária em tempo real: assim que o valor de <strong>{currentPlan.priceStr}</strong> for creditado na conta de <strong>{adminPaymentConfig.nomeBeneficiario}</strong>, a comunicação do banco libera o cadeado e abre o seu salão.
+                      <p className="text-[10px] text-slate-400 leading-relaxed max-w-sm">
+                        O sistema não possui botão de liberação manual. O acesso é desbloqueado e fica verde exclusivamente quando a confirmação for recebida da rede bancária.
                       </p>
                     </div>
 
-                    {/* Link de Acompanhamento Direto */}
-                    <div className="bg-slate-950/90 p-3 rounded-xl border border-slate-800 text-[11px] space-y-1.5">
-                      <div className="flex items-center justify-between text-[10px] text-slate-400 font-bold uppercase">
-                        <span className="flex items-center gap-1 text-slate-300">
-                          <Link2 className="w-3.5 h-3.5 text-emerald-400" />
-                          <span>Link de Acompanhamento do Pedido:</span>
-                        </span>
-                        {copiedConfirmLink && <span className="text-emerald-400 font-bold">Copiado!</span>}
+                    {/* Instruções Oficiais de Segurança Bancária */}
+                    <div className="bg-slate-950/80 p-2.5 rounded-xl border border-slate-800/80 text-[10px] text-slate-400 space-y-1">
+                      <div className="flex items-center gap-1.5 text-emerald-400 font-bold text-[11px]">
+                        <ShieldCheck className="w-3.5 h-3.5" />
+                        <span>Validação Bancária em Tempo Real</span>
                       </div>
-                      <div className="flex items-center gap-1.5">
-                        <input
-                          type="text"
-                          readOnly
-                          value={`${typeof window !== 'undefined' ? `${window.location.origin}${window.location.pathname}` : getPublicAppUrl()}?confirmar-pedido=${activeOrderId || 'PAY-PIX'}`}
-                          className="w-full bg-slate-900 border border-slate-700/80 rounded-xl px-2.5 py-1 text-xs text-slate-300 font-mono select-all focus:outline-none"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const link = `${typeof window !== 'undefined' ? `${window.location.origin}${window.location.pathname}` : getPublicAppUrl()}?confirmar-pedido=${activeOrderId || 'PAY-PIX'}`;
-                            navigator.clipboard.writeText(link);
-                            setCopiedConfirmLink(true);
-                            setTimeout(() => setCopiedConfirmLink(false), 2000);
-                          }}
-                          className="bg-slate-800 hover:bg-slate-700 text-sky-300 text-xs px-2.5 py-1 rounded-xl font-bold border border-slate-700 shrink-0 cursor-pointer"
-                          title="Copiar Link"
-                        >
-                          <Copy className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
+                      <p className="leading-relaxed">
+                        O valor a ser creditado é <strong>{currentPlan.priceStr}</strong> diretamente na conta oficial. A comunicação entre o banco e o aplicativo opera 24 horas por dia.
+                      </p>
                     </div>
 
                     {/* Ferramenta de Teste de Webhook (Apenas para Testes/Administração) */}
@@ -1636,7 +1554,7 @@ Olá *${createdSalon.ownerName}*, seu acesso ao aplicativo *${createdSalon.name}
                           className="w-full bg-slate-900 hover:bg-slate-800 border border-slate-700 text-sky-300 text-[10px] py-1.5 px-2 rounded-xl flex items-center justify-center gap-1 cursor-pointer transition-colors"
                         >
                           <Radio className="w-3 h-3 text-sky-400 animate-pulse" />
-                          <span>🧪 [Ambiente de Teste] Enviar Notificação Webhook do Banco Central para Desbloquear Botão</span>
+                          <span>🧪 [Ambiente de Teste Adm] Simular Notificação Webhook do Banco Central</span>
                         </button>
                       </div>
                     )}

@@ -167,7 +167,7 @@ app.post("/api/presence/heartbeat", (req, res) => {
 // ==========================================
 
 // Create Payment Order (Register banking transaction for live tracking)
-app.post("/api/payment/orders", (req, res) => {
+app.post("/api/payment/orders", async (req, res) => {
   try {
     const {
       buyerName,
@@ -190,8 +190,66 @@ app.post("/api/payment/orders", (req, res) => {
     } = req.body;
 
     const orderId = `PAY-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
+    const parsedAmount = Number(amount) || 30.0;
+
+    let gatewayPaymentId: string | undefined;
+    let gatewayQrCode: string | undefined;
+    let gatewayQrCodeBase64: string | undefined;
+
+    // If Mercado Pago Access Token is configured, generate real Dynamic Pix with the bank
+    const adminConfig = syncStore.getState().adminPaymentConfig || {};
+    const mpToken = adminConfig.mercadopagoAccessToken || process.env.MERCADO_PAGO_ACCESS_TOKEN;
+
+    if (mpToken && (paymentMethod === "pix" || !paymentMethod) && parsedAmount > 0) {
+      try {
+        const host = req.get("host") || "localhost:3000";
+        const protocol = req.headers["x-forwarded-proto"] || req.protocol || "https";
+        const notificationUrl = `${protocol}://${host}/api/webhook/mercadopago`;
+
+        const mpRes = await fetch("https://api.mercadopago.com/v1/payments", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${mpToken}`,
+            "Content-Type": "application/json",
+            "X-Idempotency-Key": orderId
+          },
+          body: JSON.stringify({
+            transaction_amount: parsedAmount,
+            description: `Assinatura ${planDays || 30} dias - ${salonName || "Salão de Beleza"}`,
+            payment_method_id: "pix",
+            payer: {
+              email: buyerEmail || "comprador@agendafacil.com",
+              first_name: (buyerName || "Cliente").split(" ")[0],
+              last_name: (buyerName || "Cliente").split(" ").slice(1).join(" ") || "Salão",
+              identification: {
+                type: "CPF",
+                number: (buyerCpf || "").replace(/\D/g, "") || "00000000000"
+              }
+            },
+            external_reference: orderId,
+            notification_url: notificationUrl
+          })
+        });
+
+        if (mpRes.ok) {
+          const mpData: any = await mpRes.json();
+          gatewayPaymentId = String(mpData.id);
+          gatewayQrCode = mpData.point_of_interaction?.transaction_data?.qr_code;
+          gatewayQrCodeBase64 = mpData.point_of_interaction?.transaction_data?.qr_code_base64;
+        } else {
+          const errText = await mpRes.text();
+          console.warn("[MERCADO PAGO CREATE PIX API RESPONSE]:", errText);
+        }
+      } catch (mpErr) {
+        console.warn("[MERCADO PAGO CREATE PIX ERROR]:", mpErr);
+      }
+    }
+
     const newOrder = syncStore.createPaymentOrder({
       id: orderId,
+      gatewayPaymentId,
+      gatewayQrCode,
+      gatewayQrCodeBase64,
       buyerName: buyerName || "Comprador",
       buyerCpf: buyerCpf || "",
       buyerEmail: buyerEmail || "",
@@ -206,13 +264,13 @@ app.post("/api/payment/orders", (req, res) => {
       salonName: salonName || "Salão de Beleza",
       planDays: planDays || 30,
       priceStr: priceStr || "R$ 30,00",
-      amount: Number(amount) || 30.0,
+      amount: parsedAmount,
       paymentMethod: paymentMethod || "pix",
       adminDestinationAccount: adminDestinationAccount || {
-        beneficiary: "Marlon Soares - Agenda Fácil Oficial",
-        pixKey: "11973395723",
-        bank: "Mercado Pago (Ag: 0001 / CC: 7731871243-4)",
-        cardAccount: "Mercado Pago - Agência: 0001 / Conta: 7731871243-4"
+        beneficiary: adminConfig.nomeBeneficiario || "Marlon Soares - Agenda Fácil Oficial",
+        pixKey: adminConfig.chavePix || "11973395723",
+        bank: adminConfig.bancoOuProcessador || "Mercado Pago",
+        cardAccount: adminConfig.contaRecebimentoCartao || "Mercado Pago"
       },
       status: "WAITING_BANK_CONFIRMATION",
       createdAt: Date.now()
@@ -239,7 +297,9 @@ app.get("/api/payment/orders/:orderId", async (req, res) => {
       const mpToken = adminConfig.mercadopagoAccessToken || process.env.MERCADO_PAGO_ACCESS_TOKEN;
       if (mpToken && (order.gatewayPaymentId || order.id)) {
         try {
-          const searchRef = order.gatewayPaymentId ? `https://api.mercadopago.com/v1/payments/${order.gatewayPaymentId}` : `https://api.mercadopago.com/v1/payments/search?external_reference=${order.id}`;
+          const searchRef = order.gatewayPaymentId 
+            ? `https://api.mercadopago.com/v1/payments/${order.gatewayPaymentId}` 
+            : `https://api.mercadopago.com/v1/payments/search?external_reference=${order.id}`;
           const mpRes = await fetch(searchRef, {
             headers: { 'Authorization': `Bearer ${mpToken}` }
           });
@@ -250,7 +310,7 @@ app.get("/api/payment/orders/:orderId", async (req, res) => {
               order = syncStore.confirmPaymentOrder(orderId, {
                 bankTransactionId: String(paymentItem.id || `MP-${Date.now()}`),
                 bankReceiptCode: `REC-MP-${paymentItem.id || Math.floor(100000 + Math.random() * 900000)}`,
-                confirmedBy: "mercadopago_api_polling_auto",
+                confirmedBy: "mercadopago_notificacao_bancaria_aprovada",
                 creditedToAccount: order.adminDestinationAccount
               });
             }
@@ -267,10 +327,10 @@ app.get("/api/payment/orders/:orderId", async (req, res) => {
   }
 });
 
-// Direct Bank Check & Confirmation (Called by client radar or active verification check)
+// Direct Bank Check (Called continuously by active bank radar - Strictly checks bank API, never bypasses)
 app.post("/api/payment/check-bank-status", async (req, res) => {
   try {
-    const { orderId, forceVerify, confirmedBy } = req.body;
+    const { orderId } = req.body;
     if (!orderId) {
       return res.status(400).json({ error: "orderId é obrigatório." });
     }
@@ -285,21 +345,23 @@ app.post("/api/payment/check-bank-status", async (req, res) => {
         success: true,
         confirmed: true,
         isConfirmed: true,
-        message: "Pagamento já confirmado anteriormente pelo banco!",
+        message: "Pagamento confirmado pelo banco!",
         order
       });
     }
 
-    // Check with configured Gateway (Mercado Pago / Asaas / BACEN) if token exists
+    // Check with configured Gateway (Mercado Pago) if token exists
     const adminConfig = syncStore.getState().adminPaymentConfig || {};
     const mpToken = adminConfig.mercadopagoAccessToken || process.env.MERCADO_PAGO_ACCESS_TOKEN;
     let bankFound = false;
-    let bankTransactionId = `E${Date.now()}${Math.floor(100000 + Math.random() * 900000)}BACENPIX`;
-    let bankReceiptCode = `REC-PIX-${Math.floor(100000 + Math.random() * 900000)}`;
+    let bankTransactionId = "";
+    let bankReceiptCode = "";
 
     if (mpToken) {
       try {
-        const searchRef = order.gatewayPaymentId ? `https://api.mercadopago.com/v1/payments/${order.gatewayPaymentId}` : `https://api.mercadopago.com/v1/payments/search?external_reference=${order.id}`;
+        const searchRef = order.gatewayPaymentId 
+          ? `https://api.mercadopago.com/v1/payments/${order.gatewayPaymentId}` 
+          : `https://api.mercadopago.com/v1/payments/search?external_reference=${order.id}`;
         const mpRes = await fetch(searchRef, {
           headers: { 'Authorization': `Bearer ${mpToken}` }
         });
@@ -315,12 +377,12 @@ app.post("/api/payment/check-bank-status", async (req, res) => {
       } catch {}
     }
 
-    // If forceVerify is requested (user clicked "Verificar Notificação no Banco" or direct bank validation)
-    if (forceVerify || bankFound) {
+    // ONLY confirm if the bank genuinely confirmed the payment via API
+    if (bankFound) {
       const confirmedOrder = syncStore.confirmPaymentOrder(orderId, {
         bankTransactionId,
         bankReceiptCode,
-        confirmedBy: confirmedBy || (bankFound ? "mercadopago_api_aprovado" : "banco_central_pix_validado"),
+        confirmedBy: "mercadopago_notificacao_bancaria_aprovada",
         creditedToAccount: order.adminDestinationAccount
       });
 
