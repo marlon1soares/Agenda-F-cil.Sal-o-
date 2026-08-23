@@ -33,14 +33,37 @@ import { LayoutDashboard, CreditCard, Calendar, Users, Scissors, UserCheck, LogO
 
 export function App() {
   // Check if opened via dedicated direct purchase / activation link
-  const isDirectPurchaseUrl = (() => {
+  const [isDirectPurchaseMode, setIsDirectPurchaseMode] = useState<boolean>(() => {
     try {
       return hasUrlAction('comprar-licenca', 'comprar', 'comprar_licenca', 'licenca', 'buy', 'compra', 'contratar');
     } catch {}
     return false;
-  })();
+  });
 
   const [isPageClosed, setIsPageClosed] = useState(false);
+
+  // Close and exit entire screen / URL action handler
+  const handleCloseEntireScreen = () => {
+    // 1. Attempt standard script and window closing
+    try {
+      window.close();
+      window.open('', '_self', '');
+      window.close();
+    } catch {}
+
+    // 2. Clean URL query parameters so direct purchase mode doesn't re-trigger
+    try {
+      if (typeof window !== 'undefined' && window.history && window.history.replaceState) {
+        const cleanUrl = window.location.origin + window.location.pathname;
+        window.history.replaceState({}, document.title, cleanUrl);
+      }
+    } catch {}
+
+    // 3. Immediately exit full-screen standalone purchase view and return to main app
+    setIsDirectPurchaseMode(false);
+    setIsBuyAppOpen(false);
+    setIsPageClosed(false);
+  };
 
   // Synchronous URL Parameter Detection for instantaneous role and modal setup
   const [userRole, setUserRole] = useState<UserRole>(() => {
@@ -454,7 +477,7 @@ export function App() {
   const licenseInfo = getSalonLicenseInfo(activeSalon);
 
   // Standalone Direct Purchase Mode (when link with ?action=comprar-licenca is opened)
-  if (isDirectPurchaseUrl) {
+  if (isDirectPurchaseMode) {
     if (isPageClosed || !isBuyAppOpen) {
       return (
         <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 text-slate-100 font-sans select-none">
@@ -478,13 +501,7 @@ export function App() {
             <div className="pt-2 space-y-2.5">
               <button
                 type="button"
-                onClick={() => {
-                  try {
-                    window.close();
-                    window.open('', '_self', '');
-                    window.close();
-                  } catch {}
-                }}
+                onClick={handleCloseEntireScreen}
                 className="w-full bg-rose-600 hover:bg-rose-500 text-white font-extrabold py-3.5 px-4 rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg transition-all active:scale-95 cursor-pointer"
               >
                 <LogOut className="w-4 h-4" />
@@ -512,15 +529,7 @@ export function App() {
       <div className="min-h-screen bg-slate-950 font-sans text-slate-800 p-2 sm:p-6 flex items-center justify-center">
         <BuyAppModal
           isOpen={isBuyAppOpen}
-          onClose={() => {
-            try {
-              window.close();
-              window.open('', '_self', '');
-              window.close();
-            } catch {}
-            setIsBuyAppOpen(false);
-            setIsPageClosed(true);
-          }}
+          onClose={handleCloseEntireScreen}
           userRole="salao"
           activeSalon={activeSalon}
           onUpdateSalon={handleUpdateSalon}
