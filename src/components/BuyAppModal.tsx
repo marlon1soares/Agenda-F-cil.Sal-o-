@@ -1565,21 +1565,6 @@ Olá *${createdSalon.ownerName}*, seu acesso ao aplicativo *${createdSalon.name}
                         O valor a ser creditado é <strong>{currentPlan.priceStr}</strong> diretamente na conta oficial. A comunicação entre o banco e o aplicativo opera 24 horas por dia.
                       </p>
                     </div>
-
-                    {/* Ferramenta de Teste de Webhook (Apenas para Testes/Administração) */}
-                    {(userRole === 'admin' || isAdminCpf(cpf) || Boolean(getUrlParam('teste-banco'))) && (
-                      <div className="pt-1 border-t border-slate-800/80">
-                        <button
-                          type="button"
-                          onClick={handleSimulateBankPixDeposit}
-                          disabled={isSimulatingPix || isAutoAdvancing}
-                          className="w-full bg-slate-900 hover:bg-slate-800 border border-slate-700 text-sky-300 text-[10px] py-1.5 px-2 rounded-xl flex items-center justify-center gap-1 cursor-pointer transition-colors"
-                        >
-                          <Radio className="w-3 h-3 text-sky-400 animate-pulse" />
-                          <span>🧪 [Ambiente de Teste Adm] Simular Notificação Webhook do Banco Central</span>
-                        </button>
-                      </div>
-                    )}
                   </div>
                 )}
 
@@ -1756,21 +1741,6 @@ Olá *${createdSalon.ownerName}*, seu acesso ao aplicativo *${createdSalon.name}
                         </>
                       )}
                     </button>
-
-                    {/* Ferramenta de Teste de Webhook para Cartão (Ambiente de Testes) */}
-                    {adminPaymentConfig.ativarAmbienteTestes && (
-                      <div className="pt-1">
-                        <button
-                          type="button"
-                          onClick={handleSimulateBankPixDeposit}
-                          disabled={isSimulatingPix || isAutoAdvancing}
-                          className="w-full bg-slate-900 hover:bg-slate-800 border border-slate-700 text-sky-300 text-[10px] py-1.5 px-2 rounded-xl flex items-center justify-center gap-1 cursor-pointer transition-colors"
-                        >
-                          <Radio className="w-3 h-3 text-sky-400 animate-pulse" />
-                          <span>🧪 [Ambiente de Teste Adm] Simular Notificação Webhook da Operadora de Cartão</span>
-                        </button>
-                      </div>
-                    )}
                   </div>
                 )}
 
