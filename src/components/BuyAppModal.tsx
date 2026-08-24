@@ -204,6 +204,10 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
   const [copiedPixEmv, setCopiedPixEmv] = useState(false);
   const [isZoomingQr, setIsZoomingQr] = useState(false);
 
+  // Mercado Pago Preference & Checkout State
+  const [preferenceId, setPreferenceId] = useState<string>('');
+  const [initPoint, setInitPoint] = useState<string>('');
+
   // Banking Order & Verification State (Auto-Advance upon bank credit)
   const [activeOrderId, setActiveOrderId] = useState<string | null>(null);
   const [bankOrderStatus, setBankOrderStatus] = useState<'idle' | 'waiting_bank' | 'bank_confirmed' | 'failed'>('idle');
@@ -603,10 +607,11 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
 
     try {
       setIsProcessing(true);
-      const res = await fetch('/api/payment/orders', {
+      const res = await fetch('/api/pay', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          orderId: orderIdToUse,
           buyerName: finalName,
           buyerCpf: finalCpf,
           buyerEmail: finalEmail,
@@ -643,14 +648,26 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
           data = null;
         }
 
-        if (data && data.success && data.order) {
-          setActiveOrderId(data.order.id);
-          if (data.order.gatewayQrCode) {
-            setPixEmvPayload(data.order.gatewayQrCode);
-            if (data.order.gatewayQrCodeBase64) {
-              setPixQrDataUrl(`data:image/png;base64,${data.order.gatewayQrCodeBase64}`);
+        if (data && data.success) {
+          if (data.preferenceId) setPreferenceId(data.preferenceId);
+          if (data.initPoint) setInitPoint(data.initPoint);
+
+          const order = data.order || {};
+          const finalId = order.id || data.orderId || orderIdToUse;
+          setActiveOrderId(finalId);
+
+          if (order.preferenceId) setPreferenceId(order.preferenceId);
+          if (order.initPoint) setInitPoint(order.initPoint);
+
+          const qrCode = order.gatewayQrCode || data.gatewayQrCode;
+          const qrCodeBase64 = order.gatewayQrCodeBase64 || data.gatewayQrCodeBase64;
+
+          if (qrCode) {
+            setPixEmvPayload(qrCode);
+            if (qrCodeBase64) {
+              setPixQrDataUrl(`data:image/png;base64,${qrCodeBase64}`);
             } else {
-              generateQrCodeDataUrl(data.order.gatewayQrCode).then(url => {
+              generateQrCodeDataUrl(qrCode).then(url => {
                 if (url) setPixQrDataUrl(url);
               });
             }
@@ -1488,6 +1505,18 @@ Olá *${createdSalon.ownerName}*, seu acesso ao aplicativo *${createdSalon.name}
                         <Copy className="w-3 h-3 text-slate-400" />
                         <span>{copiedPix ? 'Chave Pix Copiada!' : `Copiar Chave (${adminPaymentConfig.chavePix})`}</span>
                       </button>
+
+                      {initPoint && (
+                        <a
+                          href={initPoint}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="w-full bg-[#009EE3] hover:bg-[#0081b8] text-white font-extrabold py-2 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-md transition-all active:scale-95 cursor-pointer text-center"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                          <span>Pagar no Checkout Mercado Pago</span>
+                        </a>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1741,6 +1770,18 @@ Olá *${createdSalon.ownerName}*, seu acesso ao aplicativo *${createdSalon.name}
                         </>
                       )}
                     </button>
+
+                    {initPoint && (
+                      <a
+                        href={initPoint}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="w-full bg-[#009EE3] hover:bg-[#0081b8] text-white font-extrabold py-2.5 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-md transition-all active:scale-95 cursor-pointer text-center"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        <span>Pagar no Checkout Seguro Mercado Pago</span>
+                      </a>
+                    )}
                   </div>
                 )}
 

@@ -162,12 +162,131 @@ app.post("/api/presence/heartbeat", (req, res) => {
   }
 });
 
+// Helper to retrieve Mercado Pago Access Token securely from server environment or admin config
+const getMercadoPagoAccessToken = (): string | undefined => {
+  const adminConfig = syncStore.getState().adminPaymentConfig || {};
+  return (
+    adminConfig.mercadopagoAccessToken ||
+    process.env.MERCADOPAGO_ACCESS_TOKEN ||
+    process.env.MERCADO_PAGO_ACCESS_TOKEN ||
+    process.env.MP_ACCESS_TOKEN ||
+    process.env.MERCADOPAGO_TOKEN ||
+    process.env.MERCADO_PAGO_TOKEN
+  )?.trim();
+};
+
+const getMercadoPagoPublicKey = (): string | undefined => {
+  const adminConfig = syncStore.getState().adminPaymentConfig || {};
+  return (
+    adminConfig.mercadopagoPublicKey ||
+    process.env.MERCADOPAGO_PUBLIC_KEY ||
+    process.env.MERCADO_PAGO_PUBLIC_KEY ||
+    process.env.MP_PUBLIC_KEY
+  )?.trim();
+};
+
+const getPaymentWebhookSecret = (): string | undefined => {
+  const adminConfig = syncStore.getState().adminPaymentConfig || {};
+  return (
+    adminConfig.webhookSecret ||
+    process.env.MERCADOPAGO_WEBHOOK_SECRET ||
+    process.env.MERCADO_PAGO_WEBHOOK_SECRET ||
+    process.env.PAYMENT_WEBHOOK_SECRET
+  )?.trim();
+};
+
+// Central helper to confirm payment and auto-activate salon in syncStore
+const processOrderConfirmation = (orderId: string, details: {
+  bankTransactionId?: string;
+  bankReceiptCode?: string;
+  confirmedBy?: string;
+  creditedToAccount?: any;
+}) => {
+  const confirmedOrder = syncStore.confirmPaymentOrder(orderId, details);
+  if (!confirmedOrder) return null;
+
+  try {
+    const state = syncStore.getState();
+    const salons = [...(state.salons || [])];
+    const cleanCpf = (confirmedOrder.buyerCpf || "").replace(/\D/g, "");
+
+    let salonIndex = salons.findIndex(s =>
+      (s.ownerCpf && s.ownerCpf.replace(/\D/g, "") === cleanCpf && cleanCpf.length > 0) ||
+      (confirmedOrder.salonName && s.name && s.name.toLowerCase() === confirmedOrder.salonName.toLowerCase())
+    );
+
+    const planDays = Number(confirmedOrder.planDays) || 30;
+    const now = new Date();
+    const expiresDate = new Date(now.getTime() + planDays * 24 * 60 * 60 * 1000);
+    const purchaseToken = `AGF-${cleanCpf.slice(-4) || "2026"}-${Math.floor(1000 + Math.random() * 9000)}`;
+
+    if (salonIndex >= 0) {
+      const existing = salons[salonIndex];
+      const prevExpiry = existing.expiresAt ? new Date(existing.expiresAt) : now;
+      const baseDate = prevExpiry > now ? prevExpiry : now;
+      const newExpiry = new Date(baseDate.getTime() + planDays * 24 * 60 * 60 * 1000);
+
+      salons[salonIndex] = {
+        ...existing,
+        planDays: (existing.planDays || 0) + planDays,
+        expiresAt: newExpiry.toISOString().split("T")[0],
+        purchaseDate: now.toISOString().split("T")[0],
+        token: existing.token || purchaseToken,
+        purchaseToken: existing.purchaseToken || purchaseToken,
+        licenseType: planDays >= 365 ? "anual" : "mensal",
+        status: "ativo"
+      };
+    } else if (confirmedOrder.salonName) {
+      salons.push({
+        id: `salon-${Date.now()}`,
+        name: confirmedOrder.salonName,
+        ownerName: confirmedOrder.buyerName,
+        ownerEmail: confirmedOrder.buyerEmail,
+        ownerPhone: confirmedOrder.buyerPhone,
+        ownerCpf: confirmedOrder.buyerCpf,
+        ownerRg: confirmedOrder.buyerRg,
+        cep: confirmedOrder.cep,
+        logradouro: confirmedOrder.logradouro,
+        numero: confirmedOrder.numero,
+        bairro: confirmedOrder.bairro,
+        cidade: confirmedOrder.cidade,
+        uf: confirmedOrder.uf,
+        createdAt: now.toISOString().split("T")[0],
+        purchaseDate: now.toISOString().split("T")[0],
+        expiresAt: expiresDate.toISOString().split("T")[0],
+        planDays,
+        token: purchaseToken,
+        purchaseToken,
+        licenseType: planDays >= 365 ? "anual" : "mensal",
+        status: "ativo"
+      });
+    }
+    syncStore.updateState({ salons });
+  } catch (err) {
+    console.warn("[AUTO SALON ACTIVATION WARNING]:", err);
+  }
+
+  return confirmedOrder;
+};
+
 // ==========================================
-// BANKING & PAYMENT GATEWAY APIS (PIX & CARTÃO)
+// BANKING & PAYMENT GATEWAY APIS (PIX, MERCADO PAGO, CARTÃO)
 // ==========================================
 
-// Create Payment Order (Register banking transaction for live tracking)
-app.post("/api/payment/orders", async (req, res) => {
+// Safe Public Config endpoint (returns non-secret info for client UI)
+app.get("/api/payment/public-config", (_req, res) => {
+  const mpToken = getMercadoPagoAccessToken();
+  const pubKey = getMercadoPagoPublicKey();
+  res.json({
+    hasMercadoPago: !!mpToken,
+    publicKey: pubKey || null,
+    gateway: "mercadopago"
+  });
+});
+
+// Unified Backend Payment Handler & Preference Generator (/api/pay & /api/payment/orders)
+// Isolates all secret access tokens strictly on the backend
+app.post(["/api/pay", "/api/pay/preference", "/api/payment/create-preference", "/api/payment/orders"], async (req, res) => {
   try {
     const {
       buyerName,
@@ -189,41 +308,103 @@ app.post("/api/payment/orders", async (req, res) => {
       adminDestinationAccount,
     } = req.body;
 
-    const orderId = `PAY-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
+    const orderId = req.body.orderId || `PAY-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
     const parsedAmount = Number(amount) || 30.0;
+    const planDuration = Number(planDays) || 30;
+    const cleanBuyerCpf = (buyerCpf || "").replace(/\D/g, "") || "00000000000";
+    const firstName = (buyerName || "Cliente").split(" ")[0] || "Cliente";
+    const lastName = (buyerName || "Cliente").split(" ").slice(1).join(" ") || "Salão";
 
+    const host = req.get("host") || "localhost:3000";
+    const protocol = req.headers["x-forwarded-proto"] || req.protocol || "https";
+    const appUrl = process.env.APP_URL || `${protocol}://${host}`;
+    const notificationUrl = `${protocol}://${host}/api/webhook/mercadopago`;
+
+    let preferenceId: string | undefined;
+    let initPoint: string | undefined;
+    let sandboxInitPoint: string | undefined;
     let gatewayPaymentId: string | undefined;
     let gatewayQrCode: string | undefined;
     let gatewayQrCodeBase64: string | undefined;
 
-    // If Mercado Pago Access Token is configured, generate real Dynamic Pix with the bank
-    const adminConfig = syncStore.getState().adminPaymentConfig || {};
-    const mpToken = adminConfig.mercadopagoAccessToken || process.env.MERCADO_PAGO_ACCESS_TOKEN;
+    const mpToken = getMercadoPagoAccessToken();
 
+    // 1. Generate Preference ID on Mercado Pago (Checkout Pro / Bricks) if secret token is configured
+    if (mpToken && parsedAmount > 0) {
+      try {
+        const prefRes = await fetch("https://api.mercadopago.com/checkout/preferences", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${mpToken}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            items: [
+              {
+                id: `plan-${planDuration}d`,
+                title: `Assinatura ${planDuration} dias - ${salonName || "Salão de Beleza"}`,
+                description: `Acesso operacional ao Sistema Agenda Fácil (${planDuration} dias)`,
+                quantity: 1,
+                currency_id: "BRL",
+                unit_price: parsedAmount
+              }
+            ],
+            payer: {
+              name: firstName,
+              surname: lastName,
+              email: buyerEmail || "comprador@agendafacil.com",
+              identification: {
+                type: "CPF",
+                number: cleanBuyerCpf
+              }
+            },
+            back_urls: {
+              success: `${appUrl}/?payment_status=success&order_id=${orderId}`,
+              pending: `${appUrl}/?payment_status=pending&order_id=${orderId}`,
+              failure: `${appUrl}/?payment_status=failure&order_id=${orderId}`
+            },
+            auto_return: "approved",
+            notification_url: notificationUrl,
+            external_reference: orderId,
+            statement_descriptor: "AGENDA FACIL"
+          })
+        });
+
+        if (prefRes.ok) {
+          const prefData: any = await prefRes.json();
+          preferenceId = prefData.id;
+          initPoint = prefData.init_point;
+          sandboxInitPoint = prefData.sandbox_init_point;
+        } else {
+          const errText = await prefRes.text();
+          console.warn("[MERCADO PAGO CREATE PREFERENCE API RESPONSE]:", errText);
+        }
+      } catch (prefErr) {
+        console.warn("[MERCADO PAGO CREATE PREFERENCE ERROR]:", prefErr);
+      }
+    }
+
+    // 2. Generate Real Dynamic Pix if Pix method is requested
     if (mpToken && (paymentMethod === "pix" || !paymentMethod) && parsedAmount > 0) {
       try {
-        const host = req.get("host") || "localhost:3000";
-        const protocol = req.headers["x-forwarded-proto"] || req.protocol || "https";
-        const notificationUrl = `${protocol}://${host}/api/webhook/mercadopago`;
-
         const mpRes = await fetch("https://api.mercadopago.com/v1/payments", {
           method: "POST",
           headers: {
             "Authorization": `Bearer ${mpToken}`,
             "Content-Type": "application/json",
-            "X-Idempotency-Key": orderId
+            "X-Idempotency-Key": `${orderId}-pix`
           },
           body: JSON.stringify({
             transaction_amount: parsedAmount,
-            description: `Assinatura ${planDays || 30} dias - ${salonName || "Salão de Beleza"}`,
+            description: `Assinatura ${planDuration} dias - ${salonName || "Salão de Beleza"}`,
             payment_method_id: "pix",
             payer: {
               email: buyerEmail || "comprador@agendafacil.com",
-              first_name: (buyerName || "Cliente").split(" ")[0],
-              last_name: (buyerName || "Cliente").split(" ").slice(1).join(" ") || "Salão",
+              first_name: firstName,
+              last_name: lastName,
               identification: {
                 type: "CPF",
-                number: (buyerCpf || "").replace(/\D/g, "") || "00000000000"
+                number: cleanBuyerCpf
               }
             },
             external_reference: orderId,
@@ -245,8 +426,12 @@ app.post("/api/payment/orders", async (req, res) => {
       }
     }
 
+    const adminConfig = syncStore.getState().adminPaymentConfig || {};
     const newOrder = syncStore.createPaymentOrder({
       id: orderId,
+      preferenceId,
+      initPoint,
+      sandboxInitPoint,
       gatewayPaymentId,
       gatewayQrCode,
       gatewayQrCodeBase64,
@@ -262,8 +447,8 @@ app.post("/api/payment/orders", async (req, res) => {
       cidade: cidade || "",
       uf: uf || "",
       salonName: salonName || "Salão de Beleza",
-      planDays: planDays || 30,
-      priceStr: priceStr || "R$ 30,00",
+      planDays: planDuration,
+      priceStr: priceStr || `R$ ${parsedAmount.toFixed(2).replace(".", ",")}`,
       amount: parsedAmount,
       paymentMethod: paymentMethod || "pix",
       adminDestinationAccount: adminDestinationAccount || {
@@ -276,7 +461,17 @@ app.post("/api/payment/orders", async (req, res) => {
       createdAt: Date.now()
     });
 
-    res.json({ success: true, order: newOrder });
+    res.json({
+      success: true,
+      preferenceId,
+      initPoint,
+      sandboxInitPoint,
+      orderId,
+      gatewayPaymentId,
+      gatewayQrCode,
+      gatewayQrCodeBase64,
+      order: newOrder
+    });
   } catch (err: any) {
     res.status(500).json({ error: err.message || "Erro ao gerar ordem de pagamento bancária." });
   }
@@ -293,8 +488,7 @@ app.get("/api/payment/orders/:orderId", async (req, res) => {
 
     // If order is waiting and gateway token is configured, check with gateway API
     if (order.status !== "CONFIRMED_BY_BANK") {
-      const adminConfig = syncStore.getState().adminPaymentConfig || {};
-      const mpToken = adminConfig.mercadopagoAccessToken || process.env.MERCADO_PAGO_ACCESS_TOKEN;
+      const mpToken = getMercadoPagoAccessToken();
       if (mpToken && (order.gatewayPaymentId || order.id)) {
         try {
           const searchRef = order.gatewayPaymentId 
@@ -307,12 +501,12 @@ app.get("/api/payment/orders/:orderId", async (req, res) => {
             const mpData: any = await mpRes.json();
             const paymentItem = Array.isArray(mpData.results) ? mpData.results[0] : mpData;
             if (paymentItem && (paymentItem.status === 'approved' || paymentItem.status_detail === 'accredited')) {
-              order = syncStore.confirmPaymentOrder(orderId, {
+              order = processOrderConfirmation(orderId, {
                 bankTransactionId: String(paymentItem.id || `MP-${Date.now()}`),
                 bankReceiptCode: `REC-MP-${paymentItem.id || Math.floor(100000 + Math.random() * 900000)}`,
                 confirmedBy: "mercadopago_notificacao_bancaria_aprovada",
                 creditedToAccount: order.adminDestinationAccount
-              });
+              }) || order;
             }
           }
         } catch (mpErr) {
@@ -351,8 +545,7 @@ app.post("/api/payment/check-bank-status", async (req, res) => {
     }
 
     // Check with configured Gateway (Mercado Pago) if token exists
-    const adminConfig = syncStore.getState().adminPaymentConfig || {};
-    const mpToken = adminConfig.mercadopagoAccessToken || process.env.MERCADO_PAGO_ACCESS_TOKEN;
+    const mpToken = getMercadoPagoAccessToken();
     let bankFound = false;
     let bankTransactionId = "";
     let bankReceiptCode = "";
@@ -379,12 +572,12 @@ app.post("/api/payment/check-bank-status", async (req, res) => {
 
     // ONLY confirm if the bank genuinely confirmed the payment via API
     if (bankFound) {
-      const confirmedOrder = syncStore.confirmPaymentOrder(orderId, {
+      const confirmedOrder = processOrderConfirmation(orderId, {
         bankTransactionId,
         bankReceiptCode,
         confirmedBy: "mercadopago_notificacao_bancaria_aprovada",
         creditedToAccount: order.adminDestinationAccount
-      });
+      }) || order;
 
       return res.json({
         success: true,
@@ -422,12 +615,12 @@ app.post("/api/payment/confirm-pix-deposit", (req, res) => {
       return res.status(404).json({ error: "Ordem de pagamento não encontrada no sistema." });
     }
 
-    const confirmedOrder = syncStore.confirmPaymentOrder(orderId, {
+    const confirmedOrder = processOrderConfirmation(orderId, {
       bankTransactionId: bankTransactionId || `E${Date.now()}${Math.floor(100000 + Math.random() * 900000)}BACENPIX`,
       bankReceiptCode: bankReceiptCode || `REC-PIX-${Math.floor(100000 + Math.random() * 900000)}`,
       confirmedBy: confirmedBy || "banco_central_pix_webhook",
       creditedToAccount: currentOrder.adminDestinationAccount
-    });
+    }) || currentOrder;
 
     res.json({
       success: true,
@@ -524,7 +717,7 @@ app.post("/api/payment/process-card", async (req, res) => {
       });
     }
 
-    const mpToken = adminConfig.mercadopagoAccessToken || process.env.MERCADO_PAGO_ACCESS_TOKEN;
+    const mpToken = getMercadoPagoAccessToken();
     const installmentsNum = Number(cardInstallments) || 1;
     const orderAmount = Number(order.amount) || 30.0;
 
@@ -659,12 +852,12 @@ app.post("/api/payment/process-card", async (req, res) => {
     }
 
     // Confirm order authoritatively when bank authorization is obtained
-    const confirmedOrder = syncStore.confirmPaymentOrder(targetOrderId, {
+    const confirmedOrder = processOrderConfirmation(targetOrderId, {
       bankTransactionId: bankTid,
       bankReceiptCode: bankAuthCode,
       confirmedBy: "banco_operadora_cartao_credito_pci_dss_autorizado",
       creditedToAccount: effectiveDestAccount
-    });
+    }) || order;
 
     return res.json({
       success: true,
@@ -686,8 +879,7 @@ app.post("/api/payment/process-card", async (req, res) => {
 // Generic Secure Webhook Endpoint with HMAC-SHA256 Signature Validation & Anti-Replay
 app.post("/api/webhook/payment", (req, res) => {
   try {
-    const adminConfig = syncStore.getState().adminPaymentConfig || {};
-    const configuredSecret = adminConfig.webhookSecret || process.env.PAYMENT_WEBHOOK_SECRET;
+    const configuredSecret = getPaymentWebhookSecret();
 
     // Validate Signature
     const verification = WebhookSecurity.verifyWebhookSignature({
@@ -715,7 +907,7 @@ app.post("/api/webhook/payment", (req, res) => {
 
     const targetId = orderId || (data && data.id) || id;
     if (targetId) {
-      const updatedOrder = syncStore.confirmPaymentOrder(String(targetId), {
+      const updatedOrder = processOrderConfirmation(String(targetId), {
         bankTransactionId: `WEBHOOK-${eventId}-${Date.now()}`,
         confirmedBy: `webhook_autenticado_${verification.provider}`
       });
@@ -733,16 +925,15 @@ app.post("/api/webhook/payment", (req, res) => {
   }
 });
 
-// Mercado Pago Official Webhook Endpoint (Validates x-signature header and fetches payment status)
+// Mercado Pago Official Webhook Endpoint (Validates signature and fetches payment status)
 app.all("/api/webhook/mercadopago", async (req, res) => {
   if (req.method === "GET") {
     return res.status(200).json({ status: "ok", message: "Mercado Pago Webhook Endpoint Ativo" });
   }
 
   try {
-    const adminConfig = syncStore.getState().adminPaymentConfig || {};
-    const secret = adminConfig.webhookSecret || process.env.MERCADO_PAGO_WEBHOOK_SECRET || process.env.PAYMENT_WEBHOOK_SECRET;
-    const mpToken = adminConfig.mercadopagoAccessToken || process.env.MERCADO_PAGO_ACCESS_TOKEN;
+    const secret = getPaymentWebhookSecret();
+    const mpToken = getMercadoPagoAccessToken();
 
     const verification = WebhookSecurity.verifyWebhookSignature({
       headers: req.headers as Record<string, string | string[] | undefined>,
@@ -775,11 +966,11 @@ app.all("/api/webhook/mercadopago", async (req, res) => {
             
             if (isApproved) {
               const targetId = extRef || pidStr;
-              syncStore.confirmPaymentOrder(targetId, {
+              processOrderConfirmation(targetId, {
                 bankTransactionId: String(paymentItem.id || `MP-${pidStr}`),
                 bankReceiptCode: `REC-MP-${paymentItem.id || pidStr}`,
                 confirmedBy: "mercadopago_webhook_oficial_aprovado",
-                creditedToAccount: adminConfig.cartaoContaDestino || "Mercado Pago"
+                creditedToAccount: "Mercado Pago"
               });
             }
           }
@@ -789,7 +980,7 @@ app.all("/api/webhook/mercadopago", async (req, res) => {
       }
 
       // 2. Also attempt direct confirmation by ID
-      syncStore.confirmPaymentOrder(pidStr, {
+      processOrderConfirmation(pidStr, {
         bankTransactionId: `MP-${pidStr}`,
         confirmedBy: "mercadopago_webhook_v1"
       });
