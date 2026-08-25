@@ -23,15 +23,11 @@ export function formatBRL(val?: number | string | null): string {
 export function calculateDefaultPricesFromBase(base30: number): {
   p30: number;
   p90: number;
-  p180: number;
-  p365: number;
 } {
   const base = isNaN(base30) || base30 <= 0 ? 30 : base30;
   return {
     p30: Number(base.toFixed(2)),
     p90: Number((base * 2.5).toFixed(2)),
-    p180: Number((base * 4.5).toFixed(2)),
-    p365: Number((base * 8).toFixed(2)),
   };
 }
 
@@ -41,8 +37,6 @@ export function getCalculatedLicensePlans(
 ): LicensePlan[] {
   let p30 = 30;
   let p90 = 75;
-  let p180 = 135;
-  let p365 = 240;
   let trialDays = 15;
   let isTrialEnabled = true;
 
@@ -50,20 +44,12 @@ export function getCalculatedLicensePlans(
     const calculated = calculateDefaultPricesFromBase(configOrBase);
     p30 = calculated.p30;
     p90 = calculated.p90;
-    p180 = calculated.p180;
-    p365 = calculated.p365;
   } else if (configOrBase && typeof configOrBase === 'object') {
     const base = Number(configOrBase.precoPlano30Dias) || 30;
     p30 = base;
     p90 = (configOrBase.precoPlano90Dias !== undefined && configOrBase.precoPlano90Dias !== null && Number(configOrBase.precoPlano90Dias) > 0)
       ? Number(configOrBase.precoPlano90Dias)
       : Number((base * 2.5).toFixed(2));
-    p180 = (configOrBase.precoPlano180Dias !== undefined && configOrBase.precoPlano180Dias !== null && Number(configOrBase.precoPlano180Dias) > 0)
-      ? Number(configOrBase.precoPlano180Dias)
-      : Number((base * 4.5).toFixed(2));
-    p365 = (configOrBase.precoPlano365Dias !== undefined && configOrBase.precoPlano365Dias !== null && Number(configOrBase.precoPlano365Dias) > 0)
-      ? Number(configOrBase.precoPlano365Dias)
-      : Number((base * 8).toFixed(2));
 
     if (configOrBase.diasGratuitos !== undefined && configOrBase.diasGratuitos !== null && Number(configOrBase.diasGratuitos) > 0) {
       trialDays = Number(configOrBase.diasGratuitos);
@@ -114,30 +100,6 @@ export function getCalculatedLicensePlans(
       tag: 'Plano 2',
       badge: 'Plano 2 (3 Meses)',
       maxInstallments: 1,
-    },
-    {
-      days: 180,
-      label: 'Plano 3 (6 Meses)',
-      shortLabel: 'Plano 3 - 6 Meses (Semestral)',
-      priceStr: formatBRL(p180),
-      numVal: p180,
-      monthlyEquivalentStr: `${formatBRL(p180 / 6)} / mês`,
-      detail: `${formatBRL(p180 / 6)} / mês`,
-      tag: 'Plano 3 (Até 6x)',
-      badge: 'Plano 3 (6 Meses)',
-      maxInstallments: 6,
-    },
-    {
-      days: 365,
-      label: 'Plano 4 (1 Ano)',
-      shortLabel: 'Plano 4 - 1 Ano (Anual)',
-      priceStr: formatBRL(p365),
-      numVal: p365,
-      monthlyEquivalentStr: `${formatBRL(p365 / 12)} / mês`,
-      detail: `${formatBRL(p365 / 12)} / mês`,
-      tag: 'Plano 4 (Até 6x)',
-      badge: 'Plano 4 (1 Ano)',
-      maxInstallments: 6,
     }
   );
 

@@ -1084,12 +1084,12 @@ Olá *${createdSalon.ownerName}*, seu acesso ao aplicativo *${createdSalon.name}
                 <span className="flex items-center gap-1.5">
                   <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
                   <span>
-                    Não é obrigatório usar o teste gratuito: você pode <strong>pular direto para os Planos Pagos (1, 2, 3 ou 4)</strong> e finalizar sua compra.
+                    Não é obrigatório usar o teste gratuito: você pode <strong>pular direto para os Planos Pagos (Plano 1 ou Plano 2)</strong> e finalizar sua compra.
                   </span>
                 </span>
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 pt-1">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 pt-1">
                 {availablePlans.map((p) => {
                   const isPlanTrial = p.numVal === 0;
                   const isDisabledTrial = isPlanTrial && isTrialAlreadyUsed;

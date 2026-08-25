@@ -16,8 +16,6 @@ export const AdminPaymentAccountModal: React.FC<AdminPaymentAccountModalProps> =
   const [config, setConfig] = useState<AdminPaymentConfig>(() => Storage.getAdminPaymentConfig());
   const [p30Input, setP30Input] = useState<string>('30.00');
   const [p90Input, setP90Input] = useState<string>('75.00');
-  const [p180Input, setP180Input] = useState<string>('135.00');
-  const [p365Input, setP365Input] = useState<string>('240.00');
   const [freeDaysInput, setFreeDaysInput] = useState<string>('15');
   const [enableTrial, setEnableTrial] = useState<boolean>(true);
   const [successMsg, setSuccessMsg] = useState('');
@@ -31,8 +29,6 @@ export const AdminPaymentAccountModal: React.FC<AdminPaymentAccountModalProps> =
       setConfig(current);
       setP30Input(String(current.precoPlano30Dias || 30));
       setP90Input(String(current.precoPlano90Dias || 75));
-      setP180Input(String(current.precoPlano180Dias || 135));
-      setP365Input(String(current.precoPlano365Dias || 240));
       setFreeDaysInput(String(current.diasGratuitos !== undefined && current.diasGratuitos !== null ? current.diasGratuitos : 15));
       setEnableTrial(current.habilitarPlanoGratuito !== false);
       setTestResult(null);
@@ -43,8 +39,6 @@ export const AdminPaymentAccountModal: React.FC<AdminPaymentAccountModalProps> =
 
   const numP30 = Number(p30Input.replace(',', '.')) || 30;
   const numP90 = Number(p90Input.replace(',', '.')) || (numP30 * 2.5);
-  const numP180 = Number(p180Input.replace(',', '.')) || (numP30 * 4.5);
-  const numP365 = Number(p365Input.replace(',', '.')) || (numP30 * 8);
   const numFreeDays = Math.max(1, parseInt(freeDaysInput, 10) || 15);
 
   const webhookBaseUrl = (typeof window !== 'undefined' && window.location.origin) || (config.productionUrl || 'https://agenda-f-cil-sal-o.vercel.app');
@@ -88,8 +82,6 @@ export const AdminPaymentAccountModal: React.FC<AdminPaymentAccountModalProps> =
     const defaults = calculateDefaultPricesFromBase(base);
     setP30Input(String((defaults.p30 || 30).toFixed(2)));
     setP90Input(String((defaults.p90 || 75).toFixed(2)));
-    setP180Input(String((defaults.p180 || 135).toFixed(2)));
-    setP365Input(String((defaults.p365 || 240).toFixed(2)));
   };
 
   const handleBase30Change = (val: string) => {
@@ -98,8 +90,6 @@ export const AdminPaymentAccountModal: React.FC<AdminPaymentAccountModalProps> =
     if (!isNaN(parsed) && parsed > 0) {
       const defaults = calculateDefaultPricesFromBase(parsed);
       setP90Input(String((defaults.p90 || 75).toFixed(2)));
-      setP180Input(String((defaults.p180 || 135).toFixed(2)));
-      setP365Input(String((defaults.p365 || 240).toFixed(2)));
     }
   };
 
@@ -107,8 +97,6 @@ export const AdminPaymentAccountModal: React.FC<AdminPaymentAccountModalProps> =
     ...config,
     precoPlano30Dias: numP30,
     precoPlano90Dias: numP90,
-    precoPlano180Dias: numP180,
-    precoPlano365Dias: numP365,
     diasGratuitos: numFreeDays,
     habilitarPlanoGratuito: enableTrial
   }, true);
@@ -119,8 +107,6 @@ export const AdminPaymentAccountModal: React.FC<AdminPaymentAccountModalProps> =
       ...config,
       precoPlano30Dias: numP30,
       precoPlano90Dias: numP90,
-      precoPlano180Dias: numP180,
-      precoPlano365Dias: numP365,
       diasGratuitos: numFreeDays,
       habilitarPlanoGratuito: enableTrial
     };
@@ -269,7 +255,7 @@ export const AdminPaymentAccountModal: React.FC<AdminPaymentAccountModalProps> =
                 type="button"
                 onClick={handleRecalculateFrom30}
                 className="text-[10px] bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 font-bold px-2 py-1 rounded-lg border border-emerald-500/40 flex items-center gap-1 transition-colors"
-                title="Recalcula 3 meses, 6 meses e 1 ano a partir dos 30 dias"
+                title="Recalcula o Plano 2 (3 Meses) a partir dos 30 dias"
               >
                 <RefreshCw className="w-3 h-3" />
                 <span>Recalcular Automático</span>
@@ -277,11 +263,11 @@ export const AdminPaymentAccountModal: React.FC<AdminPaymentAccountModalProps> =
             </div>
 
             <p className="text-[11px] text-slate-300">
-              Ao digitar o valor dos <strong>primeiros 30 dias</strong> (ex: R$ 30,00), os outros planos são recalculados automaticamente, ou você pode digitar o valor exato que preferir em cada plano:
+              Ao digitar o valor do <strong>Plano 1 (30 dias)</strong> (ex: R$ 30,00), o <strong>Plano 2 (3 meses)</strong> é recalculado automaticamente, ou você pode digitar o valor exato que preferir:
             </p>
 
-            {/* 4 Plan Inputs Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+            {/* 2 Plan Inputs Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
               
               {/* 30 Dias */}
               <div className="bg-slate-900 p-3 rounded-xl border border-emerald-500/40 space-y-1">
@@ -329,63 +315,17 @@ export const AdminPaymentAccountModal: React.FC<AdminPaymentAccountModalProps> =
                 <div className="text-[10px] text-slate-400">Equivale a {formatBRL(numP90 / 3)}/mês</div>
               </div>
 
-              {/* 6 Meses */}
-              <div className="bg-slate-900 p-3 rounded-xl border border-slate-800 space-y-1">
-                <div className="flex items-center justify-between text-[11px]">
-                  <span className="font-black text-white">3. Plano 6 Meses:</span>
-                  <span className="text-[9px] text-emerald-400 font-bold">Até 6x</span>
-                </div>
-                <div className="relative">
-                  <span className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-emerald-400 font-bold text-xs">
-                    R$
-                  </span>
-                  <input
-                    type="number"
-                    step="0.10"
-                    min="1"
-                    value={p180Input}
-                    onChange={(e) => setP180Input(e.target.value)}
-                    required
-                    className="w-full bg-slate-950 border border-slate-700 rounded-lg pl-8 pr-2.5 py-1.5 text-white font-mono font-bold text-sm focus:outline-none focus:border-emerald-400"
-                  />
-                </div>
-                <div className="text-[10px] text-slate-400">Equivale a {formatBRL(numP180 / 6)}/mês</div>
-              </div>
-
-              {/* 1 Ano */}
-              <div className="bg-slate-900 p-3 rounded-xl border border-slate-800 space-y-1">
-                <div className="flex items-center justify-between text-[11px]">
-                  <span className="font-black text-white">4. Plano 1 Ano (Anual):</span>
-                  <span className="text-[9px] text-emerald-400 font-bold">Até 6x</span>
-                </div>
-                <div className="relative">
-                  <span className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-emerald-400 font-bold text-xs">
-                    R$
-                  </span>
-                  <input
-                    type="number"
-                    step="0.10"
-                    min="1"
-                    value={p365Input}
-                    onChange={(e) => setP365Input(e.target.value)}
-                    required
-                    className="w-full bg-slate-950 border border-slate-700 rounded-lg pl-8 pr-2.5 py-1.5 text-white font-mono font-bold text-sm focus:outline-none focus:border-emerald-400"
-                  />
-                </div>
-                <div className="text-[10px] text-slate-400">Equivale a {formatBRL(numP365 / 12)}/mês</div>
-              </div>
-
             </div>
 
-            {/* LIVE PREVIEW OF THE 4 PLANS CARDS */}
+            {/* LIVE PREVIEW OF THE PLANS CARDS */}
             <div className="pt-2 border-t border-slate-800 space-y-1.5">
               <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block">
-                Visualização final dos 4 Planos na tela de compra do Salão:
+                Visualização final dos Planos na tela de compra do Salão:
               </span>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                 {calculatedPlans.map((p) => (
                   <div
-                    key={p.days}
+                    key={`${p.days}-${p.numVal}`}
                     className="p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-center flex flex-col justify-between"
                   >
                     <div>
@@ -393,11 +333,7 @@ export const AdminPaymentAccountModal: React.FC<AdminPaymentAccountModalProps> =
                       <span className="block text-xs font-black text-emerald-400 mt-0.5">{p.priceStr}</span>
                       <span className="block text-[9px] text-slate-400 mt-0.5">{p.detail}</span>
                     </div>
-                    <span className={`inline-block text-[8px] font-extrabold px-1.5 py-0.5 rounded-full border mt-1.5 ${
-                      p.days >= 180
-                        ? 'bg-emerald-950/80 text-emerald-300 border-emerald-500/40'
-                        : 'bg-slate-950 text-amber-300 border-amber-500/30'
-                    }`}>
+                    <span className="inline-block text-[8px] font-extrabold px-1.5 py-0.5 rounded-full border mt-1.5 bg-slate-950 text-amber-300 border-amber-500/30">
                       {p.tag}
                     </span>
                   </div>
