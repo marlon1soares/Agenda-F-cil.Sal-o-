@@ -397,7 +397,9 @@ export const Storage = {
       instrucoesPagamento: 'O valor do cartão ou Pix é creditado diretamente na conta Mercado Pago (Ag: 0001 / Conta: 7731871243-4) do Administrador.',
       productionUrl: 'https://agendamaisfacil.vercel.app',
       precoPlano30Dias: 30.00,
-      precoPlano90Dias: 75.00,
+      precoPlano90Dias: 90.00,
+      linkMercadoPago30: 'https://mpago.la/138bXFn',
+      linkMercadoPago90: 'https://mpago.la/29DGt6q',
       precoPlano180Dias: 135.00,
       precoPlano365Dias: 240.00,
       diasGratuitos: 15,
@@ -425,7 +427,9 @@ export const Storage = {
         precoPlano30Dias: base30,
         precoPlano90Dias: (parsed.precoPlano90Dias !== undefined && parsed.precoPlano90Dias !== null && !isNaN(Number(parsed.precoPlano90Dias)) && Number(parsed.precoPlano90Dias) > 0)
           ? Number(parsed.precoPlano90Dias)
-          : Number((base30 * 2.5).toFixed(2)),
+          : 90.00,
+        linkMercadoPago30: parsed.linkMercadoPago30 || 'https://mpago.la/138bXFn',
+        linkMercadoPago90: parsed.linkMercadoPago90 || 'https://mpago.la/29DGt6q',
         precoPlano180Dias: (parsed.precoPlano180Dias !== undefined && parsed.precoPlano180Dias !== null && !isNaN(Number(parsed.precoPlano180Dias)) && Number(parsed.precoPlano180Dias) > 0)
           ? Number(parsed.precoPlano180Dias)
           : Number((base30 * 4.5).toFixed(2)),

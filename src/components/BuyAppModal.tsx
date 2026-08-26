@@ -287,6 +287,11 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
   const currentPlan = getPlanPriceDetails(planDays);
   const isTrialPlanSelected = isTrialEnabled && (planDays === configuredTrialDays || currentPlan.numVal === 0);
 
+  // Link Oficial Mercado Pago correspondente ao plano selecionado (R$ 30 ou R$ 90)
+  const activeMpLink = currentPlan.paymentLink || (planDays === 90
+    ? (adminPaymentConfig.linkMercadoPago90 || 'https://mpago.la/29DGt6q')
+    : (adminPaymentConfig.linkMercadoPago30 || 'https://mpago.la/138bXFn'));
+
   useEffect(() => {
     if (isOpen) {
       const cfg = Storage.getAdminPaymentConfig();
@@ -1388,6 +1393,38 @@ Olá *${createdSalon.ownerName}*, seu acesso ao aplicativo *${createdSalon.name}
               </div>
             )}
 
+            {/* DESTAQUE PRINCIPAL: LINK DE CHECKOUT DIRETO MERCADO PAGO */}
+            <div className="bg-gradient-to-r from-[#009EE3]/20 via-[#009EE3]/10 to-[#009EE3]/20 border-2 border-[#009EE3] p-3.5 sm:p-4 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xl">
+              <div className="flex items-center gap-3 text-left w-full sm:w-auto">
+                <div className="w-10 h-10 rounded-xl bg-[#009EE3] flex items-center justify-center text-white shrink-0 shadow-md">
+                  <ExternalLink className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h4 className="text-xs sm:text-sm font-black text-white">
+                      Link Oficial Mercado Pago
+                    </h4>
+                    <span className="text-[10px] bg-[#009EE3] text-white font-extrabold px-2 py-0.5 rounded-full">
+                      {currentPlan.priceStr}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-300">
+                    Pague com Cartão de Crédito, Pix, Boleto ou Saldo da sua conta Mercado Pago.
+                  </p>
+                </div>
+              </div>
+
+              <a
+                href={activeMpLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full sm:w-auto bg-[#009EE3] hover:bg-[#0081b8] text-white font-black py-3 px-5 rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg shadow-[#009EE3]/30 transition-all active:scale-95 text-center shrink-0 cursor-pointer border border-sky-300/40"
+              >
+                <ExternalLink className="w-4 h-4" />
+                <span>Pagar {currentPlan.priceStr} no Mercado Pago</span>
+              </a>
+            </div>
+
             {/* Payment Method Selector Tabs */}
             <div className="grid grid-cols-2 gap-2 bg-slate-950 p-1.5 rounded-2xl border border-slate-800">
               <button
@@ -1506,17 +1543,15 @@ Olá *${createdSalon.ownerName}*, seu acesso ao aplicativo *${createdSalon.name}
                         <span>{copiedPix ? 'Chave Pix Copiada!' : `Copiar Chave (${adminPaymentConfig.chavePix})`}</span>
                       </button>
 
-                      {initPoint && (
-                        <a
-                          href={initPoint}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="w-full bg-[#009EE3] hover:bg-[#0081b8] text-white font-extrabold py-2 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-md transition-all active:scale-95 cursor-pointer text-center"
-                        >
-                          <ExternalLink className="w-3.5 h-3.5" />
-                          <span>Pagar no Checkout Mercado Pago</span>
-                        </a>
-                      )}
+                      <a
+                        href={activeMpLink || initPoint}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="w-full bg-[#009EE3] hover:bg-[#0081b8] text-white font-extrabold py-2.5 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-md transition-all active:scale-95 cursor-pointer text-center"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        <span>Pagar no Checkout Mercado Pago ({currentPlan.priceStr})</span>
+                      </a>
                     </div>
                   </div>
                 </div>
@@ -1771,17 +1806,15 @@ Olá *${createdSalon.ownerName}*, seu acesso ao aplicativo *${createdSalon.name}
                       )}
                     </button>
 
-                    {initPoint && (
-                      <a
-                        href={initPoint}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="w-full bg-[#009EE3] hover:bg-[#0081b8] text-white font-extrabold py-2.5 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-md transition-all active:scale-95 cursor-pointer text-center"
-                      >
-                        <ExternalLink className="w-3.5 h-3.5" />
-                        <span>Pagar no Checkout Seguro Mercado Pago</span>
-                      </a>
-                    )}
+                    <a
+                      href={activeMpLink || initPoint}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-full bg-[#009EE3] hover:bg-[#0081b8] text-white font-extrabold py-2.5 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-md transition-all active:scale-95 cursor-pointer text-center"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      <span>Pagar no Checkout Seguro Mercado Pago ({currentPlan.priceStr})</span>
+                    </a>
                   </div>
                 )}
 

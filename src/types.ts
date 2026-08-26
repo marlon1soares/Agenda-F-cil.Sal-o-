@@ -207,9 +207,11 @@ export interface AdminPaymentConfig {
   diasGratuitos?: number; // Configuração dos dias gratuitos (padrão: 15 dias, ex: 7, 15, 30)
   habilitarPlanoGratuito?: boolean; // Habilitar ou desabilitar opção de teste gratuito
   precoPlano30Dias?: number; // Plano 1: 30 Dias (padrão: 30.00)
-  precoPlano90Dias?: number; // Plano 2: 3 Meses / 90 Dias (padrão: 75.00)
-  precoPlano180Dias?: number; // Plano 3: 6 Meses / 180 Dias (padrão: 135.00)
-  precoPlano365Dias?: number; // Plano 4: 1 Ano / 365 Dias (padrão: 240.00)
+  precoPlano90Dias?: number; // Plano 2: 3 Meses / 90 Dias (padrão: 90.00)
+  linkMercadoPago30?: string; // Link de Checkout Oficial Mercado Pago R$ 30 (ex: https://mpago.la/138bXFn)
+  linkMercadoPago90?: string; // Link de Checkout Oficial Mercado Pago R$ 90 (ex: https://mpago.la/29DGt6q)
+  precoPlano180Dias?: number; // Legado
+  precoPlano365Dias?: number; // Legado
   videoTutorialConfig?: VideoTutorialConfig; // Configuração do Vídeo Tutorial & Narração pelo Administrador
   // Webhook Security & Gateway Integration (HMAC-SHA256 & PCI-DSS)
   webhookSecret?: string;

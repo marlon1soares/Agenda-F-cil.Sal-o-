@@ -11,6 +11,7 @@ export interface LicensePlan {
   tag: string;
   badge: string;
   maxInstallments: number;
+  paymentLink?: string;
 }
 
 export function formatBRL(val?: number | string | null): string {
@@ -27,7 +28,7 @@ export function calculateDefaultPricesFromBase(base30: number): {
   const base = isNaN(base30) || base30 <= 0 ? 30 : base30;
   return {
     p30: Number(base.toFixed(2)),
-    p90: Number((base * 2.5).toFixed(2)),
+    p90: Number((base * 3).toFixed(2)),
   };
 }
 
@@ -36,7 +37,9 @@ export function getCalculatedLicensePlans(
   includeTrial: boolean = true
 ): LicensePlan[] {
   let p30 = 30;
-  let p90 = 75;
+  let p90 = 90;
+  let link30 = 'https://mpago.la/138bXFn';
+  let link90 = 'https://mpago.la/29DGt6q';
   let trialDays = 15;
   let isTrialEnabled = true;
 
@@ -49,7 +52,14 @@ export function getCalculatedLicensePlans(
     p30 = base;
     p90 = (configOrBase.precoPlano90Dias !== undefined && configOrBase.precoPlano90Dias !== null && Number(configOrBase.precoPlano90Dias) > 0)
       ? Number(configOrBase.precoPlano90Dias)
-      : Number((base * 2.5).toFixed(2));
+      : Number((base * 3).toFixed(2));
+
+    if (configOrBase.linkMercadoPago30) {
+      link30 = configOrBase.linkMercadoPago30;
+    }
+    if (configOrBase.linkMercadoPago90) {
+      link90 = configOrBase.linkMercadoPago90;
+    }
 
     if (configOrBase.diasGratuitos !== undefined && configOrBase.diasGratuitos !== null && Number(configOrBase.diasGratuitos) > 0) {
       trialDays = Number(configOrBase.diasGratuitos);
@@ -85,9 +95,10 @@ export function getCalculatedLicensePlans(
       numVal: p30,
       monthlyEquivalentStr: `${formatBRL(p30)} / mês`,
       detail: 'Mensal (À vista)',
-      tag: 'Plano 1',
+      tag: 'Plano 1 (R$ 30)',
       badge: 'Plano 1 (30 Dias)',
       maxInstallments: 1,
+      paymentLink: link30,
     },
     {
       days: 90,
@@ -97,9 +108,10 @@ export function getCalculatedLicensePlans(
       numVal: p90,
       monthlyEquivalentStr: `${formatBRL(p90 / 3)} / mês`,
       detail: `${formatBRL(p90 / 3)} / mês`,
-      tag: 'Plano 2',
+      tag: 'Plano 2 (R$ 90)',
       badge: 'Plano 2 (3 Meses)',
       maxInstallments: 1,
+      paymentLink: link90,
     }
   );
 

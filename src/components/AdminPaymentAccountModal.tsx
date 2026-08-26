@@ -15,7 +15,9 @@ export const AdminPaymentAccountModal: React.FC<AdminPaymentAccountModalProps> =
 }) => {
   const [config, setConfig] = useState<AdminPaymentConfig>(() => Storage.getAdminPaymentConfig());
   const [p30Input, setP30Input] = useState<string>('30.00');
-  const [p90Input, setP90Input] = useState<string>('75.00');
+  const [p90Input, setP90Input] = useState<string>('90.00');
+  const [link30Input, setLink30Input] = useState<string>('https://mpago.la/138bXFn');
+  const [link90Input, setLink90Input] = useState<string>('https://mpago.la/29DGt6q');
   const [freeDaysInput, setFreeDaysInput] = useState<string>('15');
   const [enableTrial, setEnableTrial] = useState<boolean>(true);
   const [successMsg, setSuccessMsg] = useState('');
@@ -28,7 +30,9 @@ export const AdminPaymentAccountModal: React.FC<AdminPaymentAccountModalProps> =
       const current = Storage.getAdminPaymentConfig();
       setConfig(current);
       setP30Input(String(current.precoPlano30Dias || 30));
-      setP90Input(String(current.precoPlano90Dias || 75));
+      setP90Input(String(current.precoPlano90Dias || 90));
+      setLink30Input(current.linkMercadoPago30 || 'https://mpago.la/138bXFn');
+      setLink90Input(current.linkMercadoPago90 || 'https://mpago.la/29DGt6q');
       setFreeDaysInput(String(current.diasGratuitos !== undefined && current.diasGratuitos !== null ? current.diasGratuitos : 15));
       setEnableTrial(current.habilitarPlanoGratuito !== false);
       setTestResult(null);
@@ -38,7 +42,7 @@ export const AdminPaymentAccountModal: React.FC<AdminPaymentAccountModalProps> =
   if (!isOpen) return null;
 
   const numP30 = Number(p30Input.replace(',', '.')) || 30;
-  const numP90 = Number(p90Input.replace(',', '.')) || (numP30 * 2.5);
+  const numP90 = Number(p90Input.replace(',', '.')) || (numP30 * 3);
   const numFreeDays = Math.max(1, parseInt(freeDaysInput, 10) || 15);
 
   const webhookBaseUrl = (typeof window !== 'undefined' && window.location.origin) || (config.productionUrl || 'https://agenda-f-cil-sal-o.vercel.app');
@@ -81,7 +85,7 @@ export const AdminPaymentAccountModal: React.FC<AdminPaymentAccountModalProps> =
     const base = Number(p30Input.replace(',', '.')) || 30;
     const defaults = calculateDefaultPricesFromBase(base);
     setP30Input(String((defaults.p30 || 30).toFixed(2)));
-    setP90Input(String((defaults.p90 || 75).toFixed(2)));
+    setP90Input(String((defaults.p90 || 90).toFixed(2)));
   };
 
   const handleBase30Change = (val: string) => {
@@ -89,7 +93,7 @@ export const AdminPaymentAccountModal: React.FC<AdminPaymentAccountModalProps> =
     const parsed = Number(val.replace(',', '.'));
     if (!isNaN(parsed) && parsed > 0) {
       const defaults = calculateDefaultPricesFromBase(parsed);
-      setP90Input(String((defaults.p90 || 75).toFixed(2)));
+      setP90Input(String((defaults.p90 || 90).toFixed(2)));
     }
   };
 
@@ -97,6 +101,8 @@ export const AdminPaymentAccountModal: React.FC<AdminPaymentAccountModalProps> =
     ...config,
     precoPlano30Dias: numP30,
     precoPlano90Dias: numP90,
+    linkMercadoPago30: link30Input.trim(),
+    linkMercadoPago90: link90Input.trim(),
     diasGratuitos: numFreeDays,
     habilitarPlanoGratuito: enableTrial
   }, true);
@@ -107,11 +113,13 @@ export const AdminPaymentAccountModal: React.FC<AdminPaymentAccountModalProps> =
       ...config,
       precoPlano30Dias: numP30,
       precoPlano90Dias: numP90,
+      linkMercadoPago30: link30Input.trim() || 'https://mpago.la/138bXFn',
+      linkMercadoPago90: link90Input.trim() || 'https://mpago.la/29DGt6q',
       diasGratuitos: numFreeDays,
       habilitarPlanoGratuito: enableTrial
     };
     Storage.saveAdminPaymentConfig(updatedConfig);
-    setSuccessMsg('Valores das licenças, dias gratuitos e formas de pagamento salvos com sucesso!');
+    setSuccessMsg('Valores das licenças, links do Mercado Pago e formas de pagamento salvos com sucesso!');
     setTimeout(() => {
       setSuccessMsg('');
       onClose();
@@ -295,7 +303,7 @@ export const AdminPaymentAccountModal: React.FC<AdminPaymentAccountModalProps> =
               {/* 3 Meses */}
               <div className="bg-slate-900 p-3 rounded-xl border border-slate-800 space-y-1">
                 <div className="flex items-center justify-between text-[11px]">
-                  <span className="font-black text-white">2. Plano 3 Meses:</span>
+                  <span className="font-black text-white">2. Plano 3 Meses (Trimestral):</span>
                   <span className="text-[9px] text-amber-300 font-bold">À vista</span>
                 </div>
                 <div className="relative">
@@ -315,6 +323,81 @@ export const AdminPaymentAccountModal: React.FC<AdminPaymentAccountModalProps> =
                 <div className="text-[10px] text-slate-400">Equivale a {formatBRL(numP90 / 3)}/mês</div>
               </div>
 
+            </div>
+
+            {/* SEÇÃO OFICIAL: LINKS DE CHECKOUT MERCADO PAGO */}
+            <div className="bg-slate-900/90 border border-sky-500/40 p-3.5 rounded-2xl space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5 text-sky-400 font-black text-xs">
+                  <ExternalLink className="w-4 h-4" />
+                  <span>Links de Pagamento Oficiais Mercado Pago (Sua Conta MP):</span>
+                </div>
+                <span className="text-[10px] bg-sky-950 text-sky-300 px-2 py-0.5 rounded-md border border-sky-800/60 font-bold">
+                  Checkout Direto
+                </span>
+              </div>
+
+              <p className="text-[11px] text-slate-300 leading-relaxed">
+                Cole aqui os seus links de checkout do Mercado Pago para cada plano. Ao clicar em pagar, o cliente será direcionado diretamente para o seu link:
+              </p>
+
+              {/* Link R$ 30 */}
+              <div className="space-y-1">
+                <div className="flex items-center justify-between text-[11px]">
+                  <label className="font-bold text-white flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+                    <span>Link Mercado Pago - Plano 30 Dias ({formatBRL(numP30)}): *</span>
+                  </label>
+                  {link30Input && (
+                    <a
+                      href={link30Input}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[10px] text-sky-400 hover:text-sky-300 font-bold flex items-center gap-1 underline"
+                    >
+                      <ExternalLink className="w-3 h-3" />
+                      <span>Testar Link</span>
+                    </a>
+                  )}
+                </div>
+                <input
+                  type="url"
+                  value={link30Input}
+                  onChange={(e) => setLink30Input(e.target.value)}
+                  placeholder="https://mpago.la/138bXFn"
+                  required
+                  className="w-full bg-slate-950 border border-sky-500/50 rounded-xl px-3 py-2 text-sky-300 font-mono text-xs focus:outline-none focus:border-sky-400"
+                />
+              </div>
+
+              {/* Link R$ 90 */}
+              <div className="space-y-1">
+                <div className="flex items-center justify-between text-[11px]">
+                  <label className="font-bold text-white flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-sky-400"></span>
+                    <span>Link Mercado Pago - Plano 3 Meses ({formatBRL(numP90)}): *</span>
+                  </label>
+                  {link90Input && (
+                    <a
+                      href={link90Input}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[10px] text-sky-400 hover:text-sky-300 font-bold flex items-center gap-1 underline"
+                    >
+                      <ExternalLink className="w-3 h-3" />
+                      <span>Testar Link</span>
+                    </a>
+                  )}
+                </div>
+                <input
+                  type="url"
+                  value={link90Input}
+                  onChange={(e) => setLink90Input(e.target.value)}
+                  placeholder="https://mpago.la/29DGt6q"
+                  required
+                  className="w-full bg-slate-950 border border-sky-500/50 rounded-xl px-3 py-2 text-sky-300 font-mono text-xs focus:outline-none focus:border-sky-400"
+                />
+              </div>
             </div>
 
             {/* LIVE PREVIEW OF THE PLANS CARDS */}
