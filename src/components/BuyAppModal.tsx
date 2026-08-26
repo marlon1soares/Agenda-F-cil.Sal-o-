@@ -1542,92 +1542,29 @@ Olá *${createdSalon.ownerName}*, seu acesso ao aplicativo *${createdSalon.name}
                         <Copy className="w-3 h-3 text-slate-400" />
                         <span>{copiedPix ? 'Chave Pix Copiada!' : `Copiar Chave (${adminPaymentConfig.chavePix})`}</span>
                       </button>
-
-                      <a
-                        href={activeMpLink || initPoint}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="w-full bg-[#009EE3] hover:bg-[#0081b8] text-white font-extrabold py-2.5 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-md transition-all active:scale-95 cursor-pointer text-center"
-                      >
-                        <ExternalLink className="w-3.5 h-3.5" />
-                        <span>Pagar no Checkout Mercado Pago ({currentPlan.priceStr})</span>
-                      </a>
                     </div>
                   </div>
                 </div>
 
-                {/* AUTOMATED BANK CONFIRMATION RADAR */}
-                {bankOrderStatus === 'bank_confirmed' ? (
+                {/* Se confirmado pelo banco, exibe confirmação */}
+                {bankOrderStatus === 'bank_confirmed' && (
                   <div className="bg-emerald-950/90 border-2 border-emerald-400 p-4 rounded-2xl text-center space-y-2.5 shadow-2xl animate-pulse">
                     <div className="flex items-center justify-center gap-2 text-emerald-300 font-black text-sm sm:text-base">
                       <CheckCircle2 className="w-6 h-6 text-emerald-400" />
-                      <span>NOTIFICAÇÃO RECEBIDA: PAGAMENTO CONFIRMADO PELO BANCO!</span>
+                      <span>PAGAMENTO CONFIRMADO!</span>
                     </div>
                     <p className="text-xs text-emerald-100 font-medium">
-                      O Banco Central / Gateway notificou e confirmou o crédito de <strong>{currentPlan.priceStr}</strong> na conta de <strong>{adminPaymentConfig.nomeBeneficiario}</strong>.
+                      O crédito de <strong>{currentPlan.priceStr}</strong> foi confirmado com sucesso.
                     </p>
-                    {bankReceipt?.bankReceiptCode && (
-                      <div className="text-[10px] font-mono bg-slate-950/80 px-2.5 py-1 rounded-xl text-emerald-400 border border-emerald-800/60 inline-block font-bold">
-                        Código de Autorização Bancária: {bankReceipt.bankReceiptCode}
-                      </div>
-                    )}
-
-                    {/* Botão Oficial Desbloqueado pelo Banco */}
                     <div className="pt-2">
                       <button
                         type="button"
                         onClick={() => executeSalonActivationAndAdvance(bankReceipt)}
-                        className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3.5 px-4 rounded-2xl text-xs sm:text-sm shadow-xl shadow-emerald-950/60 transition-all flex items-center justify-center gap-2 active:scale-95 cursor-pointer border-2 border-emerald-400"
+                        className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3 px-4 rounded-2xl text-xs sm:text-sm shadow-xl transition-all flex items-center justify-center gap-2 active:scale-95 cursor-pointer border-2 border-emerald-400"
                       >
                         <Unlock className="w-5 h-5 text-white" />
-                        <span>🔓 LIBERADO PELO BANCO: Acessar Meu Salão Agora</span>
+                        <span>Acessar Meu Salão Agora</span>
                       </button>
-                    </div>
-
-                    <p className="text-xs text-amber-300 font-bold animate-bounce pt-1">
-                      🚀 Avançando automaticamente para a liberação do seu Salão...
-                    </p>
-                  </div>
-                ) : (
-                  <div className="bg-slate-900/90 border border-emerald-500/40 p-4 rounded-2xl space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2 text-emerald-400 font-black text-xs">
-                        <span className="relative flex h-3 w-3">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                          <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
-                        </span>
-                        <span>Comunicação com o Banco Ativa (Aguardando Notificação)</span>
-                      </div>
-                      <span className="text-[10px] text-emerald-400/90 font-mono bg-emerald-950/60 px-2 py-0.5 rounded-md border border-emerald-800/50 flex items-center gap-1">
-                        <Radio className="w-3 h-3 animate-pulse text-emerald-400" />
-                        <span>Radar Bacen Conectado</span>
-                      </span>
-                    </div>
-
-                    <p className="text-xs text-slate-300 leading-relaxed">
-                      Abra o aplicativo do seu banco no celular e efetue o pagamento do QR Code Pix acima. <strong>Assim que o seu banco registrar o crédito de {currentPlan.priceStr} na conta de {adminPaymentConfig.nomeBeneficiario || 'Administrador'}, o banco enviará a notificação para o sistema e o seu salão será liberado instantaneamente.</strong>
-                    </p>
-
-                    {/* Indicador de Cadeado Fechado - Somente o banco pode liberar */}
-                    <div className="bg-slate-950/90 border-2 border-slate-800 p-3.5 rounded-xl flex flex-col items-center justify-center gap-1.5 text-center shadow-inner">
-                      <div className="flex items-center gap-2 text-amber-400 font-black text-xs sm:text-sm">
-                        <Lock className="w-4 h-4 text-amber-400 animate-pulse" />
-                        <span>🔒 Cadeado Fechado: Aguardando Notificação de Pagamento do Banco</span>
-                      </div>
-                      <p className="text-[10px] text-slate-400 leading-relaxed max-w-sm">
-                        O sistema não possui botão de liberação manual. O acesso é desbloqueado e fica verde exclusivamente quando a confirmação for recebida da rede bancária.
-                      </p>
-                    </div>
-
-                    {/* Instruções Oficiais de Segurança Bancária */}
-                    <div className="bg-slate-950/80 p-2.5 rounded-xl border border-slate-800/80 text-[10px] text-slate-400 space-y-1">
-                      <div className="flex items-center gap-1.5 text-emerald-400 font-bold text-[11px]">
-                        <ShieldCheck className="w-3.5 h-3.5" />
-                        <span>Validação Bancária em Tempo Real</span>
-                      </div>
-                      <p className="leading-relaxed">
-                        O valor a ser creditado é <strong>{currentPlan.priceStr}</strong> diretamente na conta oficial. A comunicação entre o banco e o aplicativo opera 24 horas por dia.
-                      </p>
                     </div>
                   </div>
                 )}
@@ -1635,189 +1572,67 @@ Olá *${createdSalon.ownerName}*, seu acesso ao aplicativo *${createdSalon.name}
               </div>
             )}
 
-            {/* TAB CONTENT: CARTÃO DE CRÉDITO */}
+            {/* TAB CONTENT: CARTÃO DE CRÉDITO / MERCADO PAGO */}
             {paymentMethod === 'cartao' && (
-              <div className="bg-slate-950 p-4 rounded-2xl border border-blue-500/30 space-y-3">
-                <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-                  <span className="font-extrabold text-blue-400 flex items-center gap-1.5 text-xs">
+              <div className="bg-slate-950 p-4 sm:p-5 rounded-2xl border border-[#009EE3]/40 space-y-4 shadow-xl">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
+                  <span className="font-extrabold text-[#009EE3] flex items-center gap-2 text-xs sm:text-sm">
                     <CreditCard className="w-4 h-4" />
-                    <span>Cartão de Crédito (Pagamento Direto para o Adm)</span>
+                    <span>Cartão de Crédito & Mercado Pago</span>
                   </span>
-                  {currentPlan.maxInstallments === 1 ? (
-                    <span className="text-[10px] bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-full font-bold border border-amber-500/30">
-                      Somente À Vista
-                    </span>
-                  ) : (
-                    <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full font-bold border border-emerald-500/30">
-                      Até 6x (1ª, 2ª e 3ª SEM JUROS)
-                    </span>
-                  )}
+                  <span className="text-[10px] bg-[#009EE3]/20 text-sky-300 px-2.5 py-0.5 rounded-full font-bold border border-[#009EE3]/40">
+                    Checkout Seguro Oficial
+                  </span>
                 </div>
 
-                {/* Radar Bancário Ativo para Cartão */}
-                <div className="bg-slate-900/90 border border-blue-500/40 p-3.5 rounded-2xl space-y-2.5">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-blue-400 font-black text-xs">
-                      <span className="relative flex h-3 w-3">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-3 w-3 bg-blue-500"></span>
-                      </span>
-                      <span>Comunicação Bancária com a Operadora Ativa</span>
+                {/* Information Card */}
+                <div className="bg-slate-900/90 border border-slate-800 p-4 rounded-2xl space-y-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-[#009EE3]/20 border border-[#009EE3]/40 flex items-center justify-center text-[#009EE3] shrink-0">
+                      <ShieldCheck className="w-5 h-5" />
                     </div>
-                    <span className="text-[10px] text-blue-400/90 font-mono bg-blue-950/60 px-2 py-0.5 rounded-md border border-blue-800/50 flex items-center gap-1">
-                      <Radio className="w-3 h-3 animate-pulse text-blue-400" />
-                      <span>Gateway Conectado</span>
-                    </span>
-                  </div>
-
-                  <p className="text-xs text-slate-300 leading-relaxed">
-                    Preencha os dados do cartão abaixo e envie para a operadora bancária. <strong>Assim que a operadora e o banco confirmarem o débito e o crédito na conta de {adminPaymentConfig.nomeBeneficiario || 'Administrador'}, o banco enviará a notificação de aprovação e o seu salão será liberado instantaneamente.</strong>
-                  </p>
-                </div>
-
-                {cardError && (
-                  <div className="bg-rose-950/90 border border-rose-600 text-rose-200 p-2.5 rounded-xl text-xs font-bold">
-                    {cardError}
-                  </div>
-                )}
-
-                {/* Card Number */}
-                <div>
-                  <label className="block text-slate-300 font-bold mb-1 text-xs">Número do Cartão de Crédito:</label>
-                  <input
-                    type="text"
-                    value={cardNumber}
-                    onChange={(e) => setCardNumber(e.target.value)}
-                    placeholder="0000 0000 0000 0000"
-                    maxLength={19}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white placeholder-slate-500 font-mono focus:outline-none focus:border-blue-500"
-                  />
-                </div>
-
-                {/* Card Holder Name */}
-                <div>
-                  <label className="block text-slate-300 font-bold mb-1 text-xs">Nome impresso no Cartão:</label>
-                  <input
-                    type="text"
-                    value={cardHolder}
-                    onChange={(e) => setCardHolder(e.target.value)}
-                    placeholder="NOME COMO ESTÁ NO CARTÃO"
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white uppercase placeholder-slate-500 focus:outline-none focus:border-blue-500"
-                  />
-                </div>
-
-                {/* Expiry, CVV & Installments */}
-                <div className="grid grid-cols-3 gap-2">
-                  <div>
-                    <label className="block text-slate-300 font-bold mb-1 text-xs">Validade:</label>
-                    <input
-                      type="text"
-                      value={cardExpiry}
-                      onChange={(e) => setCardExpiry(e.target.value)}
-                      placeholder="MM/AA"
-                      maxLength={5}
-                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-2 text-white placeholder-slate-500 font-mono text-center focus:outline-none focus:border-blue-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-slate-300 font-bold mb-1 text-xs">CVV:</label>
-                    <input
-                      type="text"
-                      value={cardCvv}
-                      onChange={(e) => setCardCvv(e.target.value)}
-                      placeholder="123"
-                      maxLength={4}
-                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-2 text-white placeholder-slate-500 font-mono text-center focus:outline-none focus:border-blue-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-slate-300 font-bold mb-1 text-xs">Parcelamento:</label>
-                    <select
-                      value={cardInstallments}
-                      onChange={(e) => setCardInstallments(e.target.value)}
-                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-2 py-2 text-white font-bold focus:outline-none focus:border-blue-500 text-[11px]"
-                    >
-                      {currentPlan.maxInstallments === 1 ? (
-                        <option value="1">1x de {currentPlan.priceStr} (À vista - S/ Juros)</option>
-                      ) : (
-                        <>
-                          <option value="1">1x de {currentPlan.priceStr} (À vista - Sem juros)</option>
-                          <option value="2">2x de R$ {((currentPlan.numVal || 0) / 2).toFixed(2).replace('.', ',')} (Sem juros)</option>
-                          <option value="3">3x de R$ {((currentPlan.numVal || 0) / 3).toFixed(2).replace('.', ',')} (Sem juros)</option>
-                          <option value="4">4x de R$ {(((currentPlan.numVal || 0) * 1.05) / 4).toFixed(2).replace('.', ',')} (c/ juros)</option>
-                          <option value="5">5x de R$ {(((currentPlan.numVal || 0) * 1.07) / 5).toFixed(2).replace('.', ',')} (c/ juros)</option>
-                          <option value="6">6x de R$ {(((currentPlan.numVal || 0) * 1.09) / 6).toFixed(2).replace('.', ',')} (c/ juros)</option>
-                        </>
-                      )}
-                    </select>
-                  </div>
-                </div>
-
-                {/* Card Confirmation Status or Action Button */}
-                {bankOrderStatus === 'bank_confirmed' ? (
-                  <div className="bg-emerald-950/90 border-2 border-emerald-400 p-4 rounded-2xl text-center space-y-2.5 shadow-2xl animate-pulse">
-                    <div className="flex items-center justify-center gap-2 text-emerald-300 font-black text-sm sm:text-base">
-                      <CheckCircle2 className="w-6 h-6 text-emerald-400" />
-                      <span>AUTORIZAÇÃO BANCÁRIA CONFIRMADA: CARTÃO APROVADO!</span>
-                    </div>
-                    <p className="text-xs text-emerald-100 font-medium">
-                      O valor de <strong>{currentPlan.priceStr}</strong> foi processado e creditado com sucesso na conta do Administrador (<strong>{adminPaymentConfig.nomeBeneficiario}</strong>).
-                    </p>
-                    {bankReceipt?.bankReceiptCode && (
-                      <div className="text-[10px] font-mono bg-slate-950/80 px-2.5 py-1 rounded-xl text-emerald-400 border border-emerald-800/60 inline-block font-bold">
-                        Código de Autorização Bancária: {bankReceipt.bankReceiptCode}
-                      </div>
-                    )}
-                    <p className="text-xs text-amber-300 font-bold animate-bounce pt-1">
-                      🚀 Avançando automaticamente para a liberação do seu Salão...
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-2.5 pt-1">
-                    {/* Indicador de Cadeado Fechado - Somente o banco pode liberar */}
-                    <div className="bg-slate-950/90 border-2 border-slate-800 p-3.5 rounded-xl flex flex-col items-center justify-center gap-1.5 text-center shadow-inner">
-                      <div className="flex items-center gap-2 text-amber-400 font-black text-xs sm:text-sm">
-                        <Lock className="w-4 h-4 text-amber-400 animate-pulse" />
-                        <span>🔒 Cadeado Fechado: Aguardando Autorização e Notificação do Banco</span>
-                      </div>
-                      <p className="text-[10px] text-slate-400 leading-relaxed max-w-sm">
-                        O salão só é liberado quando a operadora bancária processar a cobrança e notificar a aprovação do crédito.
+                    <div>
+                      <h4 className="text-xs sm:text-sm font-black text-white">
+                        Pagamento 100% Protegido pelo Mercado Pago
+                      </h4>
+                      <p className="text-[11px] text-slate-300">
+                        Pague com Cartão de Crédito, Débito, Mercado Crédito ou Pix diretamente na plataforma oficial do Mercado Pago.
                       </p>
                     </div>
-
-                    <button
-                      type="button"
-                      onClick={handleProcessCardPayment}
-                      disabled={isProcessingCard || isAutoAdvancing}
-                      className="w-full bg-blue-600 hover:bg-blue-500 disabled:bg-slate-800 text-white font-black py-3.5 px-4 rounded-2xl text-xs sm:text-sm shadow-xl transition-all flex items-center justify-center gap-2 active:scale-95 cursor-pointer border border-blue-400/40"
-                    >
-                      {isProcessingCard ? (
-                        <>
-                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                          <span>Comunicando com o Banco e Validando Notificação de Crédito...</span>
-                        </>
-                      ) : (
-                        <>
-                          <CreditCard className="w-4 h-4 text-blue-200" />
-                          <span>Processar Cartão com a Operadora Bancária</span>
-                        </>
-                      )}
-                    </button>
-
-                    <a
-                      href={activeMpLink || initPoint}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="w-full bg-[#009EE3] hover:bg-[#0081b8] text-white font-extrabold py-2.5 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-md transition-all active:scale-95 cursor-pointer text-center"
-                    >
-                      <ExternalLink className="w-3.5 h-3.5" />
-                      <span>Pagar no Checkout Seguro Mercado Pago ({currentPlan.priceStr})</span>
-                    </a>
                   </div>
-                )}
 
+                  {/* Bandeiras / Métodos aceitos */}
+                  <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-300">
+                    <div className="flex items-center gap-1.5 font-bold text-white">
+                      <CreditCard className="w-3.5 h-3.5 text-[#009EE3]" />
+                      <span>Bandeiras Aceitas:</span>
+                    </div>
+                    <div className="flex items-center gap-2 font-mono text-[10px] text-slate-400 font-bold">
+                      <span className="bg-slate-900 px-2 py-0.5 rounded border border-slate-700 text-slate-200">Mastercard</span>
+                      <span className="bg-slate-900 px-2 py-0.5 rounded border border-slate-700 text-slate-200">Visa</span>
+                      <span className="bg-slate-900 px-2 py-0.5 rounded border border-slate-700 text-slate-200">Elo</span>
+                      <span className="bg-slate-900 px-2 py-0.5 rounded border border-slate-700 text-slate-200">Hipercard</span>
+                    </div>
+                  </div>
+
+                  {/* Valor do Plano selecionado */}
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-slate-950/80 border border-slate-800">
+                    <div>
+                      <span className="text-[10px] text-slate-400 block font-bold">Plano Selecionado:</span>
+                      <span className="text-xs font-black text-white">{currentPlan.label}</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[10px] text-slate-400 block font-bold">Valor Total:</span>
+                      <span className="text-sm sm:text-base font-black text-emerald-400">{currentPlan.priceStr}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-3 bg-sky-950/40 rounded-xl border border-sky-800/40 text-center">
+                  <p className="text-[11px] text-sky-200">
+                    👆 Clique no botão azul <strong>"Pagar {currentPlan.priceStr} no Mercado Pago"</strong> acima para concluir o pagamento com segurança.
+                  </p>
+                </div>
               </div>
             )}
 
