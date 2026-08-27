@@ -2,11 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { SalonApp, Professional } from '../types';
 import { getSalonSlug, Storage } from '../utils/storage';
 import { getPublicAppUrl, buildAppUrl } from '../utils/url';
+import { DEFAULT_PROFESSIONALS } from '../data/mockData';
 import QRCode from 'qrcode';
 import { 
-  X, Link2, Copy, Check, Share2, MessageSquare, ExternalLink, 
-  Sparkles, ShieldCheck, Scissors, CheckCircle2,
-  Phone, User, Smartphone, Repeat, Users, Calendar, QrCode, Lock
+  X, Link2, Copy, Check, MessageSquare, ExternalLink, 
+  Sparkles, Scissors, CheckCircle2,
+  User, Users, QrCode, Lock, Phone
 } from 'lucide-react';
 
 interface EmployeeLinkModalProps {
@@ -14,6 +15,7 @@ interface EmployeeLinkModalProps {
   onClose: () => void;
   activeSalon: SalonApp;
   salons?: SalonApp[];
+  professionals?: Professional[];
   onOpenEmployeeView?: (salon: SalonApp, profName?: string) => void;
 }
 
@@ -21,6 +23,7 @@ export const EmployeeLinkModal: React.FC<EmployeeLinkModalProps> = ({
   isOpen,
   onClose,
   activeSalon,
+  professionals: propProfessionals,
   onOpenEmployeeView,
 }) => {
   const [selectedProf, setSelectedProf] = useState<string>('all');
@@ -30,15 +33,33 @@ export const EmployeeLinkModal: React.FC<EmployeeLinkModalProps> = ({
   const [linkMode, setLinkMode] = useState<'live' | 'vercel'>('live');
   const [professionals, setProfessionals] = useState<Professional[]>([]);
 
+  // Normalize list of professionals
+  const normalizeProfs = (list: any[]): Professional[] => {
+    if (!Array.isArray(list) || list.length === 0) {
+      return DEFAULT_PROFESSIONALS;
+    }
+    return list.map((p, idx) => ({
+      id: p.id || `prof-${idx + 1}`,
+      name: p.name || p.nome || `Profissional ${idx + 1}`,
+      role: p.role || 'Cabeleireiro(a)',
+      commissionPercent: typeof p.commissionPercent === 'number' ? p.commissionPercent : (typeof p.porc === 'number' ? p.porc : 50),
+      phone: p.phone || '',
+      cpf: p.cpf || undefined,
+      active: p.active !== false
+    }));
+  };
+
   useEffect(() => {
     if (isOpen) {
-      const profsList = Storage.getProfessionals();
-      setProfessionals(profsList);
+      const sourceList = (propProfessionals && propProfessionals.length > 0)
+        ? propProfessionals 
+        : Storage.getProfessionals();
+      setProfessionals(normalizeProfs(sourceList));
       setSelectedProf('all');
       setCopied(false);
       setShowQrCode(false);
     }
-  }, [isOpen, activeSalon?.id]);
+  }, [isOpen, activeSalon?.id, propProfessionals]);
 
   if (!isOpen) return null;
 
@@ -47,26 +68,37 @@ export const EmployeeLinkModal: React.FC<EmployeeLinkModalProps> = ({
     ? (typeof window !== 'undefined' ? `${window.location.origin}/` : getPublicAppUrl())
     : 'https://agenda-f-cil-sal-o.vercel.app/';
 
-  // Build employee link
+  // Build employee link with individual professional or entire team
   const employeeUrl = buildAppUrl({
     role: 'funcionario',
     salon: salonSlug,
     ...(selectedProf !== 'all' ? { prof: selectedProf } : {})
   }, targetBaseUrl);
 
-  const selectedProfObj = professionals.find(p => p.nome === selectedProf);
-  const profDisplay = selectedProf !== 'all' ? selectedProf : 'Equipe / Funcionários';
+  const selectedProfObj = professionals.find(p => p.name === selectedProf);
+  const isIndividual = selectedProf !== 'all';
+  const profDisplayName = isIndividual ? selectedProf : 'Toda a Equipe';
 
   // Pre-configured WhatsApp message for employee
-  const defaultWhatsappMsg = `Olá, *${profDisplay}*! 💈✂️\n\n` +
-    `Aqui está o seu *Link de Acesso ao Painel de Funcionário* do *${activeSalon.config.nomeSalao || activeSalon.name}*:\n\n` +
-    `👉 ${employeeUrl}\n\n` +
-    `Com este link você tem acesso direto e sincronizado em tempo real para:\n` +
-    `📅 *Agenda* (Visualizar horários e agendamentos)\n` +
-    `👥 *Equipe* (Lista de profissionais)\n` +
-    `✂️ *Serviços* (Catálogo de cortes e procedimentos)\n` +
-    `👤 *Clientes* (Histórico e dados dos clientes)\n\n` +
-    `💡 *Dica:* Salve este link nos seus favoritos ou fixado no WhatsApp para acessar sempre que precisar! ✨`;
+  const defaultWhatsappMsg = isIndividual
+    ? `Olá, *${selectedProf}*! 💈✂️\n\n` +
+      `Aqui está o seu *Link Exclusivo de Acesso Direto* à sua Agenda no *${activeSalon.config.nomeSalao || activeSalon.name}*:\n\n` +
+      `👉 ${employeeUrl}\n\n` +
+      `Com este link você acessa diretamente:\n` +
+      `📅 *Sua Agenda do Dia* (Horários e clientes agendados com você)\n` +
+      `👥 *Equipe & Colegas*\n` +
+      `✂️ *Catálogo de Serviços & Preços*\n` +
+      `👤 *Clientes do Salão*\n\n` +
+      `💡 *Dica:* Salve este link nos seus favoritos do celular ou fixado no WhatsApp para acessar rapidamente! ✨`
+    : `Olá, equipe do *${activeSalon.config.nomeSalao || activeSalon.name}*! 💈✂️\n\n` +
+      `Aqui está o *Link Geral de Acesso para os Funcionários* do salão:\n\n` +
+      `👉 ${employeeUrl}\n\n` +
+      `Com este link a equipe tem acesso em tempo real para:\n` +
+      `📅 *Agenda* (Visualizar horários e agendamentos)\n` +
+      `👥 *Equipe* (Lista de profissionais)\n` +
+      `✂️ *Serviços* (Catálogo de cortes e procedimentos)\n` +
+      `👤 *Clientes* (Histórico e dados dos clientes)\n\n` +
+      `💡 Salvem este link nos seus favoritos! ✨`;
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(employeeUrl);
@@ -150,7 +182,7 @@ export const EmployeeLinkModal: React.FC<EmployeeLinkModalProps> = ({
                 <span className="bg-teal-500/20 text-teal-300 text-[9px] px-2 py-0.5 rounded font-mono">100% Sincronizado</span>
               </span>
               <p className="text-[11px] text-teal-200/90 leading-relaxed">
-                Ao abrir este link, o funcionário acessa instantaneamente o painel com <strong>Agenda</strong>, <strong>Equipe</strong>, <strong>Serviços</strong> e <strong>Clientes</strong> integrados diretamente ao banco de dados do salão.
+                Selecione abaixo o <strong>Link Geral de toda a equipe</strong> ou clique no <strong>nome de um profissional individual</strong> para gerar o link exclusivo dele.
               </p>
               <div className="pt-1 flex flex-wrap gap-2 text-[10px] text-slate-400 font-semibold">
                 <span className="flex items-center gap-1 text-emerald-400">
@@ -189,58 +221,100 @@ export const EmployeeLinkModal: React.FC<EmployeeLinkModalProps> = ({
           </div>
 
           {/* Target Professional Selection */}
-          <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800 space-y-2">
+          <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800 space-y-2.5">
             <label className="block text-slate-300 font-bold text-[11px] flex items-center justify-between">
               <span className="flex items-center gap-1.5">
                 <User className="w-3.5 h-3.5 text-teal-400" />
                 <span>Destinatário do Link:</span>
               </span>
-              <span className="text-[10px] text-slate-400 font-normal">
-                {professionals.length} profissionais na equipe
+              <span className="text-[10px] text-teal-400 font-extrabold bg-teal-950 px-2 py-0.5 rounded-full border border-teal-800/60">
+                {professionals.length} {professionals.length === 1 ? 'profissional' : 'profissionais'} na equipe
               </span>
             </label>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {/* Option 1: General Link (Whole Team) */}
               <button
                 type="button"
                 onClick={() => setSelectedProf('all')}
-                className={`py-2 px-3 rounded-xl text-xs font-bold text-left transition-all border flex items-center justify-between ${
+                className={`py-2.5 px-3 rounded-2xl text-xs font-bold text-left transition-all border flex items-center justify-between cursor-pointer ${
                   selectedProf === 'all'
-                    ? 'bg-teal-900/60 border-teal-500 text-teal-300 shadow-sm'
-                    : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                    ? 'bg-gradient-to-r from-teal-900/90 to-emerald-950/90 border-teal-400 text-teal-200 shadow-md ring-1 ring-teal-400/50'
+                    : 'bg-slate-900/90 border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700'
                 }`}
               >
-                <span>👥 Link Geral (Toda a Equipe)</span>
-                {selectedProf === 'all' && <Check className="w-3.5 h-3.5 text-teal-400" />}
+                <div className="flex items-center gap-2">
+                  <div className={`w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-black ${
+                    selectedProf === 'all' ? 'bg-teal-500 text-white' : 'bg-slate-800 text-slate-400'
+                  }`}>
+                    👥
+                  </div>
+                  <div>
+                    <span className="block font-black text-white text-xs">Link Geral</span>
+                    <span className="block text-[10px] text-teal-300/80 font-normal">Toda a Equipe</span>
+                  </div>
+                </div>
+                {selectedProf === 'all' && (
+                  <span className="w-5 h-5 rounded-full bg-teal-500 text-white flex items-center justify-center shrink-0">
+                    <Check className="w-3 h-3 stroke-[3]" />
+                  </span>
+                )}
               </button>
 
-              {professionals.map((prof) => (
-                <button
-                  key={prof.id || prof.nome}
-                  type="button"
-                  onClick={() => setSelectedProf(prof.nome)}
-                  className={`py-2 px-3 rounded-xl text-xs font-bold text-left transition-all border flex items-center justify-between truncate ${
-                    selectedProf === prof.nome
-                      ? 'bg-teal-900/60 border-teal-500 text-teal-300 shadow-sm'
-                      : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
-                  }`}
-                >
-                  <span className="truncate">👤 {prof.nome}</span>
-                  {selectedProf === prof.nome && <Check className="w-3.5 h-3.5 text-teal-400 shrink-0 ml-1" />}
-                </button>
-              ))}
+              {/* Option 2..N: Individual Professional Buttons */}
+              {professionals.map((prof, idx) => {
+                const profName = prof.name || `Profissional ${idx + 1}`;
+                const isSelected = selectedProf === profName;
+                const initials = profName.slice(0, 2).toUpperCase();
+
+                return (
+                  <button
+                    key={prof.id || profName}
+                    type="button"
+                    onClick={() => setSelectedProf(profName)}
+                    className={`py-2.5 px-3 rounded-2xl text-xs font-bold text-left transition-all border flex items-center justify-between cursor-pointer ${
+                      isSelected
+                        ? 'bg-gradient-to-r from-teal-900/90 to-emerald-950/90 border-teal-400 text-teal-200 shadow-md ring-1 ring-teal-400/50'
+                        : 'bg-slate-900/90 border-slate-800 text-slate-300 hover:text-white hover:border-slate-700'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 min-w-0 pr-1">
+                      <div className={`w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-black shrink-0 ${
+                        isSelected ? 'bg-teal-500 text-white' : 'bg-sky-950 text-sky-300 border border-sky-800'
+                      }`}>
+                        {initials}
+                      </div>
+                      <div className="min-w-0">
+                        <span className="block font-black text-white text-xs truncate">
+                          {profName}
+                        </span>
+                        <span className="block text-[10px] text-slate-400 truncate">
+                          {prof.role || 'Profissional'}
+                        </span>
+                      </div>
+                    </div>
+                    {isSelected && (
+                      <span className="w-5 h-5 rounded-full bg-teal-500 text-white flex items-center justify-center shrink-0">
+                        <Check className="w-3 h-3 stroke-[3]" />
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
           {/* Generated Link Display Box */}
           <div className="bg-slate-950 p-4 rounded-2xl border border-teal-500/40 space-y-3 shadow-inner">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-wrap gap-2">
               <span className="text-[11px] font-black text-teal-300 uppercase tracking-wider flex items-center gap-1.5">
                 <Link2 className="w-3.5 h-3.5 text-teal-400" />
-                <span>Link de Acesso para Salão / Funcionário:</span>
+                <span>
+                  {isIndividual ? `Link Direto de: ${selectedProf}` : 'Link Geral de Acesso (Equipe):'}
+                </span>
               </span>
               <span className="bg-emerald-500/20 text-emerald-400 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-500/30">
-                Ativo & Pronto
+                {isIndividual ? `Exclusivo • ${selectedProf}` : 'Geral • Equipe'}
               </span>
             </div>
 
@@ -261,7 +335,7 @@ export const EmployeeLinkModal: React.FC<EmployeeLinkModalProps> = ({
                 className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 px-4 rounded-xl shadow-lg flex items-center justify-center gap-2 transition-all active:scale-98 text-xs cursor-pointer"
               >
                 {copied ? <Check className="w-4 h-4 text-white" /> : <Copy className="w-4 h-4 text-white" />}
-                <span>{copied ? 'Link Copiado!' : 'Copiar Link do Funcionário'}</span>
+                <span>{copied ? 'Link Copiado!' : (isIndividual ? `Copiar Link de ${selectedProf}` : 'Copiar Link da Equipe')}</span>
               </button>
 
               <button
@@ -270,7 +344,7 @@ export const EmployeeLinkModal: React.FC<EmployeeLinkModalProps> = ({
                 className="w-full bg-[#25D366] hover:bg-[#20bd5a] text-white font-bold py-2.5 px-4 rounded-xl shadow-lg flex items-center justify-center gap-2 transition-all active:scale-98 text-xs cursor-pointer"
               >
                 <MessageSquare className="w-4 h-4 text-white" />
-                <span>Enviar pelo WhatsApp</span>
+                <span>{isIndividual ? `Enviar p/ ${selectedProf}` : 'Enviar no WhatsApp'}</span>
               </button>
             </div>
 
@@ -297,7 +371,7 @@ export const EmployeeLinkModal: React.FC<EmployeeLinkModalProps> = ({
                 className="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold py-2 px-3 rounded-xl border border-slate-700 flex items-center justify-center gap-2 transition-all text-xs cursor-pointer"
               >
                 <ExternalLink className="w-4 h-4 text-teal-400" />
-                <span>Testar / Abrir Painel do Funcionário</span>
+                <span>{isIndividual ? `Abrir Painel de ${selectedProf}` : 'Testar / Abrir Painel'}</span>
               </button>
             </div>
 
@@ -305,11 +379,11 @@ export const EmployeeLinkModal: React.FC<EmployeeLinkModalProps> = ({
             {showQrCode && qrCodeDataUrl && (
               <div className="mt-3 p-4 bg-white rounded-2xl flex flex-col items-center justify-center gap-2 border border-teal-500 animate-in fade-in zoom-in duration-150">
                 <span className="text-slate-800 font-black text-xs">
-                  Escaneie com a câmera do celular para abrir o painel do funcionário:
+                  Escaneie com a câmera do celular para abrir o painel:
                 </span>
                 <img src={qrCodeDataUrl} alt="QR Code Funcionário" className="w-48 h-48 rounded-xl shadow-md" />
                 <span className="text-[10px] text-slate-500 font-medium">
-                  {activeSalon.config.nomeSalao} • {profDisplay}
+                  {activeSalon.config.nomeSalon || activeSalon.config.nomeSalao} • {profDisplayName}
                 </span>
               </div>
             )}

@@ -1265,7 +1265,8 @@ export function App() {
         onClose={() => setIsEmployeeLinkOpen(false)}
         activeSalon={salons.find(s => s.id === activeSalonId) || salons[0]}
         salons={salons}
-        onOpenEmployeeView={(salon) => {
+        professionals={professionals}
+        onOpenEmployeeView={(salon, profName) => {
           handleSelectSalon(salon);
           setUserRole('funcionario');
           setActiveTab('agenda');
