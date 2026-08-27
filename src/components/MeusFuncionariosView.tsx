@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Professional, Transaction, Appointment, SalonConfig, EmployeeFechamentoRecord, FechamentoPeriodType, UserRole } from '../types';
 import { Storage, getSalonSlug } from '../utils/storage';
+import { DEFAULT_PROFESSIONALS } from '../data/mockData';
 import { getPublicAppUrl, buildAppUrl } from '../utils/url';
 import { getTimeSlotsForDate, getScheduleRuleForDate } from '../utils/schedule';
 import { downloadDailyScheduleWord, downloadFechamentoWord, printScheduleDirect, ScheduleItemExport, FechamentoItemExport } from '../utils/exportWord';
@@ -37,7 +38,24 @@ export const MeusFuncionariosView: React.FC<MeusFuncionariosViewProps> = ({
 }) => {
   const isEmployee = userRole === 'funcionario';
   const isSalonAdmin = userRole === 'salao' || userRole === 'admin';
-  const [editingProfs, setEditingProfs] = useState<Professional[]>(professionals || []);
+
+  // Normalize incoming professionals
+  const normalizeProfs = (profsList: any[]): Professional[] => {
+    if (!Array.isArray(profsList) || profsList.length === 0) {
+      return DEFAULT_PROFESSIONALS;
+    }
+    return profsList.map((p: any, idx: number) => ({
+      id: p?.id || `prof-${idx + 1}`,
+      name: p?.name || p?.nome || `Profissional ${idx + 1}`,
+      role: p?.role || 'Cabeleireiro(a)',
+      commissionPercent: typeof p?.commissionPercent === 'number' ? p.commissionPercent : (typeof p?.porc === 'number' ? p.porc : 50),
+      phone: p?.phone || '',
+      cpf: p?.cpf || undefined,
+      active: p?.active !== false
+    }));
+  };
+
+  const [editingProfs, setEditingProfs] = useState<Professional[]>(() => normalizeProfs(professionals));
   const [showAddModal, setShowAddModal] = useState(false);
   
   // Selected employee for detailed Day Agenda or Fechamento inspection
@@ -75,19 +93,24 @@ export const MeusFuncionariosView: React.FC<MeusFuncionariosViewProps> = ({
 
   useEffect(() => {
     if (professionals && Array.isArray(professionals)) {
-      setEditingProfs(professionals);
+      setEditingProfs(normalizeProfs(professionals));
     }
-    setSavedFechamentos(Storage.getFechamentos());
+    try {
+      setSavedFechamentos(Storage.getFechamentos() || []);
+    } catch (e) {
+      console.error("Error loading fechamentos:", e);
+    }
   }, [professionals]);
 
-  const salonSlug = activeSalonSlug || getSalonSlug(config.nomeSalao || 'salao');
+  const salonSlug = activeSalonSlug || getSalonSlug(config?.nomeSalao || 'salao');
 
   // Compute stats for each professional across all appointments and transactions
   const profsStats = useMemo(() => {
     const statsMap: Record<string, { daysWorked: Set<string>; clientsServed: number; totalGross: number; totalCommission: number }> = {};
 
-    editingProfs.forEach(p => {
-      statsMap[p.name] = {
+    editingProfs.forEach((p, idx) => {
+      const profName = p?.name || `Profissional ${idx + 1}`;
+      statsMap[profName] = {
         daysWorked: new Set<string>(),
         clientsServed: 0,
         totalGross: 0,
@@ -96,30 +119,35 @@ export const MeusFuncionariosView: React.FC<MeusFuncionariosViewProps> = ({
     });
 
     // 1. Scan transactions (POS Completed)
-    transactions.forEach(t => {
-      if (t.commissions && Array.isArray(t.commissions)) {
+    (transactions || []).forEach(t => {
+      if (t && t.commissions && Array.isArray(t.commissions)) {
         t.commissions.forEach(c => {
+          if (!c || !c.professionalName) return;
           const profEntry = statsMap[c.professionalName];
           if (profEntry) {
             if (t.date) profEntry.daysWorked.add(t.date);
             profEntry.clientsServed += 1;
-            profEntry.totalGross += t.grossAmount;
-            profEntry.totalCommission += c.amount;
+            profEntry.totalGross += (Number(t.grossAmount) || 0);
+            profEntry.totalCommission += (Number(c.amount) || 0);
           }
         });
       }
     });
 
     // 2. Scan appointments (Booked or completed appointments)
-    Object.entries(appointments).forEach(([date, daySlots]) => {
-      Object.values(daySlots).forEach(ap => {
-        if (ap.professionalName && statsMap[ap.professionalName]) {
-          if (ap.status === 'agendado' || ap.status === 'concluido') {
-            statsMap[ap.professionalName].daysWorked.add(date);
-          }
+    if (appointments && typeof appointments === 'object') {
+      Object.entries(appointments).forEach(([date, daySlots]) => {
+        if (daySlots && typeof daySlots === 'object') {
+          Object.values(daySlots).forEach((ap: any) => {
+            if (ap && ap.professionalName && statsMap[ap.professionalName]) {
+              if (ap.status === 'agendado' || ap.status === 'concluido') {
+                statsMap[ap.professionalName].daysWorked.add(date);
+              }
+            }
+          });
         }
       });
-    });
+    }
 
     return statsMap;
   }, [editingProfs, transactions, appointments]);
@@ -170,11 +198,12 @@ export const MeusFuncionariosView: React.FC<MeusFuncionariosViewProps> = ({
 
   // Helper to build individual employee agenda link
   const getProfAgendaUrl = (profName: string) => {
+    const safeName = profName || 'Equipe';
     const baseUrl = typeof window !== 'undefined' ? `${window.location.origin}/` : getPublicAppUrl();
     return buildAppUrl({
       role: 'funcionario',
       salon: salonSlug,
-      prof: profName
+      prof: safeName
     }, baseUrl);
   };
 
@@ -201,9 +230,10 @@ export const MeusFuncionariosView: React.FC<MeusFuncionariosViewProps> = ({
   };
 
   const handleSendProfLinkWhatsapp = (prof: Professional) => {
-    const url = getProfAgendaUrl(prof.name);
-    const msg = `Olá, *${prof.name}*! 💈✂️\n\n` +
-      `Aqui está o seu *Link Exclusivo de Acesso à sua Agenda* no *${config.nomeSalao}*:\n\n` +
+    const safeProfName = prof?.name || 'Profissional';
+    const url = getProfAgendaUrl(safeProfName);
+    const msg = `Olá, *${safeProfName}*! 💈✂️\n\n` +
+      `Aqui está o seu *Link Exclusivo de Acesso à sua Agenda* no *${config?.nomeSalao || 'Salão'}*:\n\n` +
       `👉 ${url}\n\n` +
       `Abra o link para visualizar seus horários, clientes agendados, catálogo de serviços e equipe em tempo real!\n\n` +
       `💡 *Dica:* Salve este link nos seus favoritos do celular ou fixado no WhatsApp para acessar rapidamente. ✨`;
@@ -220,11 +250,12 @@ export const MeusFuncionariosView: React.FC<MeusFuncionariosViewProps> = ({
   // -------------------------------------------------------------
   // DAY AGENDA INSPECTION CALCULATION
   // -------------------------------------------------------------
-  const getProfDayScheduleItems = (profName: string, dateStr: string): ScheduleItemExport[] => {
-    const generatedSlots = getTimeSlotsForDate(dateStr, config.scheduleConfig);
-    const dayAppointments = appointments[dateStr] || {};
-    const bookedSlots = Object.keys(dayAppointments);
-    const allSlots = Array.from(new Set([...generatedSlots, ...bookedSlots])).sort();
+  const getProfDayScheduleItems = (profName: string, dateStr?: string): ScheduleItemExport[] => {
+    const targetDate = dateStr || agendaDate || new Date().toISOString().split('T')[0];
+    const generatedSlots = getTimeSlotsForDate(targetDate, config?.scheduleConfig);
+    const dayAppointments = (appointments && appointments[targetDate]) ? appointments[targetDate] : {};
+    const bookedSlots = Object.keys(dayAppointments || {});
+    const allSlots = Array.from(new Set([...(generatedSlots || []), ...bookedSlots])).sort();
 
     const items: ScheduleItemExport[] = [];
 
@@ -236,11 +267,11 @@ export const MeusFuncionariosView: React.FC<MeusFuncionariosViewProps> = ({
           items.push({
             time,
             clientName: ap.clientName || (ap.status === 'bloqueado' ? (ap.notes || 'Horário Bloqueado') : '-'),
-            clientPhone: ap.clientPhone,
+            clientPhone: ap.clientPhone || '',
             serviceName: ap.serviceName || (ap.status === 'bloqueado' ? 'Bloqueio' : '-'),
-            price: ap.price,
-            status: ap.status,
-            notes: ap.notes
+            price: Number(ap.price) || 0,
+            status: ap.status || 'agendado',
+            notes: ap.notes || ''
           });
         }
       } else {
@@ -259,22 +290,23 @@ export const MeusFuncionariosView: React.FC<MeusFuncionariosViewProps> = ({
 
   const handleDownloadProfDayWord = (profName: string, dateStr: string) => {
     const items = getProfDayScheduleItems(profName, dateStr);
-    downloadDailyScheduleWord(config.nomeSalao || 'Salão', profName, dateStr, items);
+    downloadDailyScheduleWord(config?.nomeSalao || 'Salão', profName, dateStr, items);
   };
 
   const handlePrintProfDay = (profName: string, dateStr: string) => {
     const items = getProfDayScheduleItems(profName, dateStr);
-    printScheduleDirect(config.nomeSalao || 'Salão', profName, dateStr, items);
+    printScheduleDirect(config?.nomeSalao || 'Salão', profName, dateStr, items);
   };
 
   const handleSendDayScheduleWhatsApp = (prof: Professional, dateStr: string) => {
-    const items = getProfDayScheduleItems(prof.name, dateStr);
+    const profName = prof?.name || 'Profissional';
+    const items = getProfDayScheduleItems(profName, dateStr);
     const bookedItems = items.filter(i => i.status === 'agendado' || i.status === 'concluido');
-    const [y, m, d] = dateStr.split('-');
-    const formattedDate = `${d}/${m}/${y}`;
+    const [y, m, d] = (dateStr || '').split('-');
+    const formattedDate = (d && m && y) ? `${d}/${m}/${y}` : dateStr;
 
-    let msg = `📅 *AGENDA DO DIA (${formattedDate})* • *${config.nomeSalao}*\n` +
-      `👤 Profissional: *${prof.name}*\n` +
+    let msg = `📅 *AGENDA DO DIA (${formattedDate})* • *${config?.nomeSalao || 'Salão'}*\n` +
+      `👤 Profissional: *${profName}*\n` +
       `✂️ Total de Clientes Agendados: *${bookedItems.length}*\n\n` +
       `─────────────────────────\n`;
 
@@ -285,13 +317,13 @@ export const MeusFuncionariosView: React.FC<MeusFuncionariosViewProps> = ({
         msg += `⏰ *${i.time}* — ${i.clientName}\n`;
         msg += `   ✂️ Serviço: ${i.serviceName}\n`;
         if (i.clientPhone) msg += `   📞 Tel: ${i.clientPhone}\n`;
-        if (i.price) msg += `   💰 Valor: R$ ${i.price.toFixed(2).replace('.', ',')}\n`;
+        if (i.price) msg += `   💰 Valor: R$ ${(Number(i.price) || 0).toFixed(2).replace('.', ',')}\n`;
         msg += `\n`;
       });
     }
 
     msg += `─────────────────────────\n`;
-    msg += `👉 Acesse sua agenda ao vivo: ${getProfAgendaUrl(prof.name)}\n`;
+    msg += `👉 Acesse sua agenda ao vivo: ${getProfAgendaUrl(profName)}\n`;
     msg += `Bom trabalho! ✨`;
 
     const phone = prof.phone ? prof.phone.replace(/\D/g, '') : '';
@@ -306,20 +338,36 @@ export const MeusFuncionariosView: React.FC<MeusFuncionariosViewProps> = ({
   // -------------------------------------------------------------
   // FECHAMENTO CALCULATION (Diário, Quinzenal, Mensal, Personalizado)
   // -------------------------------------------------------------
-  const calculateFechamento = (prof: Professional) => {
+  const calculateFechamento = (prof: Professional | null) => {
+    if (!prof) {
+      return {
+        startDate: '',
+        endDate: '',
+        periodLabel: '',
+        totalDaysWorked: 0,
+        totalClients: 0,
+        grossAmount: 0,
+        commissionPercent: 50,
+        netCommission: 0,
+        items: [] as FechamentoItemExport[]
+      };
+    }
+
+    const profName = prof.name || 'Profissional';
+    const profComm = typeof prof.commissionPercent === 'number' ? prof.commissionPercent : 50;
+
     let startDate = '';
     let endDate = '';
     let periodLabel = '';
 
-    const todayStr = new Date().toISOString().split('T')[0];
-    const [curYear, curMonth] = fechamentoMonth.split('-').map(Number);
-    const lastDayOfMonth = new Date(curYear, curMonth, 0).getDate();
+    const [curYear, curMonth] = (fechamentoMonth || '2026-08').split('-').map(Number);
+    const lastDayOfMonth = new Date(curYear || 2026, curMonth || 8, 0).getDate();
 
     if (fechamentoPeriod === 'diario') {
       startDate = agendaDate;
       endDate = agendaDate;
-      const [y, m, d] = agendaDate.split('-');
-      periodLabel = `Diário (${d}/${m}/${y})`;
+      const [y, m, d] = (agendaDate || '').split('-');
+      periodLabel = `Diário (${d || '01'}/${m || '01'}/${y || '2026'})`;
     } else if (fechamentoPeriod === 'quinzenal_1') {
       startDate = `${fechamentoMonth}-01`;
       endDate = `${fechamentoMonth}-15`;
@@ -341,19 +389,19 @@ export const MeusFuncionariosView: React.FC<MeusFuncionariosViewProps> = ({
     const filteredItems: FechamentoItemExport[] = [];
     const daysWorkedSet = new Set<string>();
 
-    transactions.forEach(t => {
-      if (t.date >= startDate && t.date <= endDate) {
+    (transactions || []).forEach(t => {
+      if (t && t.date && t.date >= startDate && t.date <= endDate) {
         if (t.commissions && Array.isArray(t.commissions)) {
-          const matchComm = t.commissions.find(c => c.professionalName === prof.name || c.professionalId === prof.id);
-          if (matchComm && matchComm.amount > 0) {
+          const matchComm = t.commissions.find(c => c && (c.professionalName === profName || c.professionalId === prof.id));
+          if (matchComm && Number(matchComm.amount) > 0) {
             daysWorkedSet.add(t.date);
             filteredItems.push({
               date: t.date,
               time: t.time || '12:00',
               clientName: t.clientName || t.description || 'Cliente',
               serviceName: t.description || 'Atendimento',
-              grossAmount: t.grossAmount,
-              commissionAmount: matchComm.amount
+              grossAmount: Number(t.grossAmount) || 0,
+              commissionAmount: Number(matchComm.amount) || 0
             });
           }
         }
@@ -372,7 +420,7 @@ export const MeusFuncionariosView: React.FC<MeusFuncionariosViewProps> = ({
       totalDaysWorked,
       totalClients,
       grossAmount,
-      commissionPercent: prof.commissionPercent,
+      commissionPercent: profComm,
       netCommission,
       items: filteredItems
     };
@@ -391,7 +439,7 @@ export const MeusFuncionariosView: React.FC<MeusFuncionariosViewProps> = ({
       totalDaysWorked: calc.totalDaysWorked,
       totalClientsServed: calc.totalClients,
       grossAmount: calc.grossAmount,
-      commissionPercent: prof.commissionPercent,
+      commissionPercent: calc.commissionPercent,
       netCommissionAmount: calc.netCommission,
       status: 'fechado',
       createdAt: new Date().toISOString(),
@@ -408,7 +456,7 @@ export const MeusFuncionariosView: React.FC<MeusFuncionariosViewProps> = ({
   const handleDownloadFechamentoWord = (prof: Professional) => {
     const calc = calculateFechamento(prof);
     downloadFechamentoWord(
-      config.nomeSalao || 'Salão',
+      config?.nomeSalao || 'Salão',
       prof.name,
       {
         totalClients: calc.totalClients,
@@ -485,16 +533,24 @@ export const MeusFuncionariosView: React.FC<MeusFuncionariosViewProps> = ({
 
       {/* Employees Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-        {editingProfs.map((prof) => {
-          const stats = profsStats[prof.name] || { daysWorked: new Set(), clientsServed: 0, totalGross: 0, totalCommission: 0 };
-          const daysCount = stats.daysWorked.size;
-          const clientsCount = stats.clientsServed;
-          const grossVal = stats.totalGross;
-          const commVal = stats.totalCommission;
+        {editingProfs.map((prof, idx) => {
+          const profId = prof?.id || `prof-${idx + 1}`;
+          const profName = prof?.name || `Profissional ${idx + 1}`;
+          const profRole = prof?.role || 'Cabeleireiro(a)';
+          const profPhone = prof?.phone || '';
+          const profCpf = prof?.cpf;
+          const profCommission = typeof prof?.commissionPercent === 'number' ? prof.commissionPercent : 50;
+
+          const stats = profsStats[profName] || { daysWorked: new Set(), clientsServed: 0, totalGross: 0, totalCommission: 0 };
+          const daysCount = stats?.daysWorked ? stats.daysWorked.size : 0;
+          const clientsCount = stats?.clientsServed || 0;
+          const grossVal = stats?.totalGross || 0;
+          const commVal = stats?.totalCommission || 0;
+          const initials = (profName.slice(0, 2) || 'PR').toUpperCase();
 
           return (
             <div 
-              key={prof.id || prof.name}
+              key={profId}
               className="bg-slate-900/90 border border-slate-800 hover:border-slate-700 rounded-3xl p-4 sm:p-5 shadow-lg flex flex-col justify-between transition-all space-y-4"
             >
               {/* Header: Name, Role, Commission Input & Actions */}
@@ -502,23 +558,23 @@ export const MeusFuncionariosView: React.FC<MeusFuncionariosViewProps> = ({
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-center gap-3">
                     <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-sky-600 to-blue-700 border border-blue-400/40 flex items-center justify-center text-white font-black text-lg shadow-md shrink-0">
-                      {prof.name.slice(0, 2).toUpperCase()}
+                      {initials}
                     </div>
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
-                        <h3 className="text-base font-black text-white">{prof.name}</h3>
+                        <h3 className="text-base font-black text-white">{profName}</h3>
                         <span className="bg-slate-800 text-slate-300 text-[10px] font-bold px-2 py-0.5 rounded-md border border-slate-700">
-                          {prof.role}
+                          {profRole}
                         </span>
                       </div>
                       <div className="flex items-center gap-2 text-[11px] text-slate-400 mt-0.5">
                         <span className="flex items-center gap-1 font-mono">
                           <Phone className="w-3 h-3 text-slate-500" />
-                          {prof.phone || 'Sem telefone'}
+                          {profPhone || 'Sem telefone'}
                         </span>
-                        {prof.cpf && (
+                        {profCpf && (
                           <span className="bg-teal-950/80 text-teal-300 font-mono text-[9px] px-1.5 py-0.2 rounded border border-teal-800/40">
-                            CPF: {prof.cpf}
+                            CPF: {profCpf}
                           </span>
                         )}
                       </div>
@@ -527,7 +583,7 @@ export const MeusFuncionariosView: React.FC<MeusFuncionariosViewProps> = ({
 
                   {!isEmployee && (
                     <button
-                      onClick={() => handleDeleteProf(prof.id)}
+                      onClick={() => handleDeleteProf(profId)}
                       title="Remover Funcionário"
                       className="p-2 text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 rounded-xl transition-colors cursor-pointer"
                     >
@@ -574,7 +630,7 @@ export const MeusFuncionariosView: React.FC<MeusFuncionariosViewProps> = ({
                   {/* Commission % & Total */}
                   <div className="bg-slate-950/80 p-2.5 rounded-2xl border border-emerald-900/40 text-center">
                     <div className="flex items-center justify-center gap-1 text-[10px] font-bold text-emerald-400 uppercase">
-                      <span>Comissão ({prof.commissionPercent}%)</span>
+                      <span>Comissão ({profCommission}%)</span>
                     </div>
                     <span className="text-xs sm:text-sm font-black text-emerald-400 block mt-0.5">
                       R$ {commVal.toFixed(2).replace('.', ',')}
@@ -595,8 +651,8 @@ export const MeusFuncionariosView: React.FC<MeusFuncionariosViewProps> = ({
                         type="number"
                         min="0"
                         max="100"
-                        value={prof.commissionPercent}
-                        onChange={(e) => handleUpdateCommission(prof.id, parseFloat(e.target.value) || 0)}
+                        value={profCommission}
+                        onChange={(e) => handleUpdateCommission(profId, parseFloat(e.target.value) || 0)}
                         className="w-16 px-2 py-1 bg-slate-950 border border-slate-700 rounded-lg text-white font-mono text-center font-bold text-xs focus:ring-1 focus:ring-blue-500 outline-none"
                       />
                       <span className="text-slate-400 font-bold">%</span>

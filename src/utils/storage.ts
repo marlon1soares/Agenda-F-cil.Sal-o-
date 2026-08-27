@@ -156,8 +156,26 @@ export const Storage = {
   },
 
   getProfessionals(): Professional[] {
-    const saved = safeGetItem('salaoProfissionais');
-    return saved ? JSON.parse(saved) : DEFAULT_PROFESSIONALS;
+    try {
+      const saved = safeGetItem('salaoProfissionais');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.map((p: any, idx: number) => ({
+            id: p.id || `prof-${idx + 1}`,
+            name: p.name || p.nome || `Profissional ${idx + 1}`,
+            role: p.role || 'Cabeleireiro(a)',
+            commissionPercent: typeof p.commissionPercent === 'number' ? p.commissionPercent : (typeof p.porc === 'number' ? p.porc : 50),
+            phone: p.phone || '',
+            cpf: p.cpf || undefined,
+            active: p.active !== false
+          }));
+        }
+      }
+    } catch (e) {
+      console.error("Error loading salaoProfissionais:", e);
+    }
+    return DEFAULT_PROFESSIONALS;
   },
   saveProfessionals(profs: Professional[]) {
     safeSetItem('salaoProfissionais', JSON.stringify(profs));
