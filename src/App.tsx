@@ -899,7 +899,7 @@ export function App() {
                     }`}
                   >
                     <Users className="w-4 h-4" />
-                    <span>Meus Funcionários</span>
+                    <span>{userRole === 'funcionario' ? 'Equipe' : 'Meus Funcionários'}</span>
                   </button>
 
                   <button
@@ -1090,6 +1090,7 @@ export function App() {
                     transactions={transactions}
                     appointments={appointments}
                     config={config}
+                    userRole={userRole}
                     activeSalonSlug={salons.find(s => s.id === activeSalonId)?.slug}
                     onSaveProfessionals={(profs) => {
                       setProfessionals(profs);
@@ -1135,7 +1136,7 @@ export function App() {
         isOpen={isCatalogOpen}
         onClose={() => setIsCatalogOpen(false)}
         userRole={userRole}
-        readOnly={userRole === 'cliente'}
+        readOnly={userRole === 'cliente' || userRole === 'funcionario'}
         config={config}
         onSaveConfig={handleSaveConfig}
       />

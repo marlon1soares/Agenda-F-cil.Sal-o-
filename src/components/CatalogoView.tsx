@@ -63,8 +63,12 @@ export const CatalogoView: React.FC<CatalogoViewProps> = ({
   config: propConfig,
   onSaveConfig
 }) => {
-  // If user is 'cliente' or readOnly is explicitly true, hide all editing controls
-  const isClientView = readOnly || userRole === 'cliente';
+  // If user is 'cliente' or 'funcionario' or readOnly is explicitly true, hide all editing controls
+  // Only 'salao' (Dono do Salão) and 'admin' can modify, add, upload or delete catalog items
+  const isReadOnly = readOnly || userRole === 'cliente' || userRole === 'funcionario';
+  const canEdit = !isReadOnly && (userRole === 'salao' || userRole === 'admin');
+  const isClientView = !canEdit;
+  const isEmployee = userRole === 'funcionario';
 
   const [activeFolder, setActiveFolder] = useState<string>('salao');
   const [customFolders, setCustomFolders] = useState<{ key: string; title: string; icon: string }[]>(DEFAULT_FOLDERS);
@@ -509,13 +513,17 @@ export const CatalogoView: React.FC<CatalogoViewProps> = ({
                 <h3 className="text-xs sm:text-sm font-black text-white truncate">
                   📸 Catálogo de Mídias & Anexos
                 </h3>
-                {isClientView ? (
+                {isEmployee ? (
+                  <span className="hidden md:inline-flex items-center gap-1 text-[10px] font-extrabold bg-teal-500/20 text-teal-300 px-2.5 py-0.5 rounded-full border border-teal-500/30">
+                    <Eye className="w-3 h-3 text-teal-400" /> Salão / Funcionário (Apenas Visualização)
+                  </span>
+                ) : userRole === 'cliente' ? (
                   <span className="hidden md:inline-flex items-center gap-1 text-[10px] font-extrabold bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full border border-emerald-500/30">
                     <Eye className="w-3 h-3" /> Cliente
                   </span>
                 ) : (
                   <span className="hidden md:inline-flex items-center gap-1 text-[10px] font-extrabold bg-purple-500/20 text-purple-300 px-2 py-0.5 rounded-full border border-purple-500/30">
-                    <Settings className="w-3 h-3" /> Gestão
+                    <Settings className="w-3 h-3" /> Gestão (Proprietário / Admin)
                   </span>
                 )}
               </div>
@@ -617,6 +625,21 @@ export const CatalogoView: React.FC<CatalogoViewProps> = ({
             </button>
           </div>
         </div>
+
+        {/* Employee Read-Only Notice */}
+        {isEmployee && (
+          <div className="bg-teal-950/80 border-b border-teal-800/60 px-4 py-2 flex items-center justify-between text-xs text-teal-200">
+            <div className="flex items-center gap-2">
+              <Eye className="w-4 h-4 text-teal-400 shrink-0" />
+              <span>
+                <strong>Modo Consulta (Salão / Funcionário):</strong> Você pode visualizar todos os produtos, fotos, portfólio e valores em R$ para apresentar aos clientes. Apenas o Dono/Administrador do salão pode adicionar ou alterar itens.
+              </span>
+            </div>
+            <span className="hidden sm:inline-block bg-teal-900/80 text-teal-300 text-[10px] font-bold px-2 py-0.5 rounded-md border border-teal-700/50">
+              Apenas Leitura
+            </span>
+          </div>
+        )}
 
         {/* Folder Navigation Tabs */}
         <div className="flex items-center gap-1.5 px-3 py-2 bg-slate-950 border-b border-slate-800 overflow-x-auto shrink-0 custom-scrollbar">

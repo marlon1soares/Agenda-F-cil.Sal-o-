@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Professional, Transaction, Appointment, SalonConfig, EmployeeFechamentoRecord, FechamentoPeriodType } from '../types';
+import { Professional, Transaction, Appointment, SalonConfig, EmployeeFechamentoRecord, FechamentoPeriodType, UserRole } from '../types';
 import { Storage, getSalonSlug } from '../utils/storage';
 import { getPublicAppUrl, buildAppUrl } from '../utils/url';
 import { getTimeSlotsForDate, getScheduleRuleForDate } from '../utils/schedule';
@@ -17,6 +17,7 @@ interface MeusFuncionariosViewProps {
   transactions: Transaction[];
   appointments: Record<string, Record<string, Appointment>>;
   config: SalonConfig;
+  userRole?: UserRole;
   activeSalonSlug?: string;
   onSaveProfessionals: (profs: Professional[]) => void;
   onOpenEmployeeLink?: () => void;
@@ -28,11 +29,14 @@ export const MeusFuncionariosView: React.FC<MeusFuncionariosViewProps> = ({
   transactions = [],
   appointments = {},
   config,
+  userRole = 'salao',
   activeSalonSlug,
   onSaveProfessionals,
   onOpenEmployeeLink,
   onOpenSpecificEmployeeAgenda,
 }) => {
+  const isEmployee = userRole === 'funcionario';
+  const isSalonAdmin = userRole === 'salao' || userRole === 'admin';
   const [editingProfs, setEditingProfs] = useState<Professional[]>(professionals || []);
   const [showAddModal, setShowAddModal] = useState(false);
   
@@ -425,19 +429,25 @@ export const MeusFuncionariosView: React.FC<MeusFuncionariosViewProps> = ({
       <div className="bg-slate-900/95 p-4 sm:p-6 rounded-3xl border border-slate-800 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="bg-blue-950 text-blue-300 font-mono text-[10px] font-extrabold px-2.5 py-0.5 rounded-full border border-blue-800">
-              💈 SALÃO / ADMINISTRADOR
+            <span className={`font-mono text-[10px] font-extrabold px-2.5 py-0.5 rounded-full border ${
+              isEmployee 
+                ? 'bg-teal-950 text-teal-300 border-teal-800' 
+                : 'bg-blue-950 text-blue-300 border-blue-800'
+            }`}>
+              {isEmployee ? '💈 SALÃO / FUNCIONÁRIO • EQUIPE' : '💈 SALÃO / ADMINISTRADOR'}
             </span>
             <span className="bg-emerald-950 text-emerald-300 font-mono text-[10px] font-extrabold px-2.5 py-0.5 rounded-full border border-emerald-800">
-              {editingProfs.length} Funcionários Cadastrados
+              {editingProfs.length} {editingProfs.length === 1 ? 'Profissional' : 'Profissionais'}
             </span>
           </div>
           <h2 className="text-xl sm:text-2xl font-black text-white mt-1 flex items-center gap-2">
-            <Users className="w-6 h-6 text-sky-400" />
-            <span>Meus Funcionários & Fechamento</span>
+            <Users className={`w-6 h-6 ${isEmployee ? 'text-teal-400' : 'text-sky-400'}`} />
+            <span>{isEmployee ? 'Equipe de Profissionais' : 'Meus Funcionários & Fechamento'}</span>
           </h2>
           <p className="text-xs text-slate-400 mt-1 max-w-2xl">
-            Acompanhe dias trabalhados, clientes atendidos, realize fechamento diário/quinzenal/mensal e gerencie links e agendas individuais de cada funcionário.
+            {isEmployee
+              ? 'Consulte os profissionais da equipe, especialidades, acesse a agenda do dia e links diretos de atendimento.'
+              : 'Acompanhe dias trabalhados, clientes atendidos, realize fechamento diário/quinzenal/mensal e gerencie links e agendas individuais de cada funcionário.'}
           </p>
         </div>
 
@@ -449,17 +459,19 @@ export const MeusFuncionariosView: React.FC<MeusFuncionariosViewProps> = ({
               title="Gerar e compartilhar links de acesso direto com toda a equipe"
             >
               <Link2 className="w-4 h-4 text-teal-200" />
-              <span>Gerar Links da Equipe</span>
+              <span>{isEmployee ? 'Links da Equipe' : 'Gerar Links da Equipe'}</span>
             </button>
           )}
 
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-xs px-4 py-2.5 rounded-xl transition-all shadow-md flex items-center gap-2 shrink-0 active:scale-95 cursor-pointer"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Novo Funcionário</span>
-          </button>
+          {!isEmployee && (
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-xs px-4 py-2.5 rounded-xl transition-all shadow-md flex items-center gap-2 shrink-0 active:scale-95 cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Novo Funcionário</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -513,13 +525,15 @@ export const MeusFuncionariosView: React.FC<MeusFuncionariosViewProps> = ({
                     </div>
                   </div>
 
-                  <button
-                    onClick={() => handleDeleteProf(prof.id)}
-                    title="Remover Funcionário"
-                    className="p-2 text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 rounded-xl transition-colors cursor-pointer"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  {!isEmployee && (
+                    <button
+                      onClick={() => handleDeleteProf(prof.id)}
+                      title="Remover Funcionário"
+                      className="p-2 text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 rounded-xl transition-colors cursor-pointer"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
 
                 {/* Real-time KPI Stats Counters */}
@@ -569,31 +583,33 @@ export const MeusFuncionariosView: React.FC<MeusFuncionariosViewProps> = ({
 
                 </div>
 
-                {/* Commission Percentage Quick Slider / Input */}
-                <div className="mt-3.5 pt-3 border-t border-slate-800 flex items-center justify-between gap-3 text-xs">
-                  <span className="text-slate-400 font-semibold flex items-center gap-1">
-                    <Percent className="w-3.5 h-3.5 text-blue-400" />
-                    <span>Ajustar Taxa de Comissão:</span>
-                  </span>
-                  <div className="flex items-center gap-1">
-                    <input
-                      type="number"
-                      min="0"
-                      max="100"
-                      value={prof.commissionPercent}
-                      onChange={(e) => handleUpdateCommission(prof.id, parseFloat(e.target.value) || 0)}
-                      className="w-16 px-2 py-1 bg-slate-950 border border-slate-700 rounded-lg text-white font-mono text-center font-bold text-xs focus:ring-1 focus:ring-blue-500 outline-none"
-                    />
-                    <span className="text-slate-400 font-bold">%</span>
+                {/* Commission Percentage Quick Slider / Input - ADMIN ONLY */}
+                {!isEmployee && (
+                  <div className="mt-3.5 pt-3 border-t border-slate-800 flex items-center justify-between gap-3 text-xs">
+                    <span className="text-slate-400 font-semibold flex items-center gap-1">
+                      <Percent className="w-3.5 h-3.5 text-blue-400" />
+                      <span>Ajustar Taxa de Comissão:</span>
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={prof.commissionPercent}
+                        onChange={(e) => handleUpdateCommission(prof.id, parseFloat(e.target.value) || 0)}
+                        className="w-16 px-2 py-1 bg-slate-950 border border-slate-700 rounded-lg text-white font-mono text-center font-bold text-xs focus:ring-1 focus:ring-blue-500 outline-none"
+                      />
+                      <span className="text-slate-400 font-bold">%</span>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
 
               {/* Action Buttons: 1. Agenda do Dia (Word/Print) | 2. Fechamento | 3. Link Exclusivo */}
               <div className="space-y-2 pt-2 border-t border-slate-800/80">
                 
                 {/* Row 1: Agenda do Dia do Funcionário & Fechamento */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div className={`grid ${isEmployee ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-2'} gap-2`}>
                   <button
                     type="button"
                     onClick={() => setSelectedProfForAgenda(prof)}
@@ -603,14 +619,16 @@ export const MeusFuncionariosView: React.FC<MeusFuncionariosViewProps> = ({
                     <span>Ver Agenda do Dia & Word</span>
                   </button>
 
-                  <button
-                    type="button"
-                    onClick={() => setSelectedProfForFechamento(prof)}
-                    className="py-2.5 px-3 rounded-xl bg-emerald-600/20 hover:bg-emerald-600 text-emerald-300 hover:text-white border border-emerald-500/40 font-extrabold text-xs flex items-center justify-center gap-1.5 transition-all shadow-sm active:scale-98 cursor-pointer"
-                  >
-                    <DollarSign className="w-4 h-4 text-emerald-400" />
-                    <span>Fazer Fechamento</span>
-                  </button>
+                  {!isEmployee && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedProfForFechamento(prof)}
+                      className="py-2.5 px-3 rounded-xl bg-emerald-600/20 hover:bg-emerald-600 text-emerald-300 hover:text-white border border-emerald-500/40 font-extrabold text-xs flex items-center justify-center gap-1.5 transition-all shadow-sm active:scale-98 cursor-pointer"
+                    >
+                      <DollarSign className="w-4 h-4 text-emerald-400" />
+                      <span>Fazer Fechamento</span>
+                    </button>
+                  )}
                 </div>
 
                 {/* Row 2: Link Direto da Agenda do Funcionário */}
