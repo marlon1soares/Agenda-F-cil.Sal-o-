@@ -494,20 +494,20 @@ export const MeusFuncionariosView: React.FC<MeusFuncionariosViewProps> = ({
           </h2>
           <p className="text-xs text-slate-400 mt-1 max-w-2xl">
             {isEmployee
-              ? 'Consulte os profissionais da equipe, especialidades, acesse a agenda do dia e links diretos de atendimento.'
+              ? 'Consulte os colegas da equipe, telefones de contato, dias trabalhados e total de clientes atendidos.'
               : 'Acompanhe dias trabalhados, clientes atendidos, realize fechamento diário/quinzenal/mensal e gerencie links e agendas individuais de cada funcionário.'}
           </p>
         </div>
 
         <div className="flex items-center gap-2.5 flex-wrap w-full md:w-auto">
-          {onOpenEmployeeLink && (
+          {!isEmployee && onOpenEmployeeLink && (
             <button
               onClick={onOpenEmployeeLink}
               className="bg-gradient-to-r from-teal-700 to-emerald-700 hover:from-teal-600 hover:to-emerald-600 text-white font-extrabold text-xs px-4 py-2.5 rounded-xl transition-all shadow-md flex items-center gap-2 shrink-0 active:scale-95 cursor-pointer border border-teal-500/40"
               title="Gerar e compartilhar links de acesso direto com toda a equipe"
             >
               <Link2 className="w-4 h-4 text-teal-200" />
-              <span>{isEmployee ? 'Links da Equipe' : 'Gerar Links da Equipe'}</span>
+              <span>Gerar Links da Equipe</span>
             </button>
           )}
 
@@ -572,7 +572,7 @@ export const MeusFuncionariosView: React.FC<MeusFuncionariosViewProps> = ({
                           <Phone className="w-3 h-3 text-slate-500" />
                           {profPhone || 'Sem telefone'}
                         </span>
-                        {profCpf && (
+                        {!isEmployee && profCpf && (
                           <span className="bg-teal-950/80 text-teal-300 font-mono text-[9px] px-1.5 py-0.2 rounded border border-teal-800/40">
                             CPF: {profCpf}
                           </span>
@@ -593,51 +593,79 @@ export const MeusFuncionariosView: React.FC<MeusFuncionariosViewProps> = ({
                 </div>
 
                 {/* Real-time KPI Stats Counters */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-4">
-                  
-                  {/* Days Worked */}
-                  <div className="bg-slate-950/80 p-2.5 rounded-2xl border border-slate-800/80 text-center">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                      Dias Trabalhados
-                    </span>
-                    <span className="text-sm sm:text-base font-black text-sky-400 flex items-center justify-center gap-1 mt-0.5">
-                      <Calendar className="w-3.5 h-3.5" />
-                      <span>{daysCount} {daysCount === 1 ? 'dia' : 'dias'}</span>
-                    </span>
-                  </div>
-
-                  {/* Clients Served */}
-                  <div className="bg-slate-950/80 p-2.5 rounded-2xl border border-slate-800/80 text-center">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                      Clientes Atendidos
-                    </span>
-                    <span className="text-sm sm:text-base font-black text-emerald-400 flex items-center justify-center gap-1 mt-0.5">
-                      <Scissors className="w-3.5 h-3.5" />
-                      <span>{clientsCount}</span>
-                    </span>
-                  </div>
-
-                  {/* Gross Revenue */}
-                  <div className="bg-slate-950/80 p-2.5 rounded-2xl border border-slate-800/80 text-center">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                      Faturamento
-                    </span>
-                    <span className="text-xs sm:text-sm font-black text-slate-200 block mt-0.5">
-                      R$ {grossVal.toFixed(2).replace('.', ',')}
-                    </span>
-                  </div>
-
-                  {/* Commission % & Total */}
-                  <div className="bg-slate-950/80 p-2.5 rounded-2xl border border-emerald-900/40 text-center">
-                    <div className="flex items-center justify-center gap-1 text-[10px] font-bold text-emerald-400 uppercase">
-                      <span>Comissão ({profCommission}%)</span>
+                {isEmployee ? (
+                  /* Salão / Funcionário: Visualiza APENAS Dias Trabalhados e Clientes Atendidos */
+                  <div className="grid grid-cols-2 gap-3 mt-4">
+                    {/* Days Worked */}
+                    <div className="bg-slate-950/90 p-3 rounded-2xl border border-slate-800/80 text-center">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                        Dias Trabalhados
+                      </span>
+                      <span className="text-sm sm:text-base font-black text-sky-400 flex items-center justify-center gap-1.5 mt-1">
+                        <Calendar className="w-4 h-4" />
+                        <span>{daysCount} {daysCount === 1 ? 'dia' : 'dias'}</span>
+                      </span>
                     </div>
-                    <span className="text-xs sm:text-sm font-black text-emerald-400 block mt-0.5">
-                      R$ {commVal.toFixed(2).replace('.', ',')}
-                    </span>
-                  </div>
 
-                </div>
+                    {/* Clients Served */}
+                    <div className="bg-slate-950/90 p-3 rounded-2xl border border-slate-800/80 text-center">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                        Clientes Atendidos
+                      </span>
+                      <span className="text-sm sm:text-base font-black text-emerald-400 flex items-center justify-center gap-1.5 mt-1">
+                        <Scissors className="w-4 h-4" />
+                        <span>{clientsCount} {clientsCount === 1 ? 'cliente' : 'clientes'}</span>
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  /* Salão / Administrador: Visualiza Tudo (Dias, Clientes, Faturamento e Comissão) */
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-4">
+                    
+                    {/* Days Worked */}
+                    <div className="bg-slate-950/80 p-2.5 rounded-2xl border border-slate-800/80 text-center">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                        Dias Trabalhados
+                      </span>
+                      <span className="text-sm sm:text-base font-black text-sky-400 flex items-center justify-center gap-1 mt-0.5">
+                        <Calendar className="w-3.5 h-3.5" />
+                        <span>{daysCount} {daysCount === 1 ? 'dia' : 'dias'}</span>
+                      </span>
+                    </div>
+
+                    {/* Clients Served */}
+                    <div className="bg-slate-950/80 p-2.5 rounded-2xl border border-slate-800/80 text-center">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                        Clientes Atendidos
+                      </span>
+                      <span className="text-sm sm:text-base font-black text-emerald-400 flex items-center justify-center gap-1 mt-0.5">
+                        <Scissors className="w-3.5 h-3.5" />
+                        <span>{clientsCount}</span>
+                      </span>
+                    </div>
+
+                    {/* Gross Revenue */}
+                    <div className="bg-slate-950/80 p-2.5 rounded-2xl border border-slate-800/80 text-center">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                        Faturamento
+                      </span>
+                      <span className="text-xs sm:text-sm font-black text-slate-200 block mt-0.5">
+                        R$ {grossVal.toFixed(2).replace('.', ',')}
+                      </span>
+                    </div>
+
+                    {/* Commission % & Total */}
+                    <div className="bg-slate-950/80 p-2.5 rounded-2xl border border-emerald-900/40 text-center">
+                      <div className="flex items-center justify-center gap-1 text-[10px] font-bold text-emerald-400 uppercase">
+                        <span>Comissão ({profCommission}%)</span>
+                      </div>
+                      <span className="text-xs sm:text-sm font-black text-emerald-400 block mt-0.5">
+                        R$ {commVal.toFixed(2).replace('.', ',')}
+                      </span>
+                    </div>
+
+                  </div>
+                )}
 
                 {/* Commission Percentage Quick Slider / Input - ADMIN ONLY */}
                 {!isEmployee && (
@@ -661,21 +689,21 @@ export const MeusFuncionariosView: React.FC<MeusFuncionariosViewProps> = ({
                 )}
               </div>
 
-              {/* Action Buttons: 1. Agenda do Dia (Word/Print) | 2. Fechamento | 3. Link Exclusivo */}
-              <div className="space-y-2 pt-2 border-t border-slate-800/80">
-                
-                {/* Row 1: Agenda do Dia do Funcionário & Fechamento */}
-                <div className={`grid ${isEmployee ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-2'} gap-2`}>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedProfForAgenda(prof)}
-                    className="py-2.5 px-3 rounded-xl bg-blue-600/20 hover:bg-blue-600 text-blue-300 hover:text-white border border-blue-500/40 font-extrabold text-xs flex items-center justify-center gap-1.5 transition-all shadow-sm active:scale-98 cursor-pointer"
-                  >
-                    <Calendar className="w-4 h-4 text-blue-400 group-hover:text-white" />
-                    <span>Ver Agenda do Dia & Word</span>
-                  </button>
+              {/* Action Buttons: ADMIN ONLY (Agenda do Dia Word/Print, Fechamento e Link Exclusivo) */}
+              {!isEmployee && (
+                <div className="space-y-2 pt-2 border-t border-slate-800/80">
+                  
+                  {/* Row 1: Agenda do Dia do Funcionário & Fechamento */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedProfForAgenda(prof)}
+                      className="py-2.5 px-3 rounded-xl bg-blue-600/20 hover:bg-blue-600 text-blue-300 hover:text-white border border-blue-500/40 font-extrabold text-xs flex items-center justify-center gap-1.5 transition-all shadow-sm active:scale-98 cursor-pointer"
+                    >
+                      <Calendar className="w-4 h-4 text-blue-400 group-hover:text-white" />
+                      <span>Ver Agenda do Dia & Word</span>
+                    </button>
 
-                  {!isEmployee && (
                     <button
                       type="button"
                       onClick={() => setSelectedProfForFechamento(prof)}
@@ -684,54 +712,54 @@ export const MeusFuncionariosView: React.FC<MeusFuncionariosViewProps> = ({
                       <DollarSign className="w-4 h-4 text-emerald-400" />
                       <span>Fazer Fechamento</span>
                     </button>
-                  )}
-                </div>
+                  </div>
 
-                {/* Row 2: Link Direto da Agenda do Funcionário */}
-                <div className="bg-slate-950/90 p-2.5 rounded-2xl border border-teal-900/40 flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 overflow-hidden">
-                    <div className="w-7 h-7 rounded-lg bg-teal-500/20 text-teal-300 flex items-center justify-center shrink-0">
-                      <Link2 className="w-3.5 h-3.5" />
+                  {/* Row 2: Link Direto da Agenda do Funcionário */}
+                  <div className="bg-slate-950/90 p-2.5 rounded-2xl border border-teal-900/40 flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 overflow-hidden">
+                      <div className="w-7 h-7 rounded-lg bg-teal-500/20 text-teal-300 flex items-center justify-center shrink-0">
+                        <Link2 className="w-3.5 h-3.5" />
+                      </div>
+                      <div className="truncate">
+                        <span className="text-[9px] text-teal-400 font-bold uppercase tracking-wider block">Link da Agenda do Funcionário</span>
+                        <span className="text-[11px] font-mono text-slate-300 truncate block">
+                          ...prof={encodeURIComponent(prof.name)}
+                        </span>
+                      </div>
                     </div>
-                    <div className="truncate">
-                      <span className="text-[9px] text-teal-400 font-bold uppercase tracking-wider block">Link da Agenda do Funcionário</span>
-                      <span className="text-[11px] font-mono text-slate-300 truncate block">
-                        ...prof={encodeURIComponent(prof.name)}
-                      </span>
+
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => handleCopyProfLink(prof.name, prof.id)}
+                        title="Copiar Link Exclusivo da Agenda deste Funcionário"
+                        className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-colors cursor-pointer"
+                      >
+                        {copiedProfId === prof.id ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleSendProfLinkWhatsapp(prof)}
+                        title="Enviar Link da Agenda no WhatsApp do Funcionário"
+                        className="p-1.5 bg-[#25D366]/20 hover:bg-[#25D366] text-[#25D366] hover:text-white rounded-lg transition-colors cursor-pointer"
+                      >
+                        <MessageSquare className="w-3.5 h-3.5" />
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleOpenProfQr(prof)}
+                        title="QR Code da Agenda no Celular"
+                        className="p-1.5 bg-teal-950 text-teal-300 border border-teal-800 hover:bg-teal-900 rounded-lg transition-colors cursor-pointer"
+                      >
+                        <QrCode className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-1 shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => handleCopyProfLink(prof.name, prof.id)}
-                      title="Copiar Link Exclusivo da Agenda deste Funcionário"
-                      className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-colors cursor-pointer"
-                    >
-                      {copiedProfId === prof.id ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => handleSendProfLinkWhatsapp(prof)}
-                      title="Enviar Link da Agenda no WhatsApp do Funcionário"
-                      className="p-1.5 bg-[#25D366]/20 hover:bg-[#25D366] text-[#25D366] hover:text-white rounded-lg transition-colors cursor-pointer"
-                    >
-                      <MessageSquare className="w-3.5 h-3.5" />
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => handleOpenProfQr(prof)}
-                      title="QR Code da Agenda no Celular"
-                      className="p-1.5 bg-teal-950 text-teal-300 border border-teal-800 hover:bg-teal-900 rounded-lg transition-colors cursor-pointer"
-                    >
-                      <QrCode className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
                 </div>
-
-              </div>
+              )}
             </div>
           );
         })}
