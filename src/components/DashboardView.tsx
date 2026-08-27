@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Transaction, Appointment, SalonConfig, Professional } from '../types';
-import { DollarSign, Calendar, TrendingUp, Users, Award, CreditCard, Sparkles, ArrowUpRight, CheckCircle2, Clock, Heart } from 'lucide-react';
+import { DollarSign, Calendar, TrendingUp, Users, Award, CreditCard, Sparkles, ArrowUpRight, CheckCircle2, Clock, Heart, Link2 } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, PieChart, Pie, Cell } from 'recharts';
 
 interface DashboardViewProps {
@@ -11,6 +11,7 @@ interface DashboardViewProps {
   onNavigateToCaixa: () => void;
   onNavigateToAgenda: () => void;
   onOpenClientLink?: () => void;
+  onOpenEmployeeLink?: () => void;
 }
 
 const COLORS = ['#2563eb', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4'];
@@ -23,6 +24,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onNavigateToCaixa,
   onNavigateToAgenda,
   onOpenClientLink,
+  onOpenEmployeeLink,
 }) => {
   const [aiInsight, setAiInsight] = useState<string | null>(null);
   const [loadingAi, setLoadingAi] = useState(false);
@@ -309,6 +311,32 @@ Dê 3 recomendações curtas e motivadoras para o administrador melhorar o fatur
               <div className="text-xs font-bold text-purple-700">📅 Agendar Cliente</div>
               <div className="text-[11px] text-purple-600 mt-0.5">Reservar horário na agenda geral</div>
             </button>
+
+            {onOpenClientLink && (
+              <button
+                onClick={onOpenClientLink}
+                className="p-3.5 rounded-xl border border-rose-200 bg-rose-50/60 hover:bg-rose-100/80 text-rose-900 transition-all text-left group"
+              >
+                <div className="text-xs font-bold text-rose-700 flex items-center gap-1">
+                  <Link2 className="w-3.5 h-3.5 text-rose-600" />
+                  <span>Link do Cliente</span>
+                </div>
+                <div className="text-[11px] text-rose-600 mt-0.5">Enviar agendamento online</div>
+              </button>
+            )}
+
+            {onOpenEmployeeLink && (
+              <button
+                onClick={onOpenEmployeeLink}
+                className="p-3.5 rounded-xl border border-teal-200 bg-teal-50/60 hover:bg-teal-100/80 text-teal-900 transition-all text-left group"
+              >
+                <div className="text-xs font-bold text-teal-700 flex items-center gap-1">
+                  <Users className="w-3.5 h-3.5 text-teal-600" />
+                  <span>Link da Equipe</span>
+                </div>
+                <div className="text-[11px] text-teal-600 mt-0.5">Painel Salão/Funcionário</div>
+              </button>
+            )}
           </div>
         </div>
 

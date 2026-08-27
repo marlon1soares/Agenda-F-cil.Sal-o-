@@ -1,17 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { Professional, Transaction } from '../types';
-import { Users, Plus, Trash2, Phone, Percent, UserCheck } from 'lucide-react';
+import { Users, Plus, Trash2, Phone, Percent, UserCheck, Link2, Share2, Sparkles, Scissors } from 'lucide-react';
 
 interface ProfissionaisViewProps {
   professionals: Professional[];
   transactions: Transaction[];
   onSaveProfessionals: (profs: Professional[]) => void;
+  onOpenEmployeeLink?: () => void;
 }
 
 export const ProfissionaisView: React.FC<ProfissionaisViewProps> = ({
   professionals = [],
   transactions = [],
   onSaveProfessionals,
+  onOpenEmployeeLink,
 }) => {
   const [editingProfs, setEditingProfs] = useState<Professional[]>(professionals || []);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -20,6 +22,7 @@ export const ProfissionaisView: React.FC<ProfissionaisViewProps> = ({
   const [newRole, setNewRole] = useState('Cabeleireiro(a)');
   const [newCommission, setNewCommission] = useState('50');
   const [newPhone, setNewPhone] = useState('');
+  const [newCpf, setNewCpf] = useState('');
 
   // Keep state synchronized with props
   useEffect(() => {
@@ -54,6 +57,7 @@ export const ProfissionaisView: React.FC<ProfissionaisViewProps> = ({
       role: newRole.trim() || 'Cabeleireiro(a)',
       commissionPercent: parseFloat(newCommission) || 50,
       phone: newPhone.trim() || '(11) 90000-0000',
+      cpf: newCpf.trim() || undefined,
       active: true
     };
 
@@ -65,6 +69,7 @@ export const ProfissionaisView: React.FC<ProfissionaisViewProps> = ({
     setNewRole('Cabeleireiro(a)');
     setNewCommission('50');
     setNewPhone('');
+    setNewCpf('');
     setShowAddModal(false);
   };
 
@@ -85,17 +90,30 @@ export const ProfissionaisView: React.FC<ProfissionaisViewProps> = ({
             </span>
           </h3>
           <p className="text-xs text-slate-400 mt-0.5">
-            Gerencie os profissionais do salão, ajuste porcentagens de comissão e acompanhe os repasses
+            Gerencie os profissionais do salão, ajuste porcentagens de comissão e envie o link de acesso aos funcionários
           </p>
         </div>
 
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-xs px-4 py-2.5 rounded-xl transition-all shadow-md flex items-center gap-1.5 shrink-0 active:scale-95 cursor-pointer"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Novo Profissional</span>
-        </button>
+        <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
+          {onOpenEmployeeLink && (
+            <button
+              onClick={onOpenEmployeeLink}
+              className="bg-gradient-to-r from-teal-700 to-emerald-700 hover:from-teal-600 hover:to-emerald-600 text-white font-extrabold text-xs px-3.5 py-2.5 rounded-xl transition-all shadow-md flex items-center gap-1.5 shrink-0 active:scale-95 cursor-pointer border border-teal-500/40"
+              title="Gerar e compartilhar link de acesso direto com a equipe"
+            >
+              <Link2 className="w-4 h-4 text-teal-200" />
+              <span>Enviar Link p/ Funcionários</span>
+            </button>
+          )}
+
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-xs px-4 py-2.5 rounded-xl transition-all shadow-md flex items-center gap-1.5 shrink-0 active:scale-95 cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Novo Profissional</span>
+          </button>
+        </div>
       </div>
 
       {/* Empty State */}
@@ -177,10 +195,28 @@ export const ProfissionaisView: React.FC<ProfissionaisViewProps> = ({
                     <Phone className="w-3.5 h-3.5 text-slate-500" />
                     <span className="font-mono">{prof.phone || 'Sem telefone'}</span>
                   </span>
+                  {prof.cpf && (
+                    <span className="font-mono text-[10px] text-teal-400 font-bold bg-teal-950/80 px-2 py-0.5 rounded border border-teal-800/40">
+                      CPF: {prof.cpf}
+                    </span>
+                  )}
                   <span className="font-bold text-slate-300 bg-slate-800/80 px-2 py-0.5 rounded-md text-[11px]">
                     {servicesCount} {servicesCount === 1 ? 'atendimento' : 'atendimentos'}
                   </span>
                 </div>
+
+                {onOpenEmployeeLink && (
+                  <div className="pt-2 border-t border-slate-800/80">
+                    <button
+                      type="button"
+                      onClick={onOpenEmployeeLink}
+                      className="w-full py-1.5 px-3 rounded-xl bg-teal-950/60 hover:bg-teal-900/80 text-teal-300 border border-teal-700/50 hover:border-teal-500 font-bold text-[11px] flex items-center justify-center gap-1.5 transition-all active:scale-98 cursor-pointer"
+                    >
+                      <Link2 className="w-3.5 h-3.5 text-teal-400" />
+                      <span>Gerar Link de Acesso ({prof.name})</span>
+                    </button>
+                  </div>
+                )}
               </div>
             );
           })}
@@ -250,6 +286,17 @@ export const ProfissionaisView: React.FC<ProfissionaisViewProps> = ({
                     className="w-full px-3 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-white placeholder-slate-500 text-xs outline-none focus:border-blue-500 font-mono"
                   />
                 </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-300 mb-1">CPF do Profissional (Opcional p/ Login)</label>
+                <input
+                  type="text"
+                  value={newCpf}
+                  onChange={(e) => setNewCpf(e.target.value)}
+                  placeholder="000.000.000-00"
+                  className="w-full px-3 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-white placeholder-slate-500 text-xs outline-none focus:border-blue-500 font-mono"
+                />
               </div>
 
               <div className="flex items-center gap-2 pt-3 border-t border-slate-800">

@@ -1,4 +1,4 @@
-export type UserRole = 'admin' | 'salao' | 'cliente';
+export type UserRole = 'admin' | 'salao' | 'funcionario' | 'cliente';
 
 export type PaymentMethod = 'pix' | 'cartao_credito' | 'cartao_debito' | 'dinheiro' | 'outro';
 
@@ -48,6 +48,8 @@ export interface Professional {
   commissionPercent: number;
   role: string;
   phone?: string;
+  cpf?: string;
+  password?: string;
   avatarUrl?: string;
   active: boolean;
 }

@@ -18,6 +18,7 @@ import { ClientLinkModal } from './components/ClientLinkModal';
 import { SalonLinkModal } from './components/SalonLinkModal';
 import { SalonAccessLinkModal } from './components/SalonAccessLinkModal';
 import { SalonAuthModal } from './components/SalonAuthModal';
+import { EmployeeLinkModal } from './components/EmployeeLinkModal';
 import { LiveConnectionHubModal } from './components/LiveConnectionHubModal';
 import { VideoTutorialModal } from './components/VideoTutorialModal';
 import { AdminVideoConfigModal } from './components/AdminVideoConfigModal';
@@ -72,7 +73,8 @@ export function App() {
       if (isBuying) return 'salao';
       const role = getUrlParam('role');
       const salon = getUrlParam('salon');
-      if (role === 'cliente' || salon) return 'cliente';
+      if (role === 'funcionario' || role === 'equipe') return 'funcionario';
+      if (role === 'cliente' || (salon && !role)) return 'cliente';
       if (role === 'salao') return 'salao';
       if (role === 'admin') {
         const isAuth = typeof window !== 'undefined' && sessionStorage.getItem('salao_admin_authenticated') === 'true';
@@ -84,7 +86,13 @@ export function App() {
     return isAuth ? 'admin' : 'salao';
   });
 
-  const [activeTab, setActiveTab] = useState<'todos_saloes' | 'dashboard' | 'caixa' | 'agenda' | 'profissionais' | 'servicos' | 'clientes'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'todos_saloes' | 'dashboard' | 'caixa' | 'agenda' | 'profissionais' | 'servicos' | 'clientes'>(() => {
+    try {
+      const role = getUrlParam('role');
+      if (role === 'funcionario' || role === 'equipe') return 'agenda';
+    } catch {}
+    return 'dashboard';
+  });
 
   // Multi-Salon State
   const [salons, setSalons] = useState<SalonApp[]>(() => {
@@ -138,6 +146,7 @@ export function App() {
     return false;
   });
   const [isClientLinkOpen, setIsClientLinkOpen] = useState(false);
+  const [isEmployeeLinkOpen, setIsEmployeeLinkOpen] = useState(false);
   const [isSalonLinkOpen, setIsSalonLinkOpen] = useState(false);
   const [isSalonAccessLinkOpen, setIsSalonAccessLinkOpen] = useState(false);
   const [isLiveHubOpen, setIsLiveHubOpen] = useState(false);
@@ -162,11 +171,13 @@ export function App() {
     return null;
   });
   const [salonAuthCredentials, setSalonAuthCredentials] = useState<{ cpf: string; token: string }>({ cpf: '', token: '' });
+  const [salonAuthMode, setSalonAuthMode] = useState<'salao' | 'funcionario'>('salao');
 
   const handleOpenSalonAuth = (creds?: { cpf?: string; token?: string }) => {
     if (creds) {
       setSalonAuthCredentials({ cpf: creds.cpf || '', token: creds.token || '' });
     }
+    setSalonAuthMode('salao');
     setIsSalonAuthOpen(true);
   };
 
@@ -243,7 +254,10 @@ export function App() {
           try { localStorage.setItem('salao_cliente_name', nameParam); } catch {}
         }
 
-        if (roleParam === 'cliente' || salonParam) {
+        if (roleParam === 'funcionario' || roleParam === 'equipe') {
+          setUserRole('funcionario');
+          setActiveTab('agenda');
+        } else if (roleParam === 'cliente' || (salonParam && !roleParam)) {
           setUserRole('cliente');
         } else if (roleParam === 'salao') {
           setUserRole('salao');
@@ -257,7 +271,14 @@ export function App() {
             setActiveSalonId(targetSalon.id);
             setConfig(targetSalon.config);
             Storage.saveConfig(targetSalon.config);
-            setUserRole('cliente');
+            if (roleParam === 'funcionario' || roleParam === 'equipe') {
+              setUserRole('funcionario');
+              setActiveTab('agenda');
+            } else if (roleParam === 'salao') {
+              setUserRole('salao');
+            } else if (roleParam !== 'admin') {
+              setUserRole('cliente');
+            }
           }
         }
       } catch (err) {
@@ -367,9 +388,13 @@ export function App() {
         setIsAdminAuthOpen(true);
       }
     } else if (targetRole === 'salao') {
-      // Prompt Admin Login Screen (CPF + Password) as requested
-      setAdminAuthTargetRole('salao');
-      setIsAdminAuthOpen(true);
+      // Salão / Administrador Login Screen (CPF + Senha)
+      setSalonAuthMode('salao');
+      setIsSalonAuthOpen(true);
+    } else if (targetRole === 'funcionario') {
+      // Salão / Funcionário Login Screen (CPF Salão + CPF Funcionário + Senha)
+      setSalonAuthMode('funcionario');
+      setIsSalonAuthOpen(true);
     } else {
       setUserRole(targetRole);
     }
@@ -583,6 +608,7 @@ export function App() {
           onOpenBuyApp={() => setIsBuyAppOpen(true)}
           onOpenAdminPaymentConfig={() => setIsAdminPaymentOpen(true)}
           onOpenClientLink={() => setIsClientLinkOpen(true)}
+          onOpenEmployeeLink={() => setIsEmployeeLinkOpen(true)}
           onOpenSalonLink={() => setIsSalonLinkOpen(true)}
           onOpenSalonAccessLink={() => setIsSalonAccessLinkOpen(true)}
           onOpenAdminChangePassword={() => setIsAdminChangePasswordOpen(true)}
@@ -744,7 +770,67 @@ export function App() {
               />
             ) : (
               <>
-                {/* Primary Tab Navigation Bar for Salon / Admin */}
+                {/* Role Awareness Banners */}
+                {userRole === 'funcionario' && (
+                  <div className="bg-gradient-to-r from-teal-950/90 via-slate-900 to-teal-950/90 border border-teal-600/50 rounded-2xl p-3.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs shadow-md">
+                    <div className="flex items-center gap-2.5">
+                      <div className="p-2 bg-teal-500/20 text-teal-300 rounded-xl border border-teal-500/30 shrink-0">
+                        <UserCheck className="w-5 h-5 text-teal-400" />
+                      </div>
+                      <div>
+                        <div className="font-extrabold text-white flex items-center gap-2 flex-wrap">
+                          <span>Acesso Salão / Funcionário</span>
+                          <span className="bg-teal-900 text-teal-200 text-[10px] font-mono px-2 py-0.5 rounded-full border border-teal-700">
+                            {config.nomeSalao || 'Salão'}
+                          </span>
+                        </div>
+                        <p className="text-teal-200/80 text-[11px] mt-0.5">
+                          Visualizando apenas <strong className="text-white">Agenda</strong>, <strong className="text-white">Equipe</strong>, <strong className="text-white">Serviços</strong> e <strong className="text-white">Clientes</strong> — 100% integrado e sincronizado em tempo real.
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setSalonAuthMode('salao');
+                        setIsSalonAuthOpen(true);
+                      }}
+                      className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl border border-slate-700 text-[11px] font-bold shrink-0 transition-colors flex items-center gap-1.5 cursor-pointer self-stretch sm:self-auto justify-center"
+                    >
+                      <Key className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Sou Proprietário/Admin (Entrar)</span>
+                    </button>
+                  </div>
+                )}
+
+                {userRole === 'salao' && (
+                  <div className="bg-gradient-to-r from-slate-900 via-blue-950/40 to-slate-900 border border-blue-600/30 rounded-2xl p-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 text-xs shadow-sm">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                      <span className="font-extrabold text-white">Painel Salão / Administrador</span>
+                      <span className="text-slate-400 text-[11px] hidden sm:inline">— Acesso total ao painel e gestão do salão</span>
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
+                      <button
+                        onClick={() => setIsClientLinkOpen(true)}
+                        className="px-2.5 py-1 rounded-lg bg-rose-950/80 hover:bg-rose-900 text-rose-200 border border-rose-800/60 font-bold text-[11px] flex items-center gap-1 transition-all cursor-pointer shadow-xs"
+                        title="Enviar link de autoagendamento para os clientes no WhatsApp"
+                      >
+                        <Link2 className="w-3 h-3 text-rose-300" />
+                        <span>Link Clientes</span>
+                      </button>
+                      <button
+                        onClick={() => setIsEmployeeLinkOpen(true)}
+                        className="px-2.5 py-1 rounded-lg bg-teal-950/80 hover:bg-teal-900 text-teal-200 border border-teal-800/60 font-bold text-[11px] flex items-center gap-1 transition-all cursor-pointer shadow-xs"
+                        title="Enviar link de acesso restrito para os profissionais e funcionários"
+                      >
+                        <Users className="w-3 h-3 text-teal-300" />
+                        <span>Enviar Link Funcionários</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Primary Tab Navigation Bar for Salon / Admin / Funcionario */}
                 <div className="bg-slate-900 p-1.5 rounded-2xl flex items-center gap-1 overflow-x-auto shadow-inner border border-slate-800">
                   
                   {userRole === 'admin' && (
@@ -761,34 +847,40 @@ export function App() {
                     </button>
                   )}
 
-                  <button
-                    onClick={() => setActiveTab('dashboard')}
-                    className={`flex-1 min-w-[110px] py-2.5 px-3 rounded-xl text-xs font-extrabold transition-all flex items-center justify-center gap-2 ${
-                      activeTab === 'dashboard'
-                        ? 'bg-blue-600 text-white shadow-md'
-                        : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
-                    }`}
-                  >
-                    <LayoutDashboard className="w-4 h-4" />
-                    <span>Dashboard</span>
-                  </button>
+                  {/* Dashboard & Caixa only visible for Salão/Administrador and Gestão Admin */}
+                  {userRole !== 'funcionario' && (
+                    <>
+                      <button
+                        onClick={() => setActiveTab('dashboard')}
+                        className={`flex-1 min-w-[110px] py-2.5 px-3 rounded-xl text-xs font-extrabold transition-all flex items-center justify-center gap-2 ${
+                          activeTab === 'dashboard'
+                            ? 'bg-blue-600 text-white shadow-md'
+                            : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                        }`}
+                      >
+                        <LayoutDashboard className="w-4 h-4" />
+                        <span>Dashboard</span>
+                      </button>
 
-                  <button
-                    onClick={() => setActiveTab('caixa')}
-                    className={`flex-1 min-w-[110px] py-2.5 px-3 rounded-xl text-xs font-extrabold transition-all flex items-center justify-center gap-2 ${
-                      activeTab === 'caixa'
-                        ? 'bg-blue-600 text-white shadow-md'
-                        : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
-                    }`}
-                  >
-                    <CreditCard className="w-4 h-4" />
-                    <span>Caixa</span>
-                  </button>
+                      <button
+                        onClick={() => setActiveTab('caixa')}
+                        className={`flex-1 min-w-[110px] py-2.5 px-3 rounded-xl text-xs font-extrabold transition-all flex items-center justify-center gap-2 ${
+                          activeTab === 'caixa'
+                            ? 'bg-blue-600 text-white shadow-md'
+                            : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                        }`}
+                      >
+                        <CreditCard className="w-4 h-4" />
+                        <span>Caixa</span>
+                      </button>
+                    </>
+                  )}
 
+                  {/* Agenda, Equipe, Serviços e Clientes (Visible to all staff and admins) */}
                   <button
                     onClick={() => setActiveTab('agenda')}
                     className={`flex-1 min-w-[110px] py-2.5 px-3 rounded-xl text-xs font-extrabold transition-all flex items-center justify-center gap-2 ${
-                      activeTab === 'agenda'
+                      (activeTab === 'agenda' || (userRole === 'funcionario' && (activeTab === 'dashboard' || activeTab === 'caixa' || activeTab === 'todos_saloes')))
                         ? 'bg-blue-600 text-white shadow-md'
                         : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
                     }`}
@@ -959,6 +1051,7 @@ export function App() {
                     onNavigateToCaixa={() => setActiveTab('caixa')}
                     onNavigateToAgenda={() => setActiveTab('agenda')}
                     onOpenClientLink={() => setIsClientLinkOpen(true)}
+                    onOpenEmployeeLink={() => setIsEmployeeLinkOpen(true)}
                   />
                 )}
 
@@ -998,6 +1091,7 @@ export function App() {
                       setProfessionals(profs);
                       Storage.saveProfessionals(profs);
                     }}
+                    onOpenEmployeeLink={() => setIsEmployeeLinkOpen(true)}
                   />
                 )}
 
@@ -1157,16 +1251,34 @@ export function App() {
         }}
       />
 
-      {/* Salon Owner CPF + Token Login Modal */}
+      {/* Employee Direct Link & WhatsApp Generator Modal for Salon Admin */}
+      <EmployeeLinkModal
+        isOpen={isEmployeeLinkOpen}
+        onClose={() => setIsEmployeeLinkOpen(false)}
+        activeSalon={salons.find(s => s.id === activeSalonId) || salons[0]}
+        salons={salons}
+        onOpenEmployeeView={(salon) => {
+          handleSelectSalon(salon);
+          setUserRole('funcionario');
+          setActiveTab('agenda');
+        }}
+      />
+
+      {/* Salon Owner & Employee Login Modal */}
       <SalonAuthModal
         isOpen={isSalonAuthOpen}
         onClose={() => setIsSalonAuthOpen(false)}
         salons={salons}
         initialCpf={salonAuthCredentials.cpf}
         initialToken={salonAuthCredentials.token}
-        onSuccess={(salon) => {
+        initialMode={salonAuthMode}
+        onSuccess={(salon, authenticatedRole) => {
           handleSelectSalon(salon);
-          setUserRole('salao');
+          const roleToSet = authenticatedRole || salonAuthMode || 'salao';
+          setUserRole(roleToSet);
+          if (roleToSet === 'funcionario') {
+            setActiveTab('agenda');
+          }
           setIsSalonAuthOpen(false);
         }}
       />
