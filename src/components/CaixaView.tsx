@@ -143,14 +143,6 @@ export const CaixaView: React.FC<CaixaViewProps> = ({
             </button>
 
             <button
-              onClick={onOpenConfig}
-              className="bg-slate-700 hover:bg-slate-800 text-white text-xs font-bold px-3 py-2 rounded-xl transition-all shadow-xs flex items-center gap-1.5 shrink-0 hover:opacity-90 active:scale-95"
-            >
-              <Settings className="w-3.5 h-3.5" />
-              <span>Config</span>
-            </button>
-
-            <button
               onClick={onClearAllTransactions}
               className="bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold px-3 py-2 rounded-xl transition-all shadow-xs flex items-center gap-1.5 shrink-0 hover:opacity-90 active:scale-95"
             >
