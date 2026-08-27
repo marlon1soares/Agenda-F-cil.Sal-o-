@@ -1,4 +1,5 @@
 import { SalonConfig, ThemeConfig, Professional, ServiceItem, ClientRecord, Transaction, Appointment, CatalogMedia, SalonApp } from '../types';
+import { DEFAULT_SCHEDULE_CONFIG } from '../utils/schedule';
 
 export const THEMES: Record<string, ThemeConfig> = {
   rosa: { id: "rosa", nome: "💖 Rosa Chic", headerBg: "#db2777", borderColor: "#db2777", btnPrimary: "#ec4899", accentColor: "#f43f5e" },
@@ -19,6 +20,7 @@ export const DEFAULT_CONFIG: SalonConfig = {
   bgHeaderUrl: "",
   temaKey: "azul",
   corCustom: "#2563eb",
+  scheduleConfig: DEFAULT_SCHEDULE_CONFIG,
   profs: [
     { id: "prof-1", nome: "Michael", porc: 70 },
     { id: "prof-2", nome: "Marlon", porc: 30 }

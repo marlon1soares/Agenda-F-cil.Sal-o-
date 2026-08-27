@@ -4,10 +4,11 @@ import { Storage } from '../utils/storage';
 import { DEFAULT_TIMESLOTS, DEFAULT_SALON_APPS, DEFAULT_CONFIG } from '../data/mockData';
 import { generatePixEMVPayload, generateQrCodeDataUrl } from '../utils/pix';
 import { getUrlParam } from '../utils/url';
+import { getTimeSlotsForDate, getScheduleRuleForDate } from '../utils/schedule';
 import { 
   Scissors, Calendar, Clock, User, Phone, CheckCircle2, Building2,
   Sparkles, ArrowRight, ShieldCheck, Heart, MapPin, Share2, Award, ChevronRight, Lock, Image as ImageIcon,
-  QrCode, Copy, CheckCheck, CreditCard, ExternalLink, MessageCircle, X, Check
+  QrCode, Copy, CheckCheck, CreditCard, ExternalLink, MessageCircle, X, Check, AlertCircle
 } from 'lucide-react';
 
 interface ClientePortalViewProps {
@@ -417,72 +418,94 @@ export const ClientePortalView: React.FC<ClientePortalViewProps> = ({
               </div>
 
               {/* Time Slots */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="block text-xs font-bold text-slate-300">
-                    Horários Disponíveis (10h às 22h - Intervalo de 1 hora):
-                  </label>
-                  <span className="text-[10px] text-emerald-400 font-extrabold bg-emerald-950/80 px-2 py-0.5 rounded-full border border-emerald-800/50 flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
-                    Sincronizado c/ Salão
-                  </span>
-                </div>
+              {(() => {
+                const dayRule = getScheduleRuleForDate(selectedDate, safeConfig.scheduleConfig);
+                const dynamicSlots = getTimeSlotsForDate(selectedDate, safeConfig.scheduleConfig);
+                const isClosed = !dayRule.active || dynamicSlots.length === 0;
 
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 max-h-56 overflow-y-auto custom-scrollbar pr-1">
-                  {DEFAULT_TIMESLOTS.map((baseSlot) => {
-                    const displayTime = getDisplayTime(baseSlot);
-                    const ap = currentDayAppointments[baseSlot];
-                    const isBooked = ap && (ap.status === 'agendado' || ap.status === 'concluido');
-                    const isBlocked = ap && ap.status === 'bloqueado';
-                    const isOccupied = isBooked || isBlocked;
-                    const isSelected = selectedTime === baseSlot;
+                return (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-xs font-bold text-slate-300">
+                        {isClosed 
+                          ? 'Horários Disponíveis:' 
+                          : `Horários Disponíveis (${dayRule.startTime} às ${dayRule.endTime} - Intervalo de ${dayRule.slotIntervalMinutes || 60} min):`}
+                      </label>
+                      <span className="text-[10px] text-emerald-400 font-extrabold bg-emerald-950/80 px-2 py-0.5 rounded-full border border-emerald-800/50 flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
+                        Sincronizado c/ Salão
+                      </span>
+                    </div>
 
-                    if (isOccupied) {
-                      return (
-                        <button
-                          key={baseSlot}
-                          type="button"
-                          disabled
-                          className={`py-2 px-2.5 rounded-xl text-xs font-bold flex items-center justify-between transition-all opacity-85 cursor-not-allowed border select-none ${
-                            isBlocked
-                              ? 'bg-rose-950/60 text-rose-300 border-rose-800/70'
-                              : 'bg-amber-950/60 text-amber-200 border-amber-800/70'
-                          }`}
-                        >
-                          <span className="font-mono text-xs flex items-center gap-1">
-                            <Clock className="w-3 h-3 opacity-60" /> {displayTime}
-                          </span>
-                          <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-black/40">
-                            {isBlocked ? '🔒 Bloqueado' : '📌 Reservado'}
-                          </span>
-                        </button>
-                      );
-                    }
+                    {isClosed ? (
+                      <div className="bg-rose-950/40 border border-rose-800/60 rounded-2xl p-4 text-center space-y-1">
+                        <p className="text-xs font-bold text-rose-300 flex items-center justify-center gap-1.5">
+                          <AlertCircle className="w-4 h-4 text-rose-400" />
+                          Salão fechado / sem atendimento nesta data
+                        </p>
+                        <p className="text-[11px] text-slate-400">
+                          Por favor, selecione outro dia no calendário acima para agendar o seu horário.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 max-h-56 overflow-y-auto custom-scrollbar pr-1">
+                        {dynamicSlots.map((baseSlot) => {
+                          const displayTime = getDisplayTime(baseSlot);
+                          const ap = currentDayAppointments[baseSlot];
+                          const isBooked = ap && (ap.status === 'agendado' || ap.status === 'concluido');
+                          const isBlocked = ap && ap.status === 'bloqueado';
+                          const isOccupied = isBooked || isBlocked;
+                          const isSelected = selectedTime === baseSlot;
 
-                    return (
-                      <button
-                        key={baseSlot}
-                        type="button"
-                        onClick={() => setSelectedTime(prev => prev === baseSlot ? '' : baseSlot)}
-                        className={`py-2 px-2.5 rounded-xl text-xs font-bold flex items-center justify-between transition-all border ${
-                          isSelected
-                            ? 'bg-emerald-600 text-white font-black border-emerald-500 shadow-md scale-[1.02]'
-                            : 'bg-slate-950 text-slate-200 border-slate-800 hover:border-emerald-500/60 hover:bg-slate-900'
-                        }`}
-                      >
-                        <span className="font-mono text-xs font-extrabold flex items-center gap-1">
-                          <Clock className={`w-3 h-3 ${isSelected ? 'text-white' : 'text-emerald-400'}`} /> {displayTime}
-                        </span>
-                        <span className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded ${
-                          isSelected ? 'bg-emerald-800 text-white' : 'text-emerald-400 bg-emerald-950/70'
-                        }`}>
-                          {isSelected ? 'SELECIONADO ✓' : 'LIVRE ✓'}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+                          if (isOccupied) {
+                            return (
+                              <button
+                                key={baseSlot}
+                                type="button"
+                                disabled
+                                className={`py-2 px-2.5 rounded-xl text-xs font-bold flex items-center justify-between transition-all opacity-85 cursor-not-allowed border select-none ${
+                                  isBlocked
+                                    ? 'bg-rose-950/60 text-rose-300 border-rose-800/70'
+                                    : 'bg-amber-950/60 text-amber-200 border-amber-800/70'
+                                }`}
+                              >
+                                <span className="font-mono text-xs flex items-center gap-1">
+                                  <Clock className="w-3 h-3 opacity-60" /> {displayTime}
+                                </span>
+                                <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-black/40">
+                                  {isBlocked ? '🔒 Bloqueado' : '📌 Reservado'}
+                                </span>
+                              </button>
+                            );
+                          }
+
+                          return (
+                            <button
+                              key={baseSlot}
+                              type="button"
+                              onClick={() => setSelectedTime(prev => prev === baseSlot ? '' : baseSlot)}
+                              className={`py-2 px-2.5 rounded-xl text-xs font-bold flex items-center justify-between transition-all border ${
+                                isSelected
+                                  ? 'bg-emerald-600 text-white font-black border-emerald-500 shadow-md scale-[1.02]'
+                                  : 'bg-slate-950 text-slate-200 border-slate-800 hover:border-emerald-500/60 hover:bg-slate-900'
+                              }`}
+                            >
+                              <span className="font-mono text-xs font-extrabold flex items-center gap-1">
+                                <Clock className={`w-3 h-3 ${isSelected ? 'text-white' : 'text-emerald-400'}`} /> {displayTime}
+                              </span>
+                              <span className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded ${
+                                isSelected ? 'bg-emerald-800 text-white' : 'text-emerald-400 bg-emerald-950/70'
+                              }`}>
+                                {isSelected ? 'SELECIONADO ✓' : 'LIVRE ✓'}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
 
               {/* Client Name */}
               <div>

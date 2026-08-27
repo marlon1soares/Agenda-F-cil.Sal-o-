@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Appointment, SalonConfig, UserRole } from '../types';
 import { DEFAULT_TIMESLOTS } from '../data/mockData';
-import { Calendar as CalendarIcon, Clock, Lock, Plus, RotateCcw, CheckCircle2, ChevronUp, ChevronDown, DollarSign, X, MessageSquare, Phone, Wifi } from 'lucide-react';
+import { getTimeSlotsForDate, getScheduleRuleForDate, DAY_NAMES_PT } from '../utils/schedule';
+import { Calendar as CalendarIcon, Clock, Lock, Plus, RotateCcw, CheckCircle2, ChevronUp, ChevronDown, DollarSign, X, MessageSquare, Phone, Wifi, AlertCircle, Sparkles } from 'lucide-react';
 
 interface AgendaViewProps {
   appointments: Record<string, Record<string, Appointment>>;
@@ -42,6 +43,14 @@ export const AgendaView: React.FC<AgendaViewProps> = ({
 
   const currentDayAppointments = appointments[selectedDate] || {};
   const currentDayShift = timeAdjustments[selectedDate] || 0;
+
+  // Compute active slots and day rule for selected date
+  const dayRule = getScheduleRuleForDate(selectedDate, config.scheduleConfig);
+  const generatedSlots = getTimeSlotsForDate(selectedDate, config.scheduleConfig);
+
+  // Combine with any slots that have existing appointments recorded (so past bookings are never hidden)
+  const bookedSlots = Object.keys(currentDayAppointments);
+  const allSlots = Array.from(new Set([...generatedSlots, ...bookedSlots])).sort();
 
   const handleOpenBookModal = (slot: string) => {
     setSelectedSlot(slot);
@@ -127,18 +136,35 @@ export const AgendaView: React.FC<AgendaViewProps> = ({
         )}
       </div>
 
-      {/* Date Selector & Day Schedule Controls */}
+      {/* Date Selector & Day Schedule Summary */}
       <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         
-        <div className="flex items-center gap-3">
-          <CalendarIcon className="w-5 h-5 text-blue-600" />
-          <span className="text-xs sm:text-sm font-bold text-slate-900">Visão Geral da Agenda:</span>
-          <input
-            type="date"
-            value={selectedDate}
-            onChange={(e) => setSelectedDate(e.target.value)}
-            className="px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-bold text-slate-900 outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50 cursor-pointer"
-          />
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-2">
+            <CalendarIcon className="w-5 h-5 text-blue-600" />
+            <span className="text-xs sm:text-sm font-bold text-slate-900">Data da Agenda:</span>
+            <input
+              type="date"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              className="px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-bold text-slate-900 outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50 cursor-pointer"
+            />
+          </div>
+
+          {/* Schedule indicator badge */}
+          <div className="flex items-center gap-1.5">
+            {dayRule.active ? (
+              <span className="bg-amber-50 text-amber-800 border border-amber-200 text-[11px] font-bold px-2.5 py-1 rounded-lg flex items-center gap-1">
+                <Clock className="w-3 h-3 text-amber-600" />
+                <span>Expediente: <strong>{dayRule.startTime} às {dayRule.endTime}</strong> ({dayRule.slotIntervalMinutes || 60}m)</span>
+              </span>
+            ) : (
+              <span className="bg-rose-50 text-rose-700 border border-rose-200 text-[11px] font-bold px-2.5 py-1 rounded-lg flex items-center gap-1">
+                <AlertCircle className="w-3 h-3 text-rose-600" />
+                <span>Fechado / Folga nesta data</span>
+              </span>
+            )}
+          </div>
         </div>
 
         <button
@@ -147,12 +173,24 @@ export const AgendaView: React.FC<AgendaViewProps> = ({
               onResetDaySchedule(selectedDate);
             }
           }}
-          className="text-xs font-bold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5"
+          className="text-xs font-bold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
         >
-          <RotateCcw className="w-3.5 h-3.5" /> Resetar Horários Padrão
+          <RotateCcw className="w-3.5 h-3.5" /> Resetar Deslocamento (+/-)
         </button>
 
       </div>
+
+      {/* Closed Day Notice */}
+      {!dayRule.active && allSlots.length === 0 && (
+        <div className="bg-rose-50 border border-rose-200 text-rose-800 rounded-2xl p-4 text-xs space-y-1">
+          <div className="font-extrabold flex items-center gap-1.5 text-rose-900 text-sm">
+            <AlertCircle className="w-4 h-4 text-rose-600" /> Salão Fechado / Folga nesta data
+          </div>
+          <p className="text-slate-600">
+            Nenhum horário está liberado para atendimento no dia <strong>{selectedDate}</strong>. Você pode alterar essa configuração ou abrir o salão a qualquer momento na aba <strong>"Configurações &gt; ⏰ Horários da Agenda"</strong>.
+          </p>
+        </div>
+      )}
 
       {/* Agenda Time Slot Table */}
       <div className="bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden">
@@ -173,7 +211,7 @@ export const AgendaView: React.FC<AgendaViewProps> = ({
             </thead>
 
             <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
-              {DEFAULT_TIMESLOTS.map((timeBase, idx) => {
+              {allSlots.map((timeBase, idx) => {
                 // Calculate time shift
                 const [hbH, hbM] = timeBase.split(':').map(Number);
                 const totalMins = hbH * 60 + hbM + currentDayShift;
@@ -278,51 +316,67 @@ export const AgendaView: React.FC<AgendaViewProps> = ({
                           {ap.serviceName}
                         </span>
                       ) : (
-                        <span className="text-slate-400 font-normal">-</span>
+                        <span className="text-slate-400">-</span>
                       )}
                     </td>
 
                     {/* Professional */}
-                    <td className="p-3 font-medium">
-                      {ap?.professionalName || '-'}
+                    <td className="p-3">
+                      {ap?.professionalName ? (
+                        <span className="text-slate-800 font-semibold">{ap.professionalName}</span>
+                      ) : (
+                        <span className="text-slate-400">-</span>
+                      )}
                     </td>
 
-                    {/* Action buttons */}
+                    {/* Actions */}
                     <td className="p-3 text-center">
-                      {status === 'livre' ? (
-                        <div className="flex items-center justify-center gap-1.5">
-                          <button
-                            onClick={() => handleOpenBookModal(timeBase)}
-                            className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-[11px] px-2.5 py-1 rounded-md transition-colors flex items-center gap-1"
-                          >
-                            <Plus className="w-3 h-3" /> Agendar
-                          </button>
-                          <button
-                            onClick={() => handleOpenBlockModal(timeBase)}
-                            className="bg-slate-600 hover:bg-slate-700 text-white font-bold text-[11px] px-2 py-1 rounded-md transition-colors flex items-center gap-1"
-                          >
-                            <Lock className="w-3 h-3" /> Bloquear
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="flex items-center justify-center gap-1.5">
-                          {status === 'agendado' && (
+                      <div className="flex items-center justify-center gap-1.5">
+                        {status === 'livre' ? (
+                          <>
+                            <button
+                              onClick={() => handleOpenBookModal(timeBase)}
+                              className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-2.5 py-1 rounded-md text-[11px] transition-colors flex items-center gap-1"
+                            >
+                              <Plus className="w-3 h-3" /> Agendar
+                            </button>
+                            <button
+                              onClick={() => handleOpenBlockModal(timeBase)}
+                              className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-2 py-1 rounded-md text-[11px] transition-colors flex items-center gap-1"
+                            >
+                              <Lock className="w-3 h-3" /> Bloquear
+                            </button>
+                          </>
+                        ) : status === 'agendado' ? (
+                          <>
                             <button
                               onClick={() => onConvertToPOS(ap)}
-                              title="Concluir serviço e lançar automaticamente no Caixa"
-                              className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] px-2.5 py-1 rounded-md transition-colors flex items-center gap-1"
+                              title="Concluir atendimento e lançar no Caixa"
+                              className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-2.5 py-1 rounded-md text-[11px] transition-colors flex items-center gap-1 shadow-xs"
                             >
-                              <DollarSign className="w-3 h-3" /> Lançar Caixa
+                              <DollarSign className="w-3 h-3" /> Concluir
                             </button>
-                          )}
+                            <button
+                              onClick={() => onDeleteAppointment(selectedDate, timeBase)}
+                              className="text-rose-600 hover:text-rose-800 p-1 rounded hover:bg-rose-50"
+                              title="Desmarcar / Cancelar"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </>
+                        ) : status === 'bloqueado' ? (
                           <button
                             onClick={() => onDeleteAppointment(selectedDate, timeBase)}
-                            className="bg-rose-600 hover:bg-rose-700 text-white font-bold text-[11px] px-2.5 py-1 rounded-md transition-colors"
+                            className="text-xs text-rose-600 hover:text-rose-800 font-bold bg-rose-50 hover:bg-rose-100 px-2.5 py-1 rounded-md transition-colors"
                           >
-                            Desocupar
+                            Desbloquear
                           </button>
-                        </div>
-                      )}
+                        ) : (
+                          <span className="text-[11px] text-slate-500 font-semibold flex items-center gap-1 justify-center">
+                            <CheckCircle2 className="w-3 h-3 text-purple-600" /> Finalizado
+                          </span>
+                        )}
+                      </div>
                     </td>
 
                   </tr>
@@ -333,70 +387,60 @@ export const AgendaView: React.FC<AgendaViewProps> = ({
         </div>
       </div>
 
-      {/* BOOKING MODAL */}
+      {/* Book Modal */}
       {activeModal === 'book' && (
-        <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-md overflow-hidden p-6 space-y-5">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                <CalendarIcon className="w-5 h-5 text-blue-600" /> Agendar Atendimento ({selectedSlot})
-              </h3>
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl border border-slate-200 text-slate-800">
+            <h3 className="text-base font-bold text-slate-900 mb-4 flex items-center justify-between">
+              <span>Novo Agendamento ({selectedSlot})</span>
               <button onClick={() => setActiveModal(null)} className="text-slate-400 hover:text-slate-600">
                 <X className="w-5 h-5" />
               </button>
-            </div>
+            </h3>
 
-            <form onSubmit={handleConfirmBooking} className="space-y-4 text-xs">
+            <form onSubmit={handleConfirmBooking} className="space-y-3 text-xs">
               <div>
-                <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1">
-                  Nome do Cliente *
-                </label>
+                <label className="block font-bold text-slate-700 mb-1">Nome do Cliente:</label>
                 <input
                   type="text"
+                  required
                   value={clientName}
                   onChange={(e) => setClientName(e.target.value)}
-                  placeholder="Ex: João Silva"
-                  required
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+                  placeholder="Ex: Carlos Silva"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 font-medium"
                 />
               </div>
 
               <div>
-                <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1">
-                  Telefone / WhatsApp
-                </label>
+                <label className="block font-bold text-slate-700 mb-1">WhatsApp / Telefone:</label>
                 <input
                   type="text"
                   value={clientPhone}
                   onChange={(e) => setClientPhone(e.target.value)}
-                  placeholder="Ex: (11) 98888-7777"
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+                  placeholder="(11) 99999-8888"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 font-medium"
                 />
               </div>
 
               <div>
-                <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1">
-                  Serviço / Procedimento *
-                </label>
+                <label className="block font-bold text-slate-700 mb-1">Serviço:</label>
                 <input
                   type="text"
+                  required
                   value={serviceName}
                   onChange={(e) => setServiceName(e.target.value)}
                   placeholder="Ex: Corte Masculino + Barba"
-                  required
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 font-medium"
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1">
-                    Profissional
-                  </label>
+                  <label className="block font-bold text-slate-700 mb-1">Profissional:</label>
                   <select
                     value={selectedProf}
                     onChange={(e) => setSelectedProf(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs outline-none focus:ring-2 focus:ring-blue-500 font-medium bg-white"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 font-medium"
                   >
                     {config.profs.map(p => (
                       <option key={p.nome} value={p.nome}>{p.nome}</option>
@@ -405,63 +449,75 @@ export const AgendaView: React.FC<AgendaViewProps> = ({
                 </div>
 
                 <div>
-                  <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1">
-                    Valor Estimado (R$)
-                  </label>
+                  <label className="block font-bold text-slate-700 mb-1">Valor Previsto (R$):</label>
                   <input
                     type="number"
                     value={price}
                     onChange={(e) => setPrice(e.target.value)}
-                    placeholder="80"
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 font-medium"
                   />
                 </div>
               </div>
 
-              <button
-                type="submit"
-                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs py-3 rounded-xl transition-colors shadow-sm mt-2"
-              >
-                Confirmar Agendamento
-              </button>
+              <div className="pt-3 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setActiveModal(null)}
+                  className="flex-1 py-2 rounded-lg border border-slate-300 text-slate-700 font-bold hover:bg-slate-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2 rounded-lg bg-blue-600 text-white font-bold hover:bg-blue-700 shadow-xs"
+                >
+                  Confirmar Agendamento
+                </button>
+              </div>
             </form>
           </div>
         </div>
       )}
 
-      {/* BLOCK MODAL */}
+      {/* Block Modal */}
       {activeModal === 'block' && (
-        <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-md overflow-hidden p-6 space-y-5">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                <Lock className="w-5 h-5 text-rose-600" /> Bloquear Horário ({selectedSlot})
-              </h3>
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl border border-slate-200 text-slate-800">
+            <h3 className="text-base font-bold text-slate-900 mb-4 flex items-center justify-between">
+              <span>Bloquear Horário ({selectedSlot})</span>
               <button onClick={() => setActiveModal(null)} className="text-slate-400 hover:text-slate-600">
                 <X className="w-5 h-5" />
               </button>
-            </div>
+            </h3>
 
-            <form onSubmit={handleConfirmBlock} className="space-y-4 text-xs">
+            <form onSubmit={handleConfirmBlock} className="space-y-3 text-xs">
               <div>
-                <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1">
-                  Motivo do Bloqueio
-                </label>
+                <label className="block font-bold text-slate-700 mb-1">Motivo do Bloqueio:</label>
                 <input
                   type="text"
+                  required
                   value={blockReason}
                   onChange={(e) => setBlockReason(e.target.value)}
-                  placeholder="Ex: Horário de Almoço, Manutenção"
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+                  placeholder="Ex: Horário de Almoço, Reunião..."
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 font-medium"
                 />
               </div>
 
-              <button
-                type="submit"
-                className="w-full bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs py-3 rounded-xl transition-colors shadow-sm"
-              >
-                Confirmar Bloqueio
-              </button>
+              <div className="pt-3 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setActiveModal(null)}
+                  className="flex-1 py-2 rounded-lg border border-slate-300 text-slate-700 font-bold hover:bg-slate-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2 rounded-lg bg-rose-600 text-white font-bold hover:bg-rose-700 shadow-xs"
+                >
+                  Bloquear Horário
+                </button>
+              </div>
             </form>
           </div>
         </div>

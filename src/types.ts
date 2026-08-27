@@ -104,6 +104,22 @@ export interface AdminCredentials {
   registeredAt?: string;
 }
 
+export interface DayScheduleRule {
+  active: boolean; // true = aberto, false = fechado/folga
+  startTime: string; // HH:mm ex: "08:00", "09:00", "10:00"
+  endTime: string; // HH:mm ex: "18:00", "19:00", "20:00", "22:00"
+  slotIntervalMinutes: number; // 30, 45, 60
+  customLabel?: string; // ex: "Abre mais tarde", "Sai mais cedo", "Folga"
+}
+
+export interface ScheduleConfig {
+  defaultStartTime: string; // HH:mm ex: "09:00"
+  defaultEndTime: string; // HH:mm ex: "20:00"
+  defaultIntervalMinutes: number; // 30, 45, 60
+  weeklySchedule: Record<number, DayScheduleRule>; // 0=Domingo ... 6=Sábado
+  specificDateSchedule: Record<string, DayScheduleRule>; // YYYY-MM-DD -> Rule
+}
+
 export interface SalonConfig {
   nomeSalao: string;
   logoUrl: string;
@@ -112,6 +128,9 @@ export interface SalonConfig {
   corCustom: string;
   profs: { nome: string; porc: number; id?: string }[];
   
+  // Schedule & Working Hours Configuration
+  scheduleConfig?: ScheduleConfig;
+
   // Payment receiving config for store & catalog (unified for all products)
   chavePix?: string;
   tipoChavePix?: 'cpf' | 'cnpj' | 'email' | 'telefone' | 'aleatoria';
