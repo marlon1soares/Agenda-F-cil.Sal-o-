@@ -54,6 +54,27 @@ export interface Professional {
   active: boolean;
 }
 
+export type FechamentoPeriodType = 'diario' | 'quinzenal_1' | 'quinzenal_2' | 'mensal' | 'personalizado';
+
+export interface EmployeeFechamentoRecord {
+  id: string;
+  professionalId: string;
+  professionalName: string;
+  periodType: FechamentoPeriodType;
+  periodLabel: string;
+  startDate: string;
+  endDate: string;
+  totalDaysWorked: number;
+  totalClientsServed: number;
+  grossAmount: number;
+  commissionPercent: number;
+  netCommissionAmount: number;
+  status: 'pendente' | 'pago' | 'fechado';
+  createdAt: string;
+  paidAt?: string;
+  notes?: string;
+}
+
 export interface ServiceItem {
   id: string;
   name: string;

@@ -4,6 +4,7 @@ import { DashboardView } from './components/DashboardView';
 import { CaixaView } from './components/CaixaView';
 import { AgendaView } from './components/AgendaView';
 import { ProfissionaisView } from './components/ProfissionaisView';
+import { MeusFuncionariosView } from './components/MeusFuncionariosView';
 import { ServicosView } from './components/ServicosView';
 import { ClientesView } from './components/ClientesView';
 import { CatalogoView } from './components/CatalogoView';
@@ -891,14 +892,14 @@ export function App() {
 
                   <button
                     onClick={() => setActiveTab('profissionais')}
-                    className={`flex-1 min-w-[110px] py-2.5 px-3 rounded-xl text-xs font-extrabold transition-all flex items-center justify-center gap-2 ${
+                    className={`flex-1 min-w-[130px] py-2.5 px-3 rounded-xl text-xs font-extrabold transition-all flex items-center justify-center gap-2 ${
                       activeTab === 'profissionais'
                         ? 'bg-blue-600 text-white shadow-md'
                         : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
                     }`}
                   >
                     <Users className="w-4 h-4" />
-                    <span>Equipe</span>
+                    <span>Meus Funcionários</span>
                   </button>
 
                   <button
@@ -1084,14 +1085,20 @@ export function App() {
                 )}
 
                 {activeTab === 'profissionais' && (
-                  <ProfissionaisView
+                  <MeusFuncionariosView
                     professionals={professionals}
                     transactions={transactions}
+                    appointments={appointments}
+                    config={config}
+                    activeSalonSlug={salons.find(s => s.id === activeSalonId)?.slug}
                     onSaveProfessionals={(profs) => {
                       setProfessionals(profs);
                       Storage.saveProfessionals(profs);
                     }}
                     onOpenEmployeeLink={() => setIsEmployeeLinkOpen(true)}
+                    onOpenSpecificEmployeeAgenda={(profName) => {
+                      setActiveTab('agenda');
+                    }}
                   />
                 )}
 

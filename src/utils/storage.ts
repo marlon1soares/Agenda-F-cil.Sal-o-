@@ -1,7 +1,7 @@
 import { 
   SalonConfig, Transaction, Appointment, Professional, ServiceItem, ClientRecord, 
   CatalogMedia, CatalogFolder, AdminCredentials, SalonApp, AdminPaymentConfig,
-  ChatMessage, SystemBroadcastNotice, LivePresenceUser
+  ChatMessage, SystemBroadcastNotice, LivePresenceUser, EmployeeFechamentoRecord
 } from '../types';
 import { DEFAULT_CONFIG, DEFAULT_PROFESSIONALS, DEFAULT_SERVICES, DEFAULT_CLIENTS, INITIAL_TRANSACTIONS, INITIAL_APPOINTMENTS, INITIAL_CATALOG, DEFAULT_SALON_APPS } from '../data/mockData';
 import { syncEngine } from './syncEngine';
@@ -188,6 +188,17 @@ export const Storage = {
     syncEngine.pushUpdate({ clients });
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('salao_sync_data', { detail: { key: 'salaoClientes' } }));
+    }
+  },
+
+  getFechamentos(): EmployeeFechamentoRecord[] {
+    const saved = safeGetItem('salaoFechamentos');
+    return saved ? JSON.parse(saved) : [];
+  },
+  saveFechamentos(records: EmployeeFechamentoRecord[]) {
+    safeSetItem('salaoFechamentos', JSON.stringify(records));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('salao_sync_data', { detail: { key: 'salaoFechamentos' } }));
     }
   },
 
