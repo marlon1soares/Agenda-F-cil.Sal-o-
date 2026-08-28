@@ -26,7 +26,7 @@ export const SalonLinkModal: React.FC<SalonLinkModalProps> = ({
 
   const targetBaseUrl = linkMode === 'live'
     ? (typeof window !== 'undefined' ? `${window.location.origin}/` : getPublicAppUrl())
-    : 'https://agenda-f-cil-sal-o.vercel.app/';
+    : 'https://agendamaisfacil.vercel.app/';
 
   // The canonical purchase link for the salon owner
   const salonPurchaseUrl = buildAppUrl({

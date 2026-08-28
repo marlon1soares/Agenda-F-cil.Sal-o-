@@ -28,7 +28,7 @@ export const SalonAccessLinkModal: React.FC<SalonAccessLinkModalProps> = ({
 
   const targetBaseUrl = linkMode === 'live'
     ? (typeof window !== 'undefined' ? `${window.location.origin}/` : getPublicAppUrl())
-    : 'https://agenda-f-cil-sal-o.vercel.app/';
+    : 'https://agendamaisfacil.vercel.app/';
 
   // The canonical direct access/login link for salon owners
   const salonAccessUrl = buildAppUrl({

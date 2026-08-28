@@ -1,4 +1,4 @@
-export const DEFAULT_PRODUCTION_URL = 'https://agenda-f-cil-sal-o.vercel.app';
+export const DEFAULT_PRODUCTION_URL = 'https://agendamaisfacil.vercel.app';
 
 /**
  * Returns the public clean application base URL for sharing with clients, salons and admins.

@@ -256,31 +256,33 @@ export const AgendaView: React.FC<AgendaViewProps> = ({
       )}
 
       {/* Date Selector, Professional Filter & Export Bar */}
-      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+      <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 sm:gap-4">
         
         {/* Left: Date & Working Hours */}
-        <div className="flex items-center gap-3 flex-wrap">
-          <div className="flex items-center gap-2">
-            <CalendarIcon className="w-5 h-5 text-blue-600" />
-            <span className="text-xs sm:text-sm font-bold text-slate-900">Data:</span>
+        <div className="flex items-center gap-2.5 sm:gap-3 flex-wrap">
+          <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-start bg-slate-50 sm:bg-transparent p-2 sm:p-0 rounded-xl sm:rounded-none border sm:border-0 border-slate-200">
+            <div className="flex items-center gap-1.5">
+              <CalendarIcon className="w-4 h-4 text-blue-600 shrink-0" />
+              <span className="text-xs sm:text-sm font-bold text-slate-900">Data:</span>
+            </div>
             <input
               type="date"
               value={selectedDate}
               onChange={(e) => setSelectedDate(e.target.value)}
-              className="px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-bold text-slate-900 outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50 cursor-pointer font-mono"
+              className="px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs font-bold text-slate-900 outline-none focus:ring-2 focus:ring-blue-500 bg-white sm:bg-slate-50 cursor-pointer font-mono"
             />
           </div>
 
           {/* Schedule indicator badge */}
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 flex-wrap">
             {dayRule.active ? (
               <span className="bg-amber-50 text-amber-800 border border-amber-200 text-[11px] font-bold px-2.5 py-1 rounded-lg flex items-center gap-1">
-                <Clock className="w-3 h-3 text-amber-600" />
+                <Clock className="w-3 h-3 text-amber-600 shrink-0" />
                 <span>Expediente: <strong>{dayRule.startTime} às {dayRule.endTime}</strong> ({dayRule.slotIntervalMinutes || 60}m)</span>
               </span>
             ) : (
               <span className="bg-rose-50 text-rose-700 border border-rose-200 text-[11px] font-bold px-2.5 py-1 rounded-lg flex items-center gap-1">
-                <AlertCircle className="w-3 h-3 text-rose-600" />
+                <AlertCircle className="w-3 h-3 text-rose-600 shrink-0" />
                 <span>Fechado / Folga nesta data</span>
               </span>
             )}
@@ -289,21 +291,23 @@ export const AgendaView: React.FC<AgendaViewProps> = ({
           {/* Professional Selector Filter */}
           {isFuncionario ? (
             <div className="flex items-center gap-2 bg-gradient-to-r from-teal-950 via-teal-900 to-emerald-950 p-1.5 px-3 rounded-xl border border-teal-500/50 shadow-xs">
-              <User className="w-4 h-4 text-teal-400" />
+              <User className="w-4 h-4 text-teal-400 shrink-0" />
               <span className="text-xs font-bold text-teal-300">Sua Agenda:</span>
-              <strong className="text-xs font-black text-white uppercase tracking-wide">
+              <strong className="text-xs font-black text-white uppercase tracking-wide truncate max-w-[140px]">
                 {effectiveEmployee}
               </strong>
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse ml-0.5" title="Acesso individual exclusivo" />
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse ml-0.5 shrink-0" title="Acesso individual exclusivo" />
             </div>
           ) : (
-            <div className="flex items-center gap-1.5 bg-slate-50 p-1 rounded-xl border border-slate-200">
-              <Users className="w-4 h-4 text-blue-600 ml-1" />
-              <span className="text-xs font-bold text-slate-700">Agenda:</span>
+            <div className="flex items-center gap-1.5 bg-slate-50 p-1 rounded-xl border border-slate-200 w-full sm:w-auto justify-between sm:justify-start">
+              <div className="flex items-center gap-1">
+                <Users className="w-4 h-4 text-blue-600 ml-1 shrink-0" />
+                <span className="text-xs font-bold text-slate-700">Agenda:</span>
+              </div>
               <select
                 value={selectedProfFilter}
                 onChange={(e) => setSelectedProfFilter(e.target.value)}
-                className="bg-white border border-slate-300 text-slate-800 font-bold text-xs px-2.5 py-1 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                className="bg-white border border-slate-300 text-slate-800 font-bold text-xs px-2.5 py-1 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer flex-1 sm:flex-initial"
               >
                 <option value="todos">👥 Todos os Funcionários</option>
                 {config.profs.map(p => (
@@ -315,25 +319,25 @@ export const AgendaView: React.FC<AgendaViewProps> = ({
         </div>
 
         {/* Right: Word (.doc) Download & Print Actions */}
-        <div className="flex items-center gap-2 flex-wrap w-full lg:w-auto">
+        <div className="flex items-center gap-2 flex-wrap w-full lg:w-auto justify-between sm:justify-start">
           <button
             type="button"
             onClick={handleDownloadWord}
-            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs rounded-xl shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
+            className="flex-1 sm:flex-initial px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs rounded-xl shadow-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
             title="Baixar lista de clientes e horários em Word (.doc)"
           >
-            <Download className="w-3.5 h-3.5" />
-            <span>Baixar em Word (.doc)</span>
+            <Download className="w-3.5 h-3.5 shrink-0" />
+            <span>Baixar Word (.doc)</span>
           </button>
 
           <button
             type="button"
             onClick={handlePrint}
-            className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-xl border border-slate-300 flex items-center gap-1.5 transition-all cursor-pointer"
+            className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-xl border border-slate-300 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
             title="Imprimir escala do dia"
           >
-            <Printer className="w-3.5 h-3.5 text-slate-600" />
-            <span>Imprimir</span>
+            <Printer className="w-3.5 h-3.5 text-slate-600 shrink-0" />
+            <span className="hidden sm:inline">Imprimir</span>
           </button>
 
           <button
@@ -346,6 +350,7 @@ export const AgendaView: React.FC<AgendaViewProps> = ({
             title="Zerar deslocamento de minutos (+/-)"
           >
             <RotateCcw className="w-3 h-3" />
+            <span className="sm:hidden text-[10px]">Resetar</span>
           </button>
         </div>
 
@@ -363,8 +368,193 @@ export const AgendaView: React.FC<AgendaViewProps> = ({
         </div>
       )}
 
-      {/* Agenda Time Slot Table */}
-      <div className="bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden">
+      {/* MOBILE ADAPTIVE VIEW (CARD-BASED - PERFECT ON PHONES WITHOUT HORIZONTAL SCROLL) */}
+      <div className="block sm:hidden space-y-2.5">
+        {displaySlots.map((timeBase) => {
+          // Calculate time shift
+          const [hbH, hbM] = timeBase.split(':').map(Number);
+          const totalMins = hbH * 60 + hbM + currentDayShift;
+          const shiftedH = Math.floor(totalMins / 60).toString().padStart(2, '0');
+          const shiftedM = (totalMins % 60).toString().padStart(2, '0');
+          const displayTime = `${shiftedH}:${shiftedM}`;
+
+          const ap = currentDayAppointments[timeBase];
+          const status = ap?.status || 'livre';
+
+          return (
+            <div
+              key={`mob-${timeBase}`}
+              className={`p-3.5 rounded-2xl border transition-all shadow-xs space-y-2.5 ${
+                status === 'livre'
+                  ? 'bg-white border-slate-200'
+                  : status === 'agendado'
+                  ? 'bg-sky-50/70 border-sky-200'
+                  : status === 'concluido'
+                  ? 'bg-purple-50/70 border-purple-200'
+                  : 'bg-rose-50/70 border-rose-200'
+              }`}
+            >
+              {/* Header: Time, Time-Shift Buttons & Status Badge */}
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <div className="bg-slate-900 text-white font-mono font-black text-xs px-2.5 py-1 rounded-xl flex items-center gap-1 shadow-xs">
+                    <Clock className="w-3.5 h-3.5 text-sky-400" />
+                    <span>{displayTime}</span>
+                  </div>
+
+                  {/* Quick Shift Minute Arrows */}
+                  <div className="flex items-center gap-0.5 bg-slate-100 p-0.5 rounded-lg border border-slate-200">
+                    <button
+                      onClick={() => onShiftDayTime(selectedDate, 15)}
+                      title="+15 minutos no dia"
+                      className="p-1 hover:bg-white text-slate-700 rounded transition-colors text-[10px] font-bold"
+                    >
+                      +15m
+                    </button>
+                    <button
+                      onClick={() => onShiftDayTime(selectedDate, -15)}
+                      title="-15 minutos no dia"
+                      className="p-1 hover:bg-white text-slate-700 rounded transition-colors text-[10px] font-bold"
+                    >
+                      -15m
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  {status === 'livre' && (
+                    <span className="bg-emerald-100 text-emerald-800 text-[10px] font-black px-2.5 py-0.5 rounded-full border border-emerald-300">
+                      LIVRE ✓
+                    </span>
+                  )}
+                  {status === 'agendado' && (
+                    <span className="bg-sky-100 text-sky-800 text-[10px] font-black px-2.5 py-0.5 rounded-full border border-sky-300">
+                      AGENDADO
+                    </span>
+                  )}
+                  {status === 'concluido' && (
+                    <span className="bg-purple-100 text-purple-800 text-[10px] font-black px-2.5 py-0.5 rounded-full border border-purple-300">
+                      CONCLUÍDO
+                    </span>
+                  )}
+                  {status === 'bloqueado' && (
+                    <span className="bg-rose-100 text-rose-800 text-[10px] font-black px-2.5 py-0.5 rounded-full border border-rose-300">
+                      BLOQUEADO
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Slot Details (Client, Service, Professional) */}
+              {status === 'agendado' || status === 'concluido' ? (
+                <div className="bg-white/80 p-2.5 rounded-xl border border-slate-200/80 space-y-1.5 text-xs">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <div className="font-black text-slate-900 flex items-center gap-1.5">
+                        <span>{ap?.clientName}</span>
+                        {ap?.origem === 'cliente' && (
+                          <span className="bg-sky-100 text-sky-700 text-[9px] font-black px-1.5 py-0.2 rounded border border-sky-300">
+                            Portal
+                          </span>
+                        )}
+                      </div>
+                      {ap?.clientPhone && (
+                        <span className="text-[11px] text-slate-500 font-mono block mt-0.5">{ap.clientPhone}</span>
+                      )}
+                    </div>
+
+                    {ap?.clientPhone && (
+                      <a
+                        href={`https://wa.me/55${ap.clientPhone.replace(/\D/g, '')}?text=${encodeURIComponent(`Olá ${ap.clientName}! Confirmando seu horário no ${config.nomeSalao} às ${displayTime}.`)}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="bg-emerald-600 hover:bg-emerald-500 text-white font-black text-[11px] px-2.5 py-1 rounded-lg flex items-center gap-1 shadow-xs shrink-0"
+                      >
+                        <Phone className="w-3 h-3" />
+                        <span>Zap</span>
+                      </a>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-100 text-[11px]">
+                    <span className="bg-slate-100 text-slate-800 px-2 py-0.5 rounded font-bold truncate max-w-[140px]">
+                      ✂️ {ap?.serviceName || 'Serviço'}
+                    </span>
+                    <span className="text-slate-600 font-bold truncate max-w-[130px]">
+                      👤 {ap?.professionalName || 'Profissional'}
+                    </span>
+                  </div>
+                </div>
+              ) : status === 'bloqueado' ? (
+                <div className="bg-rose-100/60 p-2.5 rounded-xl border border-rose-200 text-xs">
+                  <span className="text-rose-800 font-bold italic">
+                    🔒 Motivo do Bloqueio: {ap?.notes || 'Horário Bloqueado'}
+                  </span>
+                </div>
+              ) : (
+                <div className="text-[11px] text-slate-400 italic">
+                  Horário vago disponível para agendamento presencial ou online.
+                </div>
+              )}
+
+              {/* Action Buttons on Mobile */}
+              <div className="flex items-center gap-2 pt-1">
+                {status === 'livre' ? (
+                  <>
+                    <button
+                      onClick={() => handleOpenBookModal(timeBase)}
+                      className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-extrabold py-2 px-3 rounded-xl text-xs transition-colors flex items-center justify-center gap-1.5 shadow-xs cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Agendar</span>
+                    </button>
+                    <button
+                      onClick={() => handleOpenBlockModal(timeBase)}
+                      className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 px-3 rounded-xl text-xs transition-colors flex items-center justify-center gap-1 border border-slate-300 cursor-pointer"
+                    >
+                      <Lock className="w-3.5 h-3.5" />
+                      <span>Bloquear</span>
+                    </button>
+                  </>
+                ) : status === 'agendado' ? (
+                  <>
+                    <button
+                      onClick={() => onConvertToPOS(ap)}
+                      className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold py-2 px-3 rounded-xl text-xs transition-colors flex items-center justify-center gap-1.5 shadow-xs cursor-pointer"
+                    >
+                      <DollarSign className="w-3.5 h-3.5" />
+                      <span>Concluir no Caixa</span>
+                    </button>
+                    <button
+                      onClick={() => onDeleteAppointment(selectedDate, timeBase)}
+                      className="bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold py-2 px-3 rounded-xl text-xs transition-colors flex items-center justify-center gap-1 border border-rose-200 cursor-pointer"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                      <span>Cancelar</span>
+                    </button>
+                  </>
+                ) : status === 'bloqueado' ? (
+                  <button
+                    onClick={() => onDeleteAppointment(selectedDate, timeBase)}
+                    className="w-full bg-rose-600 hover:bg-rose-700 text-white font-bold py-2 px-3 rounded-xl text-xs transition-colors flex items-center justify-center gap-1 cursor-pointer"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>Desbloquear Horário</span>
+                  </button>
+                ) : (
+                  <div className="w-full text-center text-xs font-bold text-purple-700 py-1 flex items-center justify-center gap-1">
+                    <CheckCircle2 className="w-4 h-4 text-purple-600" />
+                    <span>Atendimento Concluído com Sucesso</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* TABLE VIEW FOR TABLET & DESKTOP (WITH SMOOTH SCROLL) */}
+      <div className="hidden sm:block bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden">
         <div className="max-h-[550px] overflow-y-auto">
           <table className="w-full text-left text-xs border-collapse">
             <thead 

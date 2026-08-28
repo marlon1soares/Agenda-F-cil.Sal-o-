@@ -67,7 +67,7 @@ export const ClientLinkModal: React.FC<ClientLinkModalProps> = ({
   const salonSlug = getSalonSlug(activeSalon.config.nomeSalao || activeSalon.name);
   const targetBaseUrl = linkMode === 'live'
     ? (typeof window !== 'undefined' ? `${window.location.origin}/` : getPublicAppUrl())
-    : 'https://agenda-f-cil-sal-o.vercel.app/';
+    : 'https://agendamaisfacil.vercel.app/';
 
   const clientUrl = buildAppUrl({
     role: 'cliente',

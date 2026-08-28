@@ -86,8 +86,57 @@ export const ServicosView: React.FC<ServicosViewProps> = ({
         </button>
       </div>
 
-      {/* Services Table */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl shadow-md overflow-hidden">
+      {/* MOBILE ADAPTIVE VIEW (CARD-BASED - PERFECT ON PHONES) */}
+      <div className="block sm:hidden space-y-2.5">
+        {safeItems.length === 0 ? (
+          <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 text-center text-xs text-slate-400">
+            Nenhum serviço cadastrado. Clique em "Novo Serviço" para adicionar!
+          </div>
+        ) : (
+          safeItems.map((srv) => (
+            <div key={`mob-srv-${srv.id}`} className="bg-slate-900 p-4 rounded-2xl border border-slate-800 shadow-md space-y-2.5">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <h4 className="text-sm font-extrabold text-white">{srv.name}</h4>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="bg-sky-950/80 text-sky-300 font-bold text-[10px] px-2 py-0.5 rounded-md border border-sky-800/60">
+                      {srv.category}
+                    </span>
+                    <span className="text-[11px] text-slate-400 font-mono flex items-center gap-0.5">
+                      <Clock className="w-3 h-3 text-slate-500" /> {srv.durationMinutes} min
+                    </span>
+                  </div>
+                </div>
+
+                <div className="text-right shrink-0">
+                  <div className="font-black text-emerald-400 text-base font-mono">
+                    R$ {(Number(srv.price) || 0).toFixed(2).replace('.', ',')}
+                  </div>
+                </div>
+              </div>
+
+              {srv.description && (
+                <p className="text-xs text-slate-400 bg-slate-950/60 p-2 rounded-xl border border-slate-800/60">
+                  {srv.description}
+                </p>
+              )}
+
+              <div className="flex items-center justify-end pt-2 border-t border-slate-800">
+                <button
+                  onClick={() => handleDeleteService(srv.id)}
+                  className="text-rose-400 hover:text-rose-300 text-xs font-bold flex items-center gap-1 bg-rose-950/40 hover:bg-rose-900/50 px-3 py-1.5 rounded-xl border border-rose-800/40 transition-colors cursor-pointer"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Excluir Serviço</span>
+                </button>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Services Table for Tablets & Desktop */}
+      <div className="hidden sm:block bg-slate-900 border border-slate-800 rounded-2xl shadow-md overflow-hidden">
         <div className="max-h-[500px] overflow-y-auto">
           <table className="w-full text-left text-xs border-collapse">
             <thead className="bg-slate-950 text-slate-300 sticky top-0 z-10 font-bold border-b border-slate-800">

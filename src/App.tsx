@@ -150,9 +150,24 @@ export function App() {
   const [adminAuthTargetRole, setAdminAuthTargetRole] = useState<UserRole>('admin');
   const [isSalonAuthOpen, setIsSalonAuthOpen] = useState<boolean>(() => {
     try {
-      return hasUrlAction('acesso-salao', 'acesso', 'login-salao', 'acessar-salao');
+      // If direct purchase link, client portal, or specific employee link, don't open modal
+      const isBuying = hasUrlAction('comprar-licenca', 'comprar', 'comprar_licenca', 'licenca', 'buy', 'compra', 'contratar');
+      const orderTrackingParam = getUrlParam('confirmar-pedido') || getUrlParam('confirmar_pedido') || getUrlParam('pedido') || getUrlParam('order') || getUrlParam('acompanhar') || getUrlParam('pay');
+      if (isBuying || orderTrackingParam) return false;
+
+      const role = getUrlParam('role');
+      const salon = getUrlParam('salon');
+      const prof = getUrlParam('prof') || getUrlParam('funcionario') || getUrlParam('employee');
+
+      // Client portal or employee personal link opens directly to their view
+      if (role === 'cliente' || (salon && !role && !prof)) return false;
+      if (role === 'funcionario' || prof) return false;
+
+      // In all other cases (e.g. visiting agendamaisfacil.vercel.app / root URL / acesso-salao),
+      // open the "Entrada Salão / Administrador" screen directly!
+      return true;
     } catch {}
-    return false;
+    return true;
   });
   const [isAdminSalonsOpen, setIsAdminSalonsOpen] = useState(false);
   const [isAdminPaymentOpen, setIsAdminPaymentOpen] = useState(false);

@@ -66,7 +66,7 @@ export const EmployeeLinkModal: React.FC<EmployeeLinkModalProps> = ({
   const salonSlug = getSalonSlug(activeSalon.config.nomeSalao || activeSalon.name);
   const targetBaseUrl = linkMode === 'live'
     ? (typeof window !== 'undefined' ? `${window.location.origin}/` : getPublicAppUrl())
-    : 'https://agenda-f-cil-sal-o.vercel.app/';
+    : 'https://agendamaisfacil.vercel.app/';
 
   // Build employee link with individual professional or entire team
   const employeeUrl = buildAppUrl({
