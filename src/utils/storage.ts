@@ -431,7 +431,7 @@ export const Storage = {
       linkMercadoPago90: 'https://mpago.la/29DGt6q',
       precoPlano180Dias: 135.00,
       precoPlano365Dias: 240.00,
-      diasGratuitos: 15,
+      diasGratuitos: 7,
       habilitarPlanoGratuito: true,
       webhookSecret: 'ae043f22ecf5be4ebb36625d10f92b6ae689578cde0152721c211351fc73a241',
       webhookUrl: 'https://agendamaisfacil.vercel.app/api/webhook/mercadopago',

@@ -23,6 +23,7 @@ export const BlockedLicenseBanner: React.FC<BlockedLicenseBannerProps> = ({
 }) => {
   const adminPaymentConfig = Storage.getAdminPaymentConfig();
   const minPrice = formatBRL(adminPaymentConfig.precoPlano30Dias || 30);
+  const trialTotalDays = salon.planDays || adminPaymentConfig.diasGratuitos || 7;
 
   // If active and not expired, display warning badge only if trial is ending in 3 days or less
   if (!licenseInfo.isExpiredOrBlocked) {
@@ -35,13 +36,13 @@ export const BlockedLicenseBanner: React.FC<BlockedLicenseBannerProps> = ({
             </div>
             <div>
               <span className="font-extrabold text-blue-200 block">
-                Período de Teste Gratuito (15 Dias): 
+                Período de Teste Gratuito ({trialTotalDays} Dias): 
                 <span className="text-amber-300 ml-1 font-black">
                   Restam {licenseInfo.daysRemaining} {licenseInfo.daysRemaining === 1 ? 'dia' : 'dias'}
                 </span>
               </span>
               <span className="text-[10px] text-slate-400">
-                A partir do 16º dia o sistema será bloqueado e exigirá contratação de plano.
+                Após o período gratuito o sistema será bloqueado e exigirá contratação de plano.
               </span>
             </div>
           </div>
@@ -72,18 +73,18 @@ export const BlockedLicenseBanner: React.FC<BlockedLicenseBannerProps> = ({
           </div>
           
           <span className="bg-rose-950/90 text-rose-300 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wider border border-rose-500/40">
-            Acesso Bloqueado • 16º Dia Atingido
+            Acesso Bloqueado • Período Concluído
           </span>
 
           <h2 className="text-xl font-black mt-2 text-white">
             {licenseInfo.isTrial 
-              ? 'Período Gratuito de 15 Dias Expirado'
+              ? `Período Gratuito de ${trialTotalDays} Dias Expirado`
               : 'Sua Licença de Acesso Expirou'}
           </h2>
 
           <p className="text-xs text-rose-200/90 mt-1 max-w-md mx-auto">
             {licenseInfo.isTrial
-              ? `Os 15 dias gratuitos para o CPF ${salon.ownerCpf || 'cadastrado'} foram concluídos. A partir do 16º dia, o aplicativo é bloqueado e a liberação ocorre mediante a compra de uma licença.`
+              ? `Os ${trialTotalDays} dias gratuitos para o CPF ${salon.ownerCpf || 'cadastrado'} foram concluídos. O aplicativo agora está bloqueado e a liberação ocorre mediante a compra de uma licença.`
               : `O plano de uso para "${salon.name}" venceu em ${licenseInfo.formattedExpiresAt}. Para continuar utilizando e atendendo seus clientes, adquira um plano de renovação.`}
           </p>
         </div>

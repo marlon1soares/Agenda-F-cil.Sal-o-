@@ -70,7 +70,7 @@ export const AdminSalonsModal: React.FC<AdminSalonsModalProps> = ({
   const [formBairro, setFormBairro] = useState('');
   const [formCidade, setFormCidade] = useState('');
   const [formUf, setFormUf] = useState('');
-  const [formPlanDays, setFormPlanDays] = useState<number>(365);
+  const [formPlanDays, setFormPlanDays] = useState<number>(30);
   const [formTemaKey, setFormTemaKey] = useState('azul');
   const [formCorCustom, setFormCorCustom] = useState('#2563eb');
   const [formLogoUrl, setFormLogoUrl] = useState('');
@@ -328,7 +328,7 @@ export const AdminSalonsModal: React.FC<AdminSalonsModalProps> = ({
       const tokenCleanName = formName.replace(/[^a-zA-Z0-9]/g, '').slice(0, 6).toUpperCase();
       const newToken = `TOK-${tokenCleanName || 'SALÃO'}-${randomNum}`;
 
-      const isTrialMode = formPlanDays === 15;
+      const isTrialMode = formPlanDays === 7 || formPlanDays === 15;
 
       const newSalon: SalonApp = {
         id: `salon-${Date.now()}`,
@@ -1377,12 +1377,9 @@ export const AdminSalonsModal: React.FC<AdminSalonsModalProps> = ({
                     onChange={(e) => setFormPlanDays(Number(e.target.value))}
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500 font-bold"
                   >
-                    <option value={15}>15 Dias (Teste Gratuito)</option>
-                    <option value={30}>30 Dias (Mensal)</option>
-                    <option value={90}>90 Dias (Trimestral)</option>
-                    <option value={180}>180 Dias (Semestral)</option>
-                    <option value={365}>365 Dias (Anual)</option>
-                    <option value={9999}>Vitalício (Sem limite)</option>
+                    <option value={7}>Sete dias grátis (7 Dias)</option>
+                    <option value={30}>Plano 1 (30 Dias - R$ 30,00)</option>
+                    <option value={90}>Plano 2 (3 Meses - R$ 90,00)</option>
                   </select>
                 </div>
               </div>

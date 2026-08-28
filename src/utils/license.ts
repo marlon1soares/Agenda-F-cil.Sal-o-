@@ -261,7 +261,7 @@ export function getSalonLicenseInfo(salon: SalonApp | undefined | null): SalonLi
     badgeLabel = 'Bloqueado';
     badgeColor = 'rose';
   } else if (isExpiredOrBlocked) {
-    badgeLabel = isTrial ? '15 Dias Gratuitos Expirados (Bloqueado)' : 'Licença Vencida (Bloqueado)';
+    badgeLabel = isTrial ? 'Período Gratuito Expirado (Bloqueado)' : 'Licença Vencida (Bloqueado)';
     badgeColor = 'rose';
   } else if (isTrial) {
     badgeLabel = `${daysRemaining} ${daysRemaining === 1 ? 'dia gratuito restante' : 'dias gratuitos restantes'} (Período de Teste)`;

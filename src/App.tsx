@@ -587,7 +587,7 @@ export function App() {
                 className="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 font-bold py-3 px-4 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
-                <span>Reabrir Tela de Contratação / 15 Dias Grátis</span>
+                <span>Reabrir Tela de Contratação / 7 Dias Grátis</span>
               </button>
             </div>
           </div>

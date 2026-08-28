@@ -18,7 +18,7 @@ export const AdminPaymentAccountModal: React.FC<AdminPaymentAccountModalProps> =
   const [p90Input, setP90Input] = useState<string>('90.00');
   const [link30Input, setLink30Input] = useState<string>('https://mpago.la/138bXFn');
   const [link90Input, setLink90Input] = useState<string>('https://mpago.la/29DGt6q');
-  const [freeDaysInput, setFreeDaysInput] = useState<string>('15');
+  const [freeDaysInput, setFreeDaysInput] = useState<string>('7');
   const [enableTrial, setEnableTrial] = useState<boolean>(true);
   const [successMsg, setSuccessMsg] = useState('');
   const [copiedWebhook, setCopiedWebhook] = useState(false);
@@ -33,7 +33,7 @@ export const AdminPaymentAccountModal: React.FC<AdminPaymentAccountModalProps> =
       setP90Input(String(current.precoPlano90Dias || 90));
       setLink30Input(current.linkMercadoPago30 || 'https://mpago.la/138bXFn');
       setLink90Input(current.linkMercadoPago90 || 'https://mpago.la/29DGt6q');
-      setFreeDaysInput(String(current.diasGratuitos !== undefined && current.diasGratuitos !== null ? current.diasGratuitos : 15));
+      setFreeDaysInput(String(current.diasGratuitos !== undefined && current.diasGratuitos !== null ? current.diasGratuitos : 7));
       setEnableTrial(current.habilitarPlanoGratuito !== false);
       setTestResult(null);
     }
@@ -43,7 +43,7 @@ export const AdminPaymentAccountModal: React.FC<AdminPaymentAccountModalProps> =
 
   const numP30 = Number(p30Input.replace(',', '.')) || 30;
   const numP90 = Number(p90Input.replace(',', '.')) || (numP30 * 3);
-  const numFreeDays = Math.max(1, parseInt(freeDaysInput, 10) || 15);
+  const numFreeDays = Math.max(1, parseInt(freeDaysInput, 10) || 7);
 
   const webhookBaseUrl = (typeof window !== 'undefined' && window.location.origin) || (config.productionUrl || 'https://agenda-f-cil-sal-o.vercel.app');
   const fullWebhookUrl = `${webhookBaseUrl}/api/webhook/payment`;

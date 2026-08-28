@@ -44,7 +44,7 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [salonName, setSalonName] = useState('');
-  const [planDays, setPlanDays] = useState<number>(15); // Default 15 days free trial for new users
+  const [planDays, setPlanDays] = useState<number>(7); // Default 7 days free trial for new users
   
   // Address State
   const [cep, setCep] = useState('');
@@ -151,21 +151,21 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
       setBankOrderStatus('idle');
       setBankReceipt(null);
 
-      // Default plan selection (respects optional query param e.g. ?plano=30, otherwise default to 15)
+      // Default plan selection (respects optional query param e.g. ?plano=30, otherwise default to 7)
       try {
         const planParam = getUrlParam('plano') || getUrlParam('plan') || getUrlParam('dias');
         if (planParam) {
           const days = parseInt(planParam, 10);
-          if ([15, 30, 90, 180, 365].includes(days)) {
+          if ([7, 15, 30, 90, 180, 365].includes(days)) {
             setPlanDays(days);
           } else {
-            setPlanDays(15);
+            setPlanDays(configuredTrialDays || 7);
           }
         } else {
-          setPlanDays(15);
+          setPlanDays(configuredTrialDays || 7);
         }
       } catch {
-        setPlanDays(15);
+        setPlanDays(configuredTrialDays || 7);
       }
     }
   }, [isOpen, initialOrderId]);
@@ -1067,7 +1067,7 @@ Olá *${createdSalon.ownerName}*, seu acesso ao aplicativo *${createdSalon.name}
               <div className="bg-emerald-950/50 border border-emerald-500/40 p-2.5 rounded-2xl flex items-center gap-2 text-[11px] text-emerald-300 shadow-inner">
                 <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
                 <span>
-                  <strong>Acesso de Administrador Identificado:</strong> O teste de <strong>15 Dias Gratuitos está liberado sem limites</strong> para criar e testar salões quando necessário.
+                  <strong>Acesso de Administrador Identificado:</strong> O teste de <strong>{configuredTrialDays} Dias Gratuitos está liberado sem limites</strong> para criar e testar salões quando necessário.
                 </span>
               </div>
             )}
@@ -1648,7 +1648,7 @@ Olá *${createdSalon.ownerName}*, seu acesso ao aplicativo *${createdSalon.name}
 
             <div>
               <span className="bg-emerald-500/20 text-emerald-300 text-xs font-black px-3.5 py-1 rounded-full uppercase tracking-wider border border-emerald-500/40 inline-block mb-1.5 shadow-sm">
-                🎉 Teste Gratuito de 15 Dias Ativado!
+                🎉 Teste Gratuito de {configuredTrialDays} Dias Ativado!
               </span>
               <h3 className="text-xl sm:text-2xl font-black text-white tracking-tight">
                 Seu Salão Foi Cadastrado e Seu Acesso Liberado!
@@ -1679,7 +1679,7 @@ Olá *${createdSalon.ownerName}*, seu acesso ao aplicativo *${createdSalon.name}
                   <span>Suas Credenciais Oficiais:</span>
                 </span>
                 <span className="bg-emerald-500/20 text-emerald-300 text-[10px] font-mono px-2.5 py-0.5 rounded-full font-bold border border-emerald-500/30">
-                  Liberado 15 Dias ✓
+                  Liberado {configuredTrialDays} Dias ✓
                 </span>
               </div>
 
@@ -1760,7 +1760,7 @@ Olá *${createdSalon.ownerName}*, seu acesso ao aplicativo *${createdSalon.name}
                 </div>
                 <div className="flex justify-between items-center text-slate-300">
                   <span className="text-slate-400">Validade do Teste:</span>
-                  <span className="font-black text-emerald-400">15 Dias (Até {createdSalon?.expiresAt})</span>
+                  <span className="font-black text-emerald-400">{createdSalon?.planDays || configuredTrialDays || 7} Dias (Até {createdSalon?.expiresAt})</span>
                 </div>
               </div>
             </div>

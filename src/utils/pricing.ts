@@ -40,7 +40,7 @@ export function getCalculatedLicensePlans(
   let p90 = 90;
   let link30 = 'https://mpago.la/138bXFn';
   let link90 = 'https://mpago.la/29DGt6q';
-  let trialDays = 15;
+  let trialDays = 7;
   let isTrialEnabled = true;
 
   if (typeof configOrBase === 'number') {
@@ -74,8 +74,8 @@ export function getCalculatedLicensePlans(
   if (includeTrial && isTrialEnabled) {
     plans.push({
       days: trialDays,
-      label: `${trialDays} Dias`,
-      shortLabel: `${trialDays} Dias (Teste Grátis)`,
+      label: trialDays === 7 ? 'Sete Dias Grátis' : `${trialDays} Dias Grátis`,
+      shortLabel: trialDays === 7 ? '7 Dias (Teste Gratuito)' : `${trialDays} Dias (Teste Grátis)`,
       priceStr: 'Grátis (R$ 0)',
       numVal: 0,
       monthlyEquivalentStr: `${trialDays} Dias Sem Custo`,
