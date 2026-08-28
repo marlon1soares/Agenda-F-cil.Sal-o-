@@ -19,6 +19,7 @@ interface MeusFuncionariosViewProps {
   appointments: Record<string, Record<string, Appointment>>;
   config: SalonConfig;
   userRole?: UserRole;
+  employeeName?: string;
   activeSalonSlug?: string;
   onSaveProfessionals: (profs: Professional[]) => void;
   onOpenEmployeeLink?: () => void;
@@ -31,6 +32,7 @@ export const MeusFuncionariosView: React.FC<MeusFuncionariosViewProps> = ({
   appointments = {},
   config,
   userRole = 'salao',
+  employeeName,
   activeSalonSlug,
   onSaveProfessionals,
   onOpenEmployeeLink,
@@ -103,6 +105,19 @@ export const MeusFuncionariosView: React.FC<MeusFuncionariosViewProps> = ({
   }, [professionals]);
 
   const salonSlug = activeSalonSlug || getSalonSlug(config?.nomeSalao || 'salao');
+
+  // If employee role, strictly show ONLY this employee's card and information
+  const displayedProfs = useMemo(() => {
+    if (isEmployee) {
+      const targetName = (employeeName || '').toLowerCase().trim();
+      if (targetName) {
+        const match = editingProfs.filter(p => (p.name || '').toLowerCase().trim() === targetName);
+        if (match.length > 0) return match;
+      }
+      return editingProfs.slice(0, 1);
+    }
+    return editingProfs;
+  }, [isEmployee, employeeName, editingProfs]);
 
   // Compute stats for each professional across all appointments and transactions
   const profsStats = useMemo(() => {
@@ -482,19 +497,19 @@ export const MeusFuncionariosView: React.FC<MeusFuncionariosViewProps> = ({
                 ? 'bg-teal-950 text-teal-300 border-teal-800' 
                 : 'bg-blue-950 text-blue-300 border-blue-800'
             }`}>
-              {isEmployee ? '💈 SALÃO / FUNCIONÁRIO • EQUIPE' : '💈 SALÃO / ADMINISTRADOR'}
+              {isEmployee ? `💈 SALÃO / FUNCIONÁRIO: ${(employeeName || 'PROFISSIONAL').toUpperCase()}` : '💈 SALÃO / ADMINISTRADOR'}
             </span>
             <span className="bg-emerald-950 text-emerald-300 font-mono text-[10px] font-extrabold px-2.5 py-0.5 rounded-full border border-emerald-800">
-              {editingProfs.length} {editingProfs.length === 1 ? 'Profissional' : 'Profissionais'}
+              {displayedProfs.length} {displayedProfs.length === 1 ? 'Profissional' : 'Profissionais'}
             </span>
           </div>
           <h2 className="text-xl sm:text-2xl font-black text-white mt-1 flex items-center gap-2">
             <Users className={`w-6 h-6 ${isEmployee ? 'text-teal-400' : 'text-sky-400'}`} />
-            <span>{isEmployee ? 'Equipe de Profissionais' : 'Meus Funcionários & Fechamento'}</span>
+            <span>{isEmployee ? 'Meu Perfil & Desempenho' : 'Meus Funcionários & Fechamento'}</span>
           </h2>
           <p className="text-xs text-slate-400 mt-1 max-w-2xl">
             {isEmployee
-              ? 'Consulte os colegas da equipe, telefones de contato, dias trabalhados e total de clientes atendidos.'
+              ? 'Consulte exclusivamente suas informações, link pessoal de agendamento, dias trabalhados e atendimentos.'
               : 'Acompanhe dias trabalhados, clientes atendidos, realize fechamento diário/quinzenal/mensal e gerencie links e agendas individuais de cada funcionário.'}
           </p>
         </div>
@@ -533,7 +548,7 @@ export const MeusFuncionariosView: React.FC<MeusFuncionariosViewProps> = ({
 
       {/* Employees Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-        {editingProfs.map((prof, idx) => {
+        {displayedProfs.map((prof, idx) => {
           const profId = prof?.id || `prof-${idx + 1}`;
           const profName = prof?.name || `Profissional ${idx + 1}`;
           const profRole = prof?.role || 'Cabeleireiro(a)';

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { SalonConfig, UserRole, ThemeConfig } from '../types';
+import { SalonConfig, UserRole, ThemeConfig, Professional } from '../types';
 import { THEMES } from '../data/mockData';
 import { Storage } from '../utils/storage';
 import { formatBRL } from '../utils/pricing';
@@ -8,6 +8,9 @@ import { Crown, Scissors, User, Users, Minimize2, Maximize2, Settings, Image as 
 interface NavbarProps {
   config: SalonConfig;
   userRole: UserRole;
+  employeeName?: string;
+  professionals?: Professional[];
+  onSelectEmployeeName?: (name: string) => void;
   onSelectRole: (role: UserRole) => void;
   onOpenConfig: () => void;
   onOpenCatalog: () => void;
@@ -30,6 +33,9 @@ interface NavbarProps {
 export const Navbar: React.FC<NavbarProps> = ({
   config,
   userRole,
+  employeeName,
+  professionals = [],
+  onSelectEmployeeName,
   onSelectRole,
   onOpenConfig,
   onOpenCatalog,
@@ -55,6 +61,8 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   const currentTheme: ThemeConfig = THEMES[config.temaKey] || THEMES.azul;
   const headerBgColor = config.corCustom || currentTheme.headerBg;
+
+  const effectiveEmployeeName = employeeName || (professionals.length > 0 ? professionals[0].name : 'Equipe do Salão');
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -101,7 +109,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         return (
           <>
             <Scissors className="w-3.5 h-3.5 text-teal-300 shrink-0" />
-            <span>💈 Salão / Funcionário</span>
+            <span>💈 Salão / Funcionário{effectiveEmployeeName ? `: ${effectiveEmployeeName}` : ''}</span>
           </>
         );
       case 'cliente':
@@ -261,6 +269,18 @@ export const Navbar: React.FC<NavbarProps> = ({
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
             <span className="truncate max-w-[150px]">{config.nomeSalao}</span>
           </div>
+
+          {/* Prominent Employee Indicator Pill */}
+          {userRole === 'funcionario' && (
+            <div className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-xl bg-gradient-to-r from-teal-950 via-teal-900 to-emerald-950 border border-teal-400/60 text-xs font-black text-teal-200 shadow-md animate-in fade-in">
+              <span className="w-2 h-2 rounded-full bg-teal-400 animate-ping shrink-0" />
+              <User className="w-3.5 h-3.5 text-teal-300 shrink-0" />
+              <span className="text-teal-300 font-extrabold hidden xs:inline">FUNCIONÁRIO:</span>
+              <span className="text-white font-black uppercase tracking-wide truncate max-w-[160px]">
+                {effectiveEmployeeName}
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Right Side: Global Tools (Live Hub, Catalog, Config, Minimize, Expand) */}
@@ -365,6 +385,46 @@ export const Navbar: React.FC<NavbarProps> = ({
 
               <span className="text-[11px] font-bold text-slate-300 hidden md:inline">
                 ✨ Escolha o serviço, profissional e horário abaixo
+              </span>
+            </div>
+          ) : userRole === 'funcionario' ? (
+            /* EMPLOYEE ACTIONS */
+            <div className="flex items-center justify-between w-full gap-2 flex-wrap sm:flex-nowrap">
+              <div className="flex items-center gap-2 flex-wrap">
+                {/* 1. Link p/ Clientes */}
+                {onOpenClientLink && (
+                  <button
+                    id="btn-action-client-link-func"
+                    type="button"
+                    onClick={onOpenClientLink}
+                    title="Compartilhar link de agendamento online com clientes"
+                    className="bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-500 hover:to-pink-500 text-white font-extrabold text-xs px-3.5 py-1.5 rounded-xl shadow-md flex items-center gap-1.5 transition-all active:scale-95 border border-rose-400/40 cursor-pointer shrink-0"
+                  >
+                    <Link2 className="w-3.5 h-3.5 text-rose-200" />
+                    <span>Link p/ Clientes</span>
+                  </button>
+                )}
+
+                {/* 2. Nome do Funcionário (do lado direito do link para clientes) - EXCLUSIVO E INDIVIDUAL */}
+                <div 
+                  id="navbar-employee-name-pill"
+                  className="bg-gradient-to-r from-teal-950/95 via-teal-900/90 to-emerald-950/95 border border-teal-400/70 px-3.5 py-1.5 rounded-xl text-teal-200 text-xs font-bold flex items-center gap-2 shadow-md"
+                >
+                  <div className="w-5 h-5 rounded-md bg-teal-500/30 text-teal-200 border border-teal-400/40 flex items-center justify-center font-black text-[11px] shrink-0">
+                    {effectiveEmployeeName ? effectiveEmployeeName.charAt(0).toUpperCase() : '👤'}
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-teal-300 font-extrabold text-[11px] uppercase tracking-wider">Funcionário:</span>
+                    <strong className="text-white font-black text-xs uppercase tracking-wide">
+                      {effectiveEmployeeName}
+                    </strong>
+                  </div>
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" title="Conectado à sua agenda individual" />
+                </div>
+              </div>
+
+              <span className="text-[11px] font-bold text-teal-300/90 hidden md:inline">
+                ✨ Sua agenda pessoal e horários sincronizados em tempo real
               </span>
             </div>
           ) : (
@@ -515,7 +575,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           <span>
             {userRole === 'admin' && '👑 Painel Administrador • Gestão Geral da Plataforma'}
             {userRole === 'salao' && '💈 Salão / Administrador • Painel Completo & Gestão'}
-            {userRole === 'funcionario' && '💈 Salão / Funcionário • Agenda, Equipe, Serviços e Clientes'}
+            {userRole === 'funcionario' && `💈 Salão / Funcionário: ${effectiveEmployeeName} • Sua Agenda, Equipe, Serviços e Clientes`}
             {userRole === 'cliente' && '👤 Portal do Cliente • Agendamentos Online'}
           </span>
         </div>

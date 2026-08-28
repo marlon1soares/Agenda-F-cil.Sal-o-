@@ -126,6 +126,22 @@ export function App() {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
 
+  // Active Employee State (when accessed via employee personal link)
+  const [employeeName, setEmployeeName] = useState<string>(() => {
+    try {
+      const profParam = getUrlParam('prof') || getUrlParam('funcionario') || getUrlParam('employee') || getUrlParam('p');
+      if (profParam) return profParam;
+      const roleParam = getUrlParam('role');
+      if (roleParam === 'funcionario' || roleParam === 'equipe') {
+        const nameParam = getUrlParam('name') || getUrlParam('nome');
+        if (nameParam) return nameParam;
+        const saved = localStorage.getItem('salao_active_employee_name');
+        if (saved) return saved;
+      }
+    } catch {}
+    return '';
+  });
+
   // Modals
   const [isCatalogOpen, setIsCatalogOpen] = useState(false);
   const [isConfigOpen, setIsConfigOpen] = useState(false);
@@ -247,6 +263,15 @@ export function App() {
         const salonParam = getUrlParam('salon');
         const phoneParam = getUrlParam('phone') || getUrlParam('celular') || getUrlParam('tel');
         const nameParam = getUrlParam('name') || getUrlParam('nome');
+        const profParam = getUrlParam('prof') || getUrlParam('funcionario') || getUrlParam('employee') || getUrlParam('p');
+
+        if (profParam) {
+          setEmployeeName(profParam);
+          try { localStorage.setItem('salao_active_employee_name', profParam); } catch {}
+        } else if ((roleParam === 'funcionario' || roleParam === 'equipe') && nameParam) {
+          setEmployeeName(nameParam);
+          try { localStorage.setItem('salao_active_employee_name', nameParam); } catch {}
+        }
 
         if (phoneParam) {
           try { localStorage.setItem('salao_cliente_phone', phoneParam.replace(/\D/g, '')); } catch {}
@@ -393,9 +418,13 @@ export function App() {
       setSalonAuthMode('salao');
       setIsSalonAuthOpen(true);
     } else if (targetRole === 'funcionario') {
-      // Salão / Funcionário Login Screen (CPF Salão + CPF Funcionário + Senha)
-      setSalonAuthMode('funcionario');
-      setIsSalonAuthOpen(true);
+      setUserRole('funcionario');
+      setActiveTab('agenda');
+      if (!employeeName && professionals.length > 0) {
+        const saved = localStorage.getItem('salao_active_employee_name');
+        const defaultName = saved || professionals[0].name;
+        setEmployeeName(defaultName);
+      }
     } else {
       setUserRole(targetRole);
     }
@@ -596,6 +625,8 @@ export function App() {
         <Navbar
           config={config}
           userRole={userRole}
+          employeeName={employeeName}
+          professionals={professionals}
           onSelectRole={handleSelectRole}
           onOpenConfig={() => setIsConfigOpen(true)}
           onOpenCatalog={() => setIsCatalogOpen(true)}
@@ -774,19 +805,29 @@ export function App() {
                 {/* Role Awareness Banners */}
                 {userRole === 'funcionario' && (
                   <div className="bg-gradient-to-r from-teal-950/90 via-slate-900 to-teal-950/90 border border-teal-600/50 rounded-2xl p-3.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs shadow-md">
-                    <div className="flex items-center gap-2.5">
-                      <div className="p-2 bg-teal-500/20 text-teal-300 rounded-xl border border-teal-500/30 shrink-0">
-                        <UserCheck className="w-5 h-5 text-teal-400" />
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-2xl bg-teal-500/20 text-teal-300 border border-teal-500/40 flex items-center justify-center font-black text-sm shrink-0 shadow-inner">
+                        {employeeName ? employeeName.charAt(0).toUpperCase() : <UserCheck className="w-5 h-5 text-teal-400" />}
                       </div>
                       <div>
                         <div className="font-extrabold text-white flex items-center gap-2 flex-wrap">
-                          <span>Acesso Salão / Funcionário</span>
+                          <span className="text-sm">
+                            {employeeName ? `Painel do Profissional: ${employeeName}` : 'Acesso Salão / Funcionário'}
+                          </span>
                           <span className="bg-teal-900 text-teal-200 text-[10px] font-mono px-2 py-0.5 rounded-full border border-teal-700">
                             {config.nomeSalao || 'Salão'}
                           </span>
+                          {employeeName && (
+                            <span className="bg-emerald-500/20 text-emerald-300 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-500/40">
+                              ✓ Agenda Própria Conectada
+                            </span>
+                          )}
                         </div>
                         <p className="text-teal-200/80 text-[11px] mt-0.5">
-                          Visualizando apenas <strong className="text-white">Agenda</strong>, <strong className="text-white">Equipe</strong>, <strong className="text-white">Serviços</strong> e <strong className="text-white">Clientes</strong> — 100% integrado e sincronizado em tempo real.
+                          {employeeName
+                            ? `Olá, ${employeeName}! Esta é a sua agenda individual e atendimentos sincronizados em tempo real com o salão.`
+                            : 'Visualizando apenas Agenda, Equipe, Serviços e Clientes — 100% integrado e sincronizado em tempo real.'
+                          }
                         </p>
                       </div>
                     </div>
@@ -899,7 +940,7 @@ export function App() {
                     }`}
                   >
                     <Users className="w-4 h-4" />
-                    <span>{userRole === 'funcionario' ? 'Equipe' : 'Meus Funcionários'}</span>
+                    <span>{userRole === 'funcionario' ? 'Meu Perfil' : 'Meus Funcionários'}</span>
                   </button>
 
                   <button
@@ -1075,6 +1116,8 @@ export function App() {
                     timeAdjustments={timeAdjustments}
                     config={config}
                     userRole={userRole}
+                    employeeName={employeeName}
+                    initialProfFilter={employeeName || 'todos'}
                     onSaveAppointment={handleSaveAppointment}
                     onDeleteAppointment={handleDeleteAppointment}
                     onShiftDayTime={handleShiftDayTime}
@@ -1091,6 +1134,7 @@ export function App() {
                     appointments={appointments}
                     config={config}
                     userRole={userRole}
+                    employeeName={employeeName}
                     activeSalonSlug={salons.find(s => s.id === activeSalonId)?.slug}
                     onSaveProfessionals={(profs) => {
                       setProfessionals(profs);
@@ -1098,6 +1142,8 @@ export function App() {
                     }}
                     onOpenEmployeeLink={() => setIsEmployeeLinkOpen(true)}
                     onOpenSpecificEmployeeAgenda={(profName) => {
+                      setEmployeeName(profName);
+                      try { localStorage.setItem('salao_active_employee_name', profName); } catch {}
                       setActiveTab('agenda');
                     }}
                   />
@@ -1268,6 +1314,13 @@ export function App() {
         professionals={professionals}
         onOpenEmployeeView={(salon, profName) => {
           handleSelectSalon(salon);
+          if (profName) {
+            setEmployeeName(profName);
+            try { localStorage.setItem('salao_active_employee_name', profName); } catch {}
+          } else {
+            setEmployeeName('');
+            try { localStorage.removeItem('salao_active_employee_name'); } catch {}
+          }
           setUserRole('funcionario');
           setActiveTab('agenda');
         }}

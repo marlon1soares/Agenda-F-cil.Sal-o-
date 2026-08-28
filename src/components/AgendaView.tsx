@@ -6,7 +6,7 @@ import { getUrlParam } from '../utils/url';
 import { 
   Calendar as CalendarIcon, Clock, Lock, Plus, RotateCcw, CheckCircle2, ChevronUp, 
   ChevronDown, DollarSign, X, MessageSquare, Phone, AlertCircle,
-  Download, Printer, Users
+  Download, Printer, Users, User
 } from 'lucide-react';
 
 interface AgendaViewProps {
@@ -14,6 +14,7 @@ interface AgendaViewProps {
   timeAdjustments: Record<string, number>;
   config: SalonConfig;
   userRole: UserRole;
+  employeeName?: string;
   initialProfFilter?: string;
   onSaveAppointment: (date: string, timeSlot: string, ap: Appointment) => void;
   onDeleteAppointment: (date: string, timeSlot: string) => void;
@@ -28,6 +29,7 @@ export const AgendaView: React.FC<AgendaViewProps> = ({
   timeAdjustments,
   config,
   userRole,
+  employeeName,
   initialProfFilter,
   onSaveAppointment,
   onDeleteAppointment,
@@ -40,26 +42,35 @@ export const AgendaView: React.FC<AgendaViewProps> = ({
   const [activeModal, setActiveModal] = useState<'book' | 'block' | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
 
+  const isFuncionario = userRole === 'funcionario';
+  const effectiveEmployee = employeeName || config.profs[0]?.nome || 'Funcionário';
+
   // Professional filter state
   const [selectedProfFilter, setSelectedProfFilter] = useState<string>(() => {
+    if (isFuncionario) return effectiveEmployee;
     try {
       const p = getUrlParam('prof');
       if (p) return p;
     } catch {}
+    if (employeeName) return employeeName;
     return initialProfFilter || 'todos';
   });
 
   useEffect(() => {
-    if (initialProfFilter) {
+    if (isFuncionario) {
+      setSelectedProfFilter(effectiveEmployee);
+    } else if (employeeName) {
+      setSelectedProfFilter(employeeName);
+    } else if (initialProfFilter) {
       setSelectedProfFilter(initialProfFilter);
     }
-  }, [initialProfFilter]);
+  }, [isFuncionario, effectiveEmployee, employeeName, initialProfFilter]);
 
   // Form states
   const [clientName, setClientName] = useState('');
   const [clientPhone, setClientPhone] = useState('');
   const [serviceName, setServiceName] = useState('');
-  const [selectedProf, setSelectedProf] = useState(config.profs[0]?.nome || 'Michael');
+  const [selectedProf, setSelectedProf] = useState(isFuncionario ? effectiveEmployee : (config.profs[0]?.nome || 'Michael'));
   const [price, setPrice] = useState('80');
   const [blockReason, setBlockReason] = useState('Horário de Almoço');
 
@@ -74,10 +85,15 @@ export const AgendaView: React.FC<AgendaViewProps> = ({
   const bookedSlots = Object.keys(currentDayAppointments);
   const allSlots = Array.from(new Set([...generatedSlots, ...bookedSlots])).sort();
 
-  // Filter slots if specific professional is selected
+  // Filter slots strictly if employee or specific professional is selected
   const displaySlots = allSlots.filter(timeBase => {
-    if (selectedProfFilter === 'todos') return true;
     const ap = currentDayAppointments[timeBase];
+    if (isFuncionario) {
+      if (!ap) return true; // free slots are available for booking
+      // Strictly show only appointments belonging to this employee
+      return !ap.professionalName || ap.professionalName.toLowerCase() === effectiveEmployee.toLowerCase() || ap.professionalName === 'Todos';
+    }
+    if (selectedProfFilter === 'todos') return true;
     if (!ap) return true; // free slots are available
     return !ap.professionalName || ap.professionalName === selectedProfFilter || ap.professionalName === 'Todos';
   });
@@ -87,9 +103,7 @@ export const AgendaView: React.FC<AgendaViewProps> = ({
     setClientName('');
     setClientPhone('');
     setServiceName('');
-    if (selectedProfFilter !== 'todos') {
-      setSelectedProf(selectedProfFilter);
-    }
+    setSelectedProf(isFuncionario ? effectiveEmployee : (selectedProfFilter !== 'todos' ? selectedProfFilter : config.profs[0]?.nome || ''));
     setPrice('80');
     setActiveModal('book');
   };
@@ -97,9 +111,7 @@ export const AgendaView: React.FC<AgendaViewProps> = ({
   const handleOpenBlockModal = (slot: string) => {
     setSelectedSlot(slot);
     setBlockReason('Horário de Almoço');
-    if (selectedProfFilter !== 'todos') {
-      setSelectedProf(selectedProfFilter);
-    }
+    setSelectedProf(isFuncionario ? effectiveEmployee : (selectedProfFilter !== 'todos' ? selectedProfFilter : config.profs[0]?.nome || ''));
     setActiveModal('block');
   };
 
@@ -210,6 +222,39 @@ export const AgendaView: React.FC<AgendaViewProps> = ({
         </div>
       </div>
 
+      {/* Personalized Employee Hero Bar when accessed by employee */}
+      {userRole === 'funcionario' && (
+        <div className="bg-gradient-to-r from-teal-950 via-slate-900 to-teal-950 border border-teal-500/50 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs shadow-md">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-2xl bg-teal-500/20 text-teal-300 border border-teal-500/40 flex items-center justify-center font-black text-base shrink-0 shadow-inner">
+              {employeeName ? employeeName.charAt(0).toUpperCase() : '👤'}
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-black text-white text-sm sm:text-base">
+                  {employeeName ? `Agenda de: ${employeeName}` : 'Sua Agenda de Atendimentos'}
+                </span>
+                <span className="bg-teal-900/90 text-teal-300 border border-teal-500/40 text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                  {employeeName ? `Profissional: ${employeeName}` : 'Equipe do Salão'}
+                </span>
+              </div>
+              <p className="text-teal-200/90 text-[11px] mt-0.5">
+                {employeeName 
+                  ? `Visualizando exclusivamente seus horários marcados, livres e bloqueados para ${selectedDate.split('-').reverse().join('/')}.`
+                  : 'Visualizando horários e clientes agendados em tempo real.'
+                }
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 self-stretch sm:self-auto justify-end">
+            <span className="text-[11px] font-bold text-teal-300 bg-teal-950/80 px-3 py-1 rounded-xl border border-teal-500/30">
+              ⚡ Agenda Individual Conectada
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Date Selector, Professional Filter & Export Bar */}
       <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
         
@@ -242,20 +287,31 @@ export const AgendaView: React.FC<AgendaViewProps> = ({
           </div>
 
           {/* Professional Selector Filter */}
-          <div className="flex items-center gap-1.5 bg-slate-50 p-1 rounded-xl border border-slate-200">
-            <Users className="w-4 h-4 text-blue-600 ml-1" />
-            <span className="text-xs font-bold text-slate-700">Agenda:</span>
-            <select
-              value={selectedProfFilter}
-              onChange={(e) => setSelectedProfFilter(e.target.value)}
-              className="bg-white border border-slate-300 text-slate-800 font-bold text-xs px-2.5 py-1 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
-            >
-              <option value="todos">👥 Todos os Funcionários</option>
-              {config.profs.map(p => (
-                <option key={p.nome} value={p.nome}>👤 {p.nome}</option>
-              ))}
-            </select>
-          </div>
+          {isFuncionario ? (
+            <div className="flex items-center gap-2 bg-gradient-to-r from-teal-950 via-teal-900 to-emerald-950 p-1.5 px-3 rounded-xl border border-teal-500/50 shadow-xs">
+              <User className="w-4 h-4 text-teal-400" />
+              <span className="text-xs font-bold text-teal-300">Sua Agenda:</span>
+              <strong className="text-xs font-black text-white uppercase tracking-wide">
+                {effectiveEmployee}
+              </strong>
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse ml-0.5" title="Acesso individual exclusivo" />
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5 bg-slate-50 p-1 rounded-xl border border-slate-200">
+              <Users className="w-4 h-4 text-blue-600 ml-1" />
+              <span className="text-xs font-bold text-slate-700">Agenda:</span>
+              <select
+                value={selectedProfFilter}
+                onChange={(e) => setSelectedProfFilter(e.target.value)}
+                className="bg-white border border-slate-300 text-slate-800 font-bold text-xs px-2.5 py-1 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+              >
+                <option value="todos">👥 Todos os Funcionários</option>
+                {config.profs.map(p => (
+                  <option key={p.nome} value={p.nome}>👤 {p.nome}</option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
 
         {/* Right: Word (.doc) Download & Print Actions */}
@@ -554,15 +610,24 @@ export const AgendaView: React.FC<AgendaViewProps> = ({
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">Profissional:</label>
-                  <select
-                    value={selectedProf}
-                    onChange={(e) => setSelectedProf(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 font-medium"
-                  >
-                    {config.profs.map(p => (
-                      <option key={p.nome} value={p.nome}>{p.nome}</option>
-                    ))}
-                  </select>
+                  {isFuncionario ? (
+                    <input
+                      type="text"
+                      disabled
+                      value={effectiveEmployee}
+                      className="w-full px-3 py-2 border border-teal-300 bg-teal-50 text-teal-950 rounded-lg font-black text-xs cursor-not-allowed"
+                    />
+                  ) : (
+                    <select
+                      value={selectedProf}
+                      onChange={(e) => setSelectedProf(e.target.value)}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+                    >
+                      {config.profs.map(p => (
+                        <option key={p.nome} value={p.nome}>{p.nome}</option>
+                      ))}
+                    </select>
+                  )}
                 </div>
 
                 <div>
