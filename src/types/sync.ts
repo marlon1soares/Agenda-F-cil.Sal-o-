@@ -15,5 +15,6 @@ export interface FullSyncState {
   messages?: ChatMessage[];
   notices?: SystemBroadcastNotice[];
   onlineUsers?: LivePresenceUser[];
+  usedTrialCpfs?: string[];
   lastUpdated: number;
 }

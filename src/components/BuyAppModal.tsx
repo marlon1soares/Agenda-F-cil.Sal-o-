@@ -69,10 +69,11 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
     isAdminIdentifier({ cpf, email, phone })
   );
 
-  // Check if current CPF has already used the 15-day trial (Only restricts non-admin regular users)
-  // Administradores possuem liberação total e ilimitada dos 15 dias gratuitos sempre que precisarem!
+  // Check if current CPF has already used the 7-day trial (Restricts non-admin users to strictly 1 trial per CPF)
+  // Administradores possuem liberação total e ilimitada dos dias gratuitos sempre que precisarem!
+  const cleanTypedCpf = (cpf || '').replace(/\D/g, '').trim();
   const isTrialAlreadyUsed = !isUserAdmin && Boolean(
-    (cpf.trim().length >= 11 && hasCpfUsedTrial(cpf, undefined, userRole))
+    cleanTypedCpf.length >= 11 && hasCpfUsedTrial(cleanTypedCpf, undefined, userRole)
   );
 
   // Form initialization or Order Recovery for Tracking Links (?confirmar-pedido=PAY-...)
@@ -297,6 +298,13 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
   const activeMpLink = currentPlan.paymentLink || (planDays === 90
     ? (adminPaymentConfig.linkMercadoPago90 || 'https://mpago.la/29DGt6q')
     : (adminPaymentConfig.linkMercadoPago30 || 'https://mpago.la/138bXFn'));
+
+  // Auto-switch away from free trial to Plan 1 (30 days) if CPF has already used free trial
+  useEffect(() => {
+    if (isTrialAlreadyUsed && isTrialPlanSelected) {
+      setPlanDays(30);
+    }
+  }, [isTrialAlreadyUsed, isTrialPlanSelected]);
 
   useEffect(() => {
     if (isOpen) {
@@ -543,10 +551,19 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
 
       if (!eligibility.eligible) {
         setError(
-          `⚠️ Não foi possível ativar o teste gratuito: ${eligibility.reason}\n\nO período de teste gratuito (${configuredTrialDays} dias) é concedido 1 única vez por CPF. Administradores possuem liberação ilimitada. Selecione diretamente um dos 4 planos pagos (Plano 1, 2, 3 ou 4).`
+          `⚠️ Restrição de Teste Gratuito: ${eligibility.reason}\n\nConforme as regras do sistema, cada CPF só pode utilizar os ${configuredTrialDays} dias gratuitos 1 única vez. Selecione o Plano 1 (30 Dias) ou Plano 2 para continuar.`
         );
         return;
       }
+
+      // Record this CPF as having used the 7-day free trial (persisted and synced across all devices)
+      Storage.recordTrialUsed({
+        cpf: finalCpf,
+        email: finalEmail,
+        phone: finalPhone,
+        rg: finalRg,
+        salonName: finalSalonName,
+      });
 
       // Activate Free Trial Immediately (No Payment Required)
       setIsProcessing(true);
@@ -1188,8 +1205,18 @@ Olá *${createdSalon.ownerName}*, seu acesso ao aplicativo *${createdSalon.name}
                   value={cpf}
                   onChange={(e) => setCpf(e.target.value)}
                   placeholder="000.000.000-00"
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 font-mono"
+                  className={`w-full bg-slate-950 border rounded-xl px-3.5 py-2.5 text-white placeholder-slate-500 focus:outline-none font-mono ${
+                    isTrialAlreadyUsed ? 'border-amber-500/80 focus:border-amber-400' : 'border-slate-700 focus:border-blue-500'
+                  }`}
                 />
+                {isTrialAlreadyUsed && (
+                  <div className="mt-1.5 p-2 bg-amber-950/60 border border-amber-500/50 rounded-xl text-amber-300 text-[11px] leading-relaxed flex items-start gap-1.5">
+                    <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+                    <span>
+                      <strong>Restrição:</strong> Este CPF já utilizou o período de <strong>7 dias grátis</strong> anteriormente. Cada CPF só pode utilizar o teste gratuito <strong>1 única vez</strong>. Selecione o <strong>Plano 1 (30 Dias)</strong> ou Plano 2 para continuar.
+                    </span>
+                  </div>
+                )}
               </div>
 
               <div>

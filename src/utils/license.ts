@@ -86,8 +86,8 @@ export function isAdminIdentifier(data: { cpf?: string; email?: string; phone?: 
 }
 
 /**
- * Strict check: Ensures that regular users (non-admin) can only use the 15-day trial ONCE.
- * Administrators registered with CPF and password have UNLIMITED access to 15-day trials whenever needed.
+ * Strict check: Ensures that regular users (non-admin) can only use the 7-day trial ONCE per CPF.
+ * Administrators registered with CPF and password have UNLIMITED access to trials whenever needed.
  */
 export function checkTrialEligibility(
   data: {
@@ -103,15 +103,29 @@ export function checkTrialEligibility(
   userRole?: string
 ): TrialEligibilityCheck {
   // If the user has active admin role, admin session, or is a registered Administrator:
-  // Administradores possuem liberação total e ilimitada para utilizar os 15 dias gratuitos sempre que necessário.
+  // Administradores possuem liberação total e ilimitada para utilizar os testes gratuitos sempre que necessário.
   const isSessionAdmin = typeof sessionStorage !== 'undefined' && sessionStorage.getItem('salao_admin_authenticated') === 'true';
   if (userRole === 'admin' || isSessionAdmin || isAdminIdentifier(data)) {
     return { eligible: true };
   }
 
+  const reqCpf = cleanDigits(data.cpf);
+
+  // 1. Direct Used Trial CPFs verification (persisted across sessions and sync)
+  if (reqCpf && reqCpf.length >= 11) {
+    const usedCpfs = Storage.getUsedTrialCpfs();
+    if (usedCpfs.includes(reqCpf)) {
+      return {
+        eligible: false,
+        reason: `O CPF informado (${data.cpf}) já utilizou o período de 7 dias gratuitos anteriormente. Cada CPF só pode utilizar o teste grátis 1 única vez.`,
+        matchedField: 'cpf',
+        matchedValue: data.cpf,
+      };
+    }
+  }
+
   const salons = Storage.getSalons();
 
-  const reqCpf = cleanDigits(data.cpf);
   const reqRg = cleanAlphaNum(data.rg);
   const reqPhone = cleanDigits(data.phone);
   const reqEmail = cleanEmailStr(data.email);
@@ -122,19 +136,19 @@ export function checkTrialEligibility(
   for (const s of salons) {
     if (currentSalonId && s.id === currentSalonId) continue;
 
-    // Check if the salon was registered as a trial or has trial record
+    // Check if the salon was registered with this CPF
     const sCpf = cleanDigits(s.ownerCpf);
     if (reqCpf && sCpf && reqCpf === sCpf) {
       return {
         eligible: false,
-        reason: `O CPF informado (${data.cpf}) já utilizou o período de 15 dias gratuitos no salão "${s.name}".`,
+        reason: `O CPF informado (${data.cpf}) já possui cadastro com período gratuito utilizado no salão "${s.name}". Cada CPF só pode utilizar os 7 dias grátis 1 única vez.`,
         matchedField: 'cpf',
         matchedValue: data.cpf,
       };
     }
 
     const sRg = cleanAlphaNum(s.ownerRg);
-    if (reqRg && sRg && reqRg === sRg) {
+    if (reqRg && sRg && reqRg === sRg && reqRg !== 'ISENTO') {
       return {
         eligible: false,
         reason: `O RG informado (${data.rg}) já foi utilizado para ativar o teste gratuito no salão "${s.name}".`,
@@ -158,7 +172,7 @@ export function checkTrialEligibility(
     if (reqEmail && sEmail && reqEmail === sEmail) {
       return {
         eligible: false,
-        reason: `O e-mail informado (${data.email}) já possui um teste gratuito de 15 dias cadastrado no salão "${s.name}".`,
+        reason: `O e-mail informado (${data.email}) já possui um teste gratuito cadastrado no salão "${s.name}".`,
         matchedField: 'email',
         matchedValue: data.email,
       };
@@ -193,7 +207,7 @@ export function checkTrialEligibility(
 }
 
 /**
- * Checks if a CPF has ever registered or used a 15-day trial before.
+ * Checks if a CPF has ever registered or used a 7-day trial before.
  * Non-admin CPFs are strictly limited to 1 trial.
  * Admin CPFs have unlimited access and return false (never blocked).
  */
@@ -202,7 +216,11 @@ export function hasCpfUsedTrial(cpf: string, currentSalonId?: string, userRole?:
   if (userRole === 'admin' || isSessionAdmin || isAdminCpf(cpf)) {
     return false;
   }
-  return !checkTrialEligibility({ cpf }, currentSalonId, userRole).eligible;
+  const clean = cleanDigits(cpf);
+  if (!clean || clean.length < 11) {
+    return false;
+  }
+  return !checkTrialEligibility({ cpf: clean }, currentSalonId, userRole).eligible;
 }
 
 /**

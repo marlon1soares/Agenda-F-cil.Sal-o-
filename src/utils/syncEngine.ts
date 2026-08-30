@@ -270,6 +270,9 @@ class SyncEngine {
       if (state.onlineUsers && Array.isArray(state.onlineUsers)) {
         try { localStorage.setItem('salaoOnlineUsers', JSON.stringify(state.onlineUsers)); } catch {}
       }
+      if (state.usedTrialCpfs && Array.isArray(state.usedTrialCpfs)) {
+        try { localStorage.setItem('salaoUsedTrialCpfs', JSON.stringify(state.usedTrialCpfs)); } catch {}
+      }
 
       // Play chime if another device booked an appointment or sent a message
       if (senderId && senderId !== CLIENT_ID) {

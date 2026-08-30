@@ -80,7 +80,7 @@ export function getCalculatedLicensePlans(
       numVal: 0,
       monthlyEquivalentStr: `${trialDays} Dias Sem Custo`,
       detail: 'Teste Gratuito',
-      tag: '1x por Cadastro',
+      tag: '1x por CPF',
       badge: `${trialDays} Dias Grátis`,
       maxInstallments: 1,
     });

@@ -112,7 +112,7 @@ export const BlockedLicenseBanner: React.FC<BlockedLicenseBannerProps> = ({
             <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
             <div className="text-[11px] leading-relaxed">
               <strong className="block font-black text-amber-300 mb-0.5">Como reativar seu acesso:</strong>
-              Escolha um dos planos disponíveis (30 dias, 3 meses, 6 meses ou 1 ano). Assim que o pagamento for confirmado, seu salão será liberado instantaneamente com todos os seus agendamentos, clientes e configurações intactos.
+              Escolha um dos planos disponíveis (Plano 1 de 30 Dias ou Plano 2). Assim que o pagamento for confirmado, seu salão será liberado instantaneamente com todos os seus agendamentos, clientes e configurações intactos.
             </div>
           </div>
 

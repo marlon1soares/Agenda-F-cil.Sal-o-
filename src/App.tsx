@@ -43,6 +43,7 @@ export function App() {
   });
 
   const [isPageClosed, setIsPageClosed] = useState(false);
+  const [isAppCompletelyTerminated, setIsAppCompletelyTerminated] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
     try {
       const isBuying = hasUrlAction('comprar-licenca', 'comprar', 'comprar_licenca', 'licenca', 'buy', 'compra', 'contratar');
@@ -63,26 +64,44 @@ export function App() {
 
   // Close and exit entire screen / URL action handler
   const handleCloseEntireScreen = () => {
-    // 1. Attempt standard script and window closing
-    try {
-      window.close();
-      window.open('', '_self', '');
-      window.close();
-    } catch {}
-
-    // 2. Clean URL query parameters so direct purchase mode doesn't re-trigger
-    try {
-      if (typeof window !== 'undefined' && window.history && window.history.replaceState) {
-        const cleanUrl = window.location.origin + window.location.pathname;
-        window.history.replaceState({}, document.title, cleanUrl);
-      }
-    } catch {}
-
-    // 3. Immediately close and set closed state
+    setIsAppCompletelyTerminated(true);
+    setIsPageClosed(true);
     setIsDirectPurchaseMode(false);
     setIsBuyAppOpen(false);
     setIsSalonAuthOpen(false);
-    setIsPageClosed(true);
+
+    // 1. Attempt standard script and window closing
+    try {
+      if (typeof window !== 'undefined') {
+        window.close();
+        window.open('', '_self', '');
+        window.close();
+        self.close();
+        if (window.top && window.top !== window) {
+          window.top.close();
+        }
+      }
+    } catch {}
+
+    // 2. Clean URL query parameters and attempt navigation to about:blank to fully close
+    try {
+      if (typeof window !== 'undefined') {
+        if (window.history && window.history.replaceState) {
+          const cleanUrl = window.location.origin + window.location.pathname;
+          window.history.replaceState({}, document.title, cleanUrl);
+        }
+        // Redirect to about:blank if window.close was blocked by browser
+        setTimeout(() => {
+          try {
+            window.location.replace('about:blank');
+          } catch {
+            try {
+              window.location.href = 'about:blank';
+            } catch {}
+          }
+        }, 100);
+      }
+    } catch {}
   };
 
   // Synchronous URL Parameter Detection for instantaneous role and modal setup
@@ -569,6 +588,21 @@ export function App() {
   // Active Salon & License Status
   const activeSalon = salons.find(s => s.id === activeSalonId) || salons[0];
   const licenseInfo = getSalonLicenseInfo(activeSalon);
+
+  // When app is completely closed / terminated
+  if (isAppCompletelyTerminated) {
+    return (
+      <div className="fixed inset-0 bg-[#060a14] flex flex-col items-center justify-center p-6 text-center select-none z-[99999]">
+        <div className="w-14 h-14 bg-slate-900/90 rounded-2xl border border-slate-800 flex items-center justify-center text-slate-500 mb-3 shadow-inner">
+          <LogOut className="w-7 h-7 text-slate-500" />
+        </div>
+        <p className="text-base font-bold text-slate-300">Aplicativo Finalizado</p>
+        <p className="text-xs text-slate-500 mt-1 max-w-xs leading-relaxed">
+          A página e a sessão foram encerradas por completo. Você já pode fechar esta aba no seu navegador.
+        </p>
+      </div>
+    );
+  }
 
   // Standalone Direct Purchase Mode (when link with ?action=comprar-licenca is opened)
   if (isDirectPurchaseMode) {

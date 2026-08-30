@@ -619,6 +619,39 @@ export const Storage = {
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('salao_sync_data', { detail: { key: 'salaoOnlineUsers' } }));
     }
+  },
+
+  getUsedTrialCpfs(): string[] {
+    const saved = safeGetItem('salaoUsedTrialCpfs');
+    let list: string[] = saved ? JSON.parse(saved) : [];
+    // Also include CPFs of existing salons with trial or active status
+    const salons = this.getSalons();
+    salons.forEach(s => {
+      const clean = (s.ownerCpf || '').replace(/\D/g, '').trim();
+      if (clean && clean.length >= 11 && !list.includes(clean)) {
+        list.push(clean);
+      }
+    });
+    return list;
+  },
+
+  saveUsedTrialCpfs(cpfs: string[]) {
+    const cleanList = Array.from(new Set(cpfs.map(c => (c || '').replace(/\D/g, '').trim()).filter(c => c.length >= 11)));
+    safeSetItem('salaoUsedTrialCpfs', JSON.stringify(cleanList));
+    syncEngine.pushUpdate({ usedTrialCpfs: cleanList });
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('salao_sync_data', { detail: { key: 'salaoUsedTrialCpfs' } }));
+    }
+  },
+
+  recordTrialUsed(data: { cpf?: string; email?: string; phone?: string; rg?: string; salonName?: string }) {
+    const clean = (data.cpf || '').replace(/\D/g, '').trim();
+    if (!clean || clean.length < 11) return;
+    const current = this.getUsedTrialCpfs();
+    if (!current.includes(clean)) {
+      current.push(clean);
+      this.saveUsedTrialCpfs(current);
+    }
   }
 };
 
