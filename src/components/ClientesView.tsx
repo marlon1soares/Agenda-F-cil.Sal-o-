@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ClientRecord } from '../types';
-import { Users, Plus, Phone, MessageSquare, Sparkles, Send } from 'lucide-react';
+import { Users, Plus, Phone, MessageSquare, Sparkles, Send, Trash2 } from 'lucide-react';
 
 interface ClientesViewProps {
   clients: ClientRecord[];
@@ -13,6 +13,7 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
 }) => {
   const [items, setItems] = useState<ClientRecord[]>(clients || []);
   const [selectedClientForMsg, setSelectedClientForMsg] = useState<ClientRecord | null>(null);
+  const [clientToDelete, setClientToDelete] = useState<ClientRecord | null>(null);
   const [generatedMsg, setGeneratedMsg] = useState('');
   const [loadingMsg, setLoadingMsg] = useState(false);
 
@@ -27,6 +28,15 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
       setItems(clients);
     }
   }, [clients]);
+
+  const handleDeleteClient = (id: string) => {
+    const updated = items.filter(c => c.id !== id);
+    setItems(updated);
+    onSaveClients(updated);
+    if (clientToDelete?.id === id) {
+      setClientToDelete(null);
+    }
+  };
 
   const handleGenerateWhatsAppMsg = async (client: ClientRecord) => {
     setSelectedClientForMsg(client);
@@ -115,53 +125,71 @@ A mensagem deve confirmar um agendamento ou convidá-la para um novo atendimento
       </div>
 
       {/* Clients List */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {safeItems.map(cli => (
-          <div key={cli.id} className="bg-slate-900 p-5 rounded-2xl border border-slate-800 shadow-md space-y-3.5 hover:border-slate-700 transition-colors">
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <h4 className="text-sm font-extrabold text-white">{cli.name}</h4>
-                <div className="text-xs text-slate-400 flex items-center gap-1 mt-0.5 font-mono">
-                  <Phone className="w-3.5 h-3.5 text-slate-500" /> {cli.phone}
+      {safeItems.length === 0 ? (
+        <div className="bg-slate-900/70 p-8 rounded-2xl border border-slate-800 text-center space-y-2">
+          <Users className="w-8 h-8 text-slate-600 mx-auto" />
+          <h4 className="text-sm font-bold text-slate-300">Nenhum cliente cadastrado</h4>
+          <p className="text-xs text-slate-400">Clique no botão "+ Novo Cliente" acima para cadastrar um novo cliente.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {safeItems.map(cli => (
+            <div key={cli.id} className="bg-slate-900 p-5 rounded-2xl border border-slate-800 shadow-md space-y-3.5 hover:border-slate-700 transition-colors">
+              <div className="flex items-start justify-between gap-2">
+                <div className="space-y-0.5">
+                  <div className="flex items-center gap-2">
+                    <h4 className="text-sm font-extrabold text-white">{cli.name}</h4>
+                    <button
+                      onClick={() => setClientToDelete(cli)}
+                      title="Excluir cliente"
+                      aria-label={`Excluir cliente ${cli.name}`}
+                      className="p-1 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-950/50 border border-slate-800/80 hover:border-rose-800/50 transition-all cursor-pointer"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                  <div className="text-xs text-slate-400 flex items-center gap-1 font-mono">
+                    <Phone className="w-3.5 h-3.5 text-slate-500" /> {cli.phone}
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => handleGenerateWhatsAppMsg(cli)}
+                  className="bg-emerald-950/80 hover:bg-emerald-900/80 text-emerald-300 border border-emerald-800 text-xs font-bold px-3 py-1.5 rounded-xl transition-colors flex items-center gap-1.5 shrink-0 cursor-pointer"
+                >
+                  <MessageSquare className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Mensagem WhatsApp</span>
+                </button>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2 text-xs pt-2 border-t border-slate-800">
+                <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800 text-center">
+                  <span className="text-[10px] text-slate-400 font-bold uppercase block">Visitas</span>
+                  <div className="font-extrabold text-white text-sm mt-0.5">{cli.totalVisits}</div>
+                </div>
+
+                <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800 text-center">
+                  <span className="text-[10px] text-slate-400 font-bold uppercase block">Total Gasto</span>
+                  <div className="font-black text-emerald-400 text-sm mt-0.5 font-mono">
+                    R$ {(Number(cli.totalSpent) || 0).toFixed(2).replace('.', ',')}
+                  </div>
+                </div>
+
+                <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800 text-center">
+                  <span className="text-[10px] text-slate-400 font-bold uppercase block">Última Visita</span>
+                  <div className="font-bold text-slate-300 text-xs mt-0.5">{cli.lastVisit || 'Hoje'}</div>
                 </div>
               </div>
 
-              <button
-                onClick={() => handleGenerateWhatsAppMsg(cli)}
-                className="bg-emerald-950/80 hover:bg-emerald-900/80 text-emerald-300 border border-emerald-800 text-xs font-bold px-3 py-1.5 rounded-xl transition-colors flex items-center gap-1.5 shrink-0"
-              >
-                <MessageSquare className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Mensagem WhatsApp</span>
-              </button>
-            </div>
-
-            <div className="grid grid-cols-3 gap-2 text-xs pt-2 border-t border-slate-800">
-              <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800 text-center">
-                <span className="text-[10px] text-slate-400 font-bold uppercase block">Visitas</span>
-                <div className="font-extrabold text-white text-sm mt-0.5">{cli.totalVisits}</div>
-              </div>
-
-              <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800 text-center">
-                <span className="text-[10px] text-slate-400 font-bold uppercase block">Total Gasto</span>
-                <div className="font-black text-emerald-400 text-sm mt-0.5 font-mono">
-                  R$ {(Number(cli.totalSpent) || 0).toFixed(2).replace('.', ',')}
+              {cli.notes && (
+                <div className="text-[11px] text-amber-200 bg-amber-950/40 p-2.5 rounded-xl border border-amber-900/50">
+                  <span className="font-bold text-amber-400">Obs: </span>{cli.notes}
                 </div>
-              </div>
-
-              <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800 text-center">
-                <span className="text-[10px] text-slate-400 font-bold uppercase block">Última Visita</span>
-                <div className="font-bold text-slate-300 text-xs mt-0.5">{cli.lastVisit || 'Hoje'}</div>
-              </div>
+              )}
             </div>
-
-            {cli.notes && (
-              <div className="text-[11px] text-amber-200 bg-amber-950/40 p-2.5 rounded-xl border border-amber-900/50">
-                <span className="font-bold text-amber-400">Obs: </span>{cli.notes}
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
       {/* WhatsApp Message Generator Modal */}
       {selectedClientForMsg && (
@@ -297,6 +325,45 @@ A mensagem deve confirmar um agendamento ou convidá-la para um novo atendimento
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Client Confirmation Modal */}
+      {clientToDelete && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-slate-900 rounded-2xl shadow-2xl border border-rose-900/50 w-full max-w-sm overflow-hidden p-5 space-y-4 animate-in fade-in zoom-in-95 duration-150 text-center">
+            <div className="w-12 h-12 rounded-full bg-rose-950/80 border border-rose-800/60 flex items-center justify-center mx-auto text-rose-400 shadow-inner">
+              <Trash2 className="w-6 h-6" />
+            </div>
+
+            <div>
+              <h3 className="text-base font-extrabold text-white">Excluir Cliente?</h3>
+              <p className="text-xs text-slate-300 mt-1.5 leading-relaxed">
+                Tem certeza que deseja remover o cadastro de <strong className="text-white">"{clientToDelete.name}"</strong>?
+              </p>
+              <p className="text-[11px] text-slate-400 mt-1">
+                Esta ação removerá o cliente da sua lista de cadastros.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2 pt-2 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => setClientToDelete(null)}
+                className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold py-2.5 rounded-xl transition-colors text-xs cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDeleteClient(clientToDelete.id)}
+                className="flex-1 bg-rose-600 hover:bg-rose-500 text-white font-extrabold py-2.5 rounded-xl transition-colors shadow-md text-xs active:scale-95 cursor-pointer flex items-center justify-center gap-1.5"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Sim, Excluir</span>
+              </button>
+            </div>
           </div>
         </div>
       )}
