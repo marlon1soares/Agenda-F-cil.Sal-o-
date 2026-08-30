@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Key, Scissors, CheckCircle2, AlertCircle, Crown, Eye, EyeOff, Store, ShoppingCart, Gift, Sparkles } from 'lucide-react';
+import { X, Key, Scissors, CheckCircle2, AlertCircle, Crown, Eye, EyeOff, Store, ShoppingCart, Gift } from 'lucide-react';
 import { SalonApp, UserRole } from '../types';
 import { Storage } from '../utils/storage';
 import { formatBRL } from '../utils/pricing';
@@ -122,6 +122,7 @@ export const SalonAuthModal: React.FC<SalonAuthModalProps> = ({
     if (masterAdminMatch) {
       try {
         sessionStorage.setItem('salao_admin_authenticated', 'true');
+        sessionStorage.setItem('salao_authenticated', 'true');
         localStorage.setItem('salao_admin_authenticated', 'true');
       } catch {}
 
@@ -129,7 +130,7 @@ export const SalonAuthModal: React.FC<SalonAuthModalProps> = ({
       setSuccessMsg(`👑 Administrador de Gestão Autenticado! Acessando painel completo do salão...`);
       setTimeout(() => {
         onSuccess(fallbackSalon, 'salao');
-      }, 500);
+      }, 400);
       return;
     }
 
@@ -148,7 +149,7 @@ export const SalonAuthModal: React.FC<SalonAuthModalProps> = ({
         (salonToken === cleanToken || salonCode === cleanToken || salonId === cleanToken || (cleanToken.length >= 4 && salonToken.includes(cleanToken)) || rawPass === 'admin' || rawPass === '123456');
 
       const matchesTokenOnly = !cleanSalonCpf && (salonToken === cleanToken || salonCode === cleanToken);
-      const matchesDemo = (cleanSalonCpf === '12345678900' || !cleanSalonCpf) && (cleanToken === 'TOK-PARCAS-2026' || cleanToken === 'DEMO' || cleanToken === '123456');
+      const matchesDemo = (cleanSalonCpf === '12345678900' || !cleanSalonCpf) && (cleanToken === 'DEMO' || cleanToken === '123456');
 
       return matchesCpfAndToken || matchesTokenOnly || (matchesDemo && s.id === currentSalons[0]?.id);
     });
@@ -159,7 +160,12 @@ export const SalonAuthModal: React.FC<SalonAuthModalProps> = ({
         return;
       }
 
-      setSuccessMsg(`💈 Administrador do Salão autenticado! Entrando no painel completo de ${matchedSalon.config?.nomeSalao || matchedSalon.name}...`);
+      try {
+        sessionStorage.setItem('salao_authenticated', 'true');
+        sessionStorage.setItem('salao_authenticated_id', matchedSalon.id);
+      } catch {}
+
+      setSuccessMsg(`💈 Administrador do Salão autenticado! Entrando no painel de ${matchedSalon.config?.nomeSalao || matchedSalon.name}...`);
       setTimeout(() => {
         onSuccess(matchedSalon, 'salao');
       }, 400);
@@ -182,6 +188,11 @@ export const SalonAuthModal: React.FC<SalonAuthModalProps> = ({
           const updatedList = [...currentSalons.filter(s => s.id !== fetchedSalon.id), fetchedSalon];
           Storage.saveSalons(updatedList);
 
+          try {
+            sessionStorage.setItem('salao_authenticated', 'true');
+            sessionStorage.setItem('salao_authenticated_id', fetchedSalon.id);
+          } catch {}
+
           setSuccessMsg(`Autenticado com sucesso! Entrando no sistema de ${fetchedSalon.config?.nomeSalao || fetchedSalon.name}...`);
           setTimeout(() => {
             onSuccess(fetchedSalon, 'salao');
@@ -197,69 +208,106 @@ export const SalonAuthModal: React.FC<SalonAuthModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="bg-[#0b1222] border border-slate-800 w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden flex flex-col">
+      <div className="bg-[#0b1222] border border-slate-800 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden flex flex-col">
         
-        {/* Header */}
-        <div className="p-5 text-white flex items-center justify-between border-b border-slate-800/80 bg-[#0b1222]">
-          <div className="flex items-center gap-3.5">
-            <div className="p-3 rounded-2xl border flex items-center justify-center shadow-inner bg-emerald-950/60 border-emerald-500/40 text-emerald-400">
-              <Scissors className="w-6 h-6" />
+        {/* Header - Compacto e Elegante */}
+        <div className="px-4 py-3 text-white flex items-center justify-between border-b border-slate-800/80 bg-[#0b1222]">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 rounded-xl border flex items-center justify-center shadow-inner bg-emerald-950/60 border-emerald-500/40 text-emerald-400">
+              <Scissors className="w-4 h-4" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-black px-3 py-0.5 rounded-full uppercase tracking-wider border bg-emerald-950/90 text-emerald-400 border-emerald-500/40">
-                  💈 SALÃO / ADMINISTRADOR
+              <div className="flex items-center gap-1.5">
+                <span className="text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider border bg-emerald-950/90 text-emerald-400 border-emerald-500/40">
+                  💈 SALÃO
                 </span>
-                <span className="bg-amber-950/90 text-amber-300 text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider border border-amber-500/40 flex items-center gap-1">
-                  <Crown className="w-3 h-3 text-amber-400" />
+                <span className="bg-amber-950/90 text-amber-300 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider border border-amber-500/40 flex items-center gap-1">
+                  <Crown className="w-2.5 h-2.5 text-amber-400" />
                   GESTÃO
                 </span>
               </div>
-              <h2 className="text-xl sm:text-2xl font-black mt-1 tracking-tight text-white flex items-center gap-1.5">
-                <span>Entrada Salão / Administrador</span>
+              <h2 className="text-sm sm:text-base font-black mt-0.5 tracking-tight text-white">
+                Entrada Salão / Administrador
               </h2>
             </div>
           </div>
 
           <button
+            type="button"
             onClick={onClose}
-            className="p-2.5 rounded-full bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors cursor-pointer"
+            aria-label="Fechar"
+            className="p-1.5 rounded-full bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors cursor-pointer"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
-        {/* Form Body */}
-        <form onSubmit={handleLogin} className="p-5 sm:p-6 space-y-4 text-xs text-slate-200">
+        {/* Form Body - Espaços Reduzidos e Otimizados */}
+        <form onSubmit={handleLogin} className="p-4 space-y-2.5 text-xs text-slate-200">
           
-          {/* Informational Guidance Box */}
-          <div className="bg-slate-950/80 border border-emerald-900/60 p-3.5 rounded-2xl space-y-1 text-slate-300 shadow-inner">
-            <div className="flex items-center gap-2 text-amber-300 font-bold">
-              <Crown className="w-4 h-4 text-amber-400 shrink-0" />
+          {/* 7 DIAS GRÁTIS EM EVIDÊNCIA NA PARTE SUPERIOR */}
+          <button
+            type="button"
+            id="btn-modal-trial-top"
+            onClick={() => {
+              onClose();
+              if (onOpenBuyApp) {
+                onOpenBuyApp(trialDays);
+              }
+            }}
+            className="w-full bg-gradient-to-r from-emerald-950/90 via-slate-900 to-emerald-950/90 hover:from-emerald-900 hover:to-emerald-900/90 border border-emerald-500/50 hover:border-emerald-400 p-2 rounded-xl flex items-center justify-between text-left transition-all active:scale-98 shadow-sm group cursor-pointer"
+          >
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-lg bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 shrink-0 shadow-inner group-hover:scale-105 transition-transform">
+                <Gift className="w-3.5 h-3.5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[11px] font-black text-emerald-300 uppercase tracking-wide">
+                    {trialDays} Dias Grátis
+                  </span>
+                  <span className="text-[8px] font-extrabold bg-emerald-500 text-slate-950 px-1 py-0.2 rounded-full uppercase">
+                    Sem Custo
+                  </span>
+                </div>
+                <p className="text-[10px] text-slate-400">
+                  Teste o painel completo do salão sem compromisso
+                </p>
+              </div>
+            </div>
+            <span className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-[10px] px-2 py-1 rounded-lg shrink-0 transition-colors">
+              Testar ➔
+            </span>
+          </button>
+
+          {/* Informational Guidance Box - Compacto */}
+          <div className="bg-slate-950/80 border border-emerald-900/50 p-2 rounded-xl space-y-0.5 text-slate-300 shadow-inner">
+            <div className="flex items-center gap-1.5 text-amber-300 font-bold text-[10.5px]">
+              <Crown className="w-3 h-3 text-amber-400 shrink-0" />
               <span>Painel Completo: Dashboard, Caixa, Agenda, Equipe, Serviços e Clientes</span>
             </div>
-            <p className="text-[11px] text-slate-400 leading-relaxed">
-              * Acesso exclusivo para o Proprietário / Administrador com CPF e Senha de Gestão para controle completo do salão.
+            <p className="text-[10px] text-slate-400 leading-snug">
+              * Acesso com CPF e Senha de Gestão para controle total do salão.
             </p>
           </div>
 
           {errorMsg && (
-            <div className="bg-rose-950/90 border border-rose-700 p-3 rounded-2xl flex items-start gap-2 text-rose-200 animate-shake">
-              <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
-              <span className="text-xs leading-relaxed font-semibold">{errorMsg}</span>
+            <div className="bg-rose-950/90 border border-rose-700 p-2.5 rounded-xl flex items-start gap-1.5 text-rose-200 animate-shake">
+              <AlertCircle className="w-3.5 h-3.5 text-rose-400 shrink-0 mt-0.5" />
+              <span className="text-[11px] leading-snug font-semibold">{errorMsg}</span>
             </div>
           )}
 
           {successMsg && (
-            <div className="bg-emerald-950/90 border border-emerald-600 p-3 rounded-2xl flex items-center gap-2 text-emerald-200">
-              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-              <span className="text-xs font-bold">{successMsg}</span>
+            <div className="bg-emerald-950/90 border border-emerald-600 p-2.5 rounded-xl flex items-center gap-1.5 text-emerald-200">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+              <span className="text-[11px] font-bold">{successMsg}</span>
             </div>
           )}
 
           {/* Input 1: CPF do Proprietário / Administrador */}
-          <div className="space-y-1.5 pt-1">
-            <label className="block text-xs font-bold text-slate-300">
+          <div className="space-y-1">
+            <label className="block text-[11px] font-bold text-slate-300">
               CPF do Proprietário / Administrador:
             </label>
             <div className="relative">
@@ -270,25 +318,25 @@ export const SalonAuthModal: React.FC<SalonAuthModalProps> = ({
                 value={salonCpf}
                 onChange={handleSalonCpfChange}
                 maxLength={14}
-                className="w-full bg-[#060a14] border border-slate-700/80 rounded-2xl px-4 py-3 pl-11 text-white font-mono text-sm placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all shadow-inner"
+                className="w-full bg-[#060a14] border border-slate-700/80 rounded-xl px-3 py-2 pl-8 text-white font-mono text-xs placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all shadow-inner"
               />
-              <Store className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
+              <Store className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
             </div>
           </div>
 
           {/* Input 2: Senha / Token de Acesso */}
-          <div className="space-y-1.5">
+          <div className="space-y-1">
             <div className="flex justify-between items-center">
-              <label className="block text-xs font-bold text-slate-300">
+              <label className="block text-[11px] font-bold text-slate-300">
                 Senha / Token de Acesso:
               </label>
               <button
                 type="button"
                 onClick={() => setShowPassword(prev => !prev)}
-                className="text-xs text-slate-400 hover:text-slate-200 font-semibold flex items-center gap-1 cursor-pointer transition-colors"
+                className="text-[10px] text-slate-400 hover:text-slate-200 font-semibold flex items-center gap-1 cursor-pointer transition-colors"
                 title={showPassword ? 'Ocultar' : 'Exibir'}
               >
-                {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                {showPassword ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
                 <span>{showPassword ? 'Ocultar' : 'Exibir'}</span>
               </button>
             </div>
@@ -302,34 +350,31 @@ export const SalonAuthModal: React.FC<SalonAuthModalProps> = ({
                   setPasswordOrToken(e.target.value);
                   setErrorMsg('');
                 }}
-                className="w-full bg-[#060a14] border border-slate-700/80 rounded-2xl px-4 py-3 pl-11 text-white font-mono text-sm placeholder-slate-500 tracking-wider focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all shadow-inner font-bold text-emerald-300"
+                className="w-full bg-[#060a14] border border-slate-700/80 rounded-xl px-3 py-2 pl-8 text-white font-mono text-xs placeholder-slate-500 tracking-wider focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all shadow-inner font-bold text-emerald-300"
               />
-              <Key className="w-4 h-4 text-amber-400 absolute left-3.5 top-3.5" />
+              <Key className="w-3.5 h-3.5 text-amber-400 absolute left-2.5 top-2.5" />
             </div>
           </div>
 
-          {/* Submit Action Button */}
-          <div className="pt-2">
+          {/* Submit Action Button - Diminuído e Otimizado */}
+          <div className="pt-1">
             <button
               id="btn-submit-auth"
               type="submit"
-              className="w-full text-white font-black py-3.5 rounded-2xl shadow-xl flex items-center justify-center gap-2 transition-all active:scale-98 text-sm cursor-pointer bg-emerald-600 hover:bg-emerald-500 shadow-emerald-950/50"
+              className="w-full text-white font-extrabold py-2.5 px-3 rounded-xl shadow-md flex items-center justify-center gap-1.5 transition-all active:scale-98 text-xs sm:text-sm cursor-pointer bg-emerald-600 hover:bg-emerald-500 shadow-emerald-950/40"
             >
-              <CheckCircle2 className="w-5 h-5 text-white" />
+              <CheckCircle2 className="w-4 h-4 text-white" />
               <span>Entrar como Salão / Administrador ➔</span>
             </button>
           </div>
 
-          {/* Divider & Purchase / 7 Days Free Trial Section */}
-          <div className="pt-3 border-t border-slate-800/80 space-y-2.5">
-            <div className="flex items-center justify-between text-[11px] text-slate-400">
-              <span className="font-semibold">Novo por aqui ou quer criar seu salão?</span>
-              <span className="text-[10px] font-extrabold text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded-full border border-emerald-500/30">
-                {trialDays} Dias Grátis
-              </span>
+          {/* Divider & Purchase Section - Diminuído e sem o botão de 3 meses */}
+          <div className="pt-2 border-t border-slate-800/80 space-y-1.5">
+            <div className="text-[10px] text-slate-400 font-semibold text-center">
+              Deseja contratar o plano mensal para o seu salão?
             </div>
 
-            {/* Main Comprar App Button (styled exactly as image 2) */}
+            {/* Main Comprar App Button - Compacto */}
             <button
               type="button"
               id="btn-modal-buy-app"
@@ -339,49 +384,16 @@ export const SalonAuthModal: React.FC<SalonAuthModalProps> = ({
                   onOpenBuyApp(30);
                 }
               }}
-              className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-xs sm:text-sm px-4 py-2.5 rounded-2xl shadow-lg flex items-center justify-between transition-all active:scale-98 border border-emerald-400/40 cursor-pointer select-none group"
+              className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-xs px-3 py-2 rounded-xl shadow-md flex items-center justify-between transition-all active:scale-98 border border-emerald-400/30 cursor-pointer select-none group"
             >
-              <div className="flex items-center gap-2">
-                <ShoppingCart className="w-4 h-4 text-yellow-300 group-hover:scale-110 transition-transform shrink-0" />
+              <div className="flex items-center gap-1.5">
+                <ShoppingCart className="w-3.5 h-3.5 text-yellow-300 group-hover:scale-110 transition-transform shrink-0" />
                 <span>Comprar App</span>
               </div>
-              <span className="bg-yellow-400/20 text-yellow-300 font-black text-[11px] sm:text-xs px-2 py-0.5 rounded-lg border border-yellow-300/40 inline-flex items-center">
+              <span className="bg-yellow-400/20 text-yellow-300 font-black text-[10px] sm:text-[11px] px-2 py-0.5 rounded-md border border-yellow-300/40 inline-flex items-center">
                 <span>{formatBRL(p30Price)}/mês</span>
               </span>
             </button>
-
-            {/* Quick Action Plan Badges / 7 Dias Grátis & Plano 2 */}
-            <div className="grid grid-cols-2 gap-2 pt-0.5">
-              <button
-                type="button"
-                id="btn-modal-trial-7days"
-                onClick={() => {
-                  onClose();
-                  if (onOpenBuyApp) {
-                    onOpenBuyApp(trialDays);
-                  }
-                }}
-                className="bg-slate-900/90 hover:bg-slate-800 text-emerald-300 hover:text-emerald-200 border border-emerald-500/30 hover:border-emerald-500/60 py-2 px-3 rounded-xl font-extrabold text-[11px] flex items-center justify-center gap-1.5 transition-all active:scale-95 cursor-pointer shadow-sm"
-              >
-                <Gift className="w-3.5 h-3.5 text-emerald-400" />
-                <span>{trialDays} Dias Grátis (Teste)</span>
-              </button>
-
-              <button
-                type="button"
-                id="btn-modal-plan-90days"
-                onClick={() => {
-                  onClose();
-                  if (onOpenBuyApp) {
-                    onOpenBuyApp(90);
-                  }
-                }}
-                className="bg-slate-900/90 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700 hover:border-slate-600 py-2 px-3 rounded-xl font-extrabold text-[11px] flex items-center justify-center gap-1.5 transition-all active:scale-95 cursor-pointer shadow-sm"
-              >
-                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                <span>Plano 2 (3 Meses)</span>
-              </button>
-            </div>
           </div>
         </form>
 

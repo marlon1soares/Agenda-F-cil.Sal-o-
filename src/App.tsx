@@ -31,7 +31,7 @@ import { DEFAULT_SALON_APPS, DEFAULT_CONFIG } from './data/mockData';
 import { getUrlParam, hasUrlAction } from './utils/url';
 import { getSalonLicenseInfo } from './utils/license';
 import { BlockedLicenseBanner } from './components/BlockedLicenseBanner';
-import { LayoutDashboard, CreditCard, Calendar, Users, Scissors, UserCheck, LogOut, RotateCcw, ShieldCheck, Building2, Store, Eye, CheckCircle2, AlertCircle, ShoppingCart, Sparkles, Plus, ExternalLink, Key, Link2, Settings, Play, Video } from 'lucide-react';
+import { LayoutDashboard, CreditCard, Calendar, Users, Scissors, UserCheck, LogOut, RotateCcw, ShieldCheck, Building2, Store, Eye, CheckCircle2, AlertCircle, ShoppingCart, Sparkles, Plus, ExternalLink, Key, Link2, Settings, Play, Video, Gift } from 'lucide-react';
 
 export function App() {
   // Check if opened via dedicated direct purchase / activation link
@@ -43,6 +43,23 @@ export function App() {
   });
 
   const [isPageClosed, setIsPageClosed] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+    try {
+      const isBuying = hasUrlAction('comprar-licenca', 'comprar', 'comprar_licenca', 'licenca', 'buy', 'compra', 'contratar');
+      if (isBuying) return false;
+      const role = getUrlParam('role');
+      const salon = getUrlParam('salon');
+      const prof = getUrlParam('prof') || getUrlParam('funcionario') || getUrlParam('employee');
+      // Direct client or employee link
+      if (role === 'cliente' || (salon && !role && !prof)) return true;
+      if (role === 'funcionario' || prof) return true;
+
+      const isAdminAuth = typeof window !== 'undefined' && sessionStorage.getItem('salao_admin_authenticated') === 'true';
+      const isSalonAuth = typeof window !== 'undefined' && sessionStorage.getItem('salao_authenticated') === 'true';
+      if (isAdminAuth || isSalonAuth) return true;
+    } catch {}
+    return false;
+  });
 
   // Close and exit entire screen / URL action handler
   const handleCloseEntireScreen = () => {
@@ -61,10 +78,11 @@ export function App() {
       }
     } catch {}
 
-    // 3. Immediately exit full-screen standalone purchase view and return to main app
+    // 3. Immediately close and set closed state
     setIsDirectPurchaseMode(false);
     setIsBuyAppOpen(false);
-    setIsPageClosed(false);
+    setIsSalonAuthOpen(false);
+    setIsPageClosed(true);
   };
 
   // Synchronous URL Parameter Detection for instantaneous role and modal setup
@@ -557,16 +575,16 @@ export function App() {
     if (isPageClosed || !isBuyAppOpen) {
       return (
         <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 text-slate-100 font-sans select-none">
-          <div className="bg-slate-900 border border-slate-800 p-6 sm:p-8 rounded-3xl max-w-md w-full text-center shadow-2xl space-y-6">
-            <div className="w-16 h-16 bg-slate-800/80 rounded-2xl border border-slate-700/80 mx-auto flex items-center justify-center text-rose-400 shadow-inner">
-              <LogOut className="w-8 h-8" />
+          <div className="bg-[#0b1222] border border-slate-800 p-6 sm:p-8 rounded-3xl max-w-md w-full text-center shadow-2xl space-y-5">
+            <div className="w-14 h-14 bg-slate-800/80 rounded-2xl border border-slate-700 mx-auto flex items-center justify-center text-rose-400 shadow-inner">
+              <LogOut className="w-7 h-7" />
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <span className="bg-rose-500/15 text-rose-300 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wider border border-rose-500/30">
                 Página Finalizada
               </span>
-              <h2 className="text-xl font-black text-white">
+              <h2 className="text-lg sm:text-xl font-black text-white">
                 Sessão de Compra Encerrada
               </h2>
               <p className="text-xs text-slate-400 leading-relaxed">
@@ -574,11 +592,11 @@ export function App() {
               </p>
             </div>
 
-            <div className="pt-2 space-y-2.5">
+            <div className="pt-2 space-y-2">
               <button
                 type="button"
                 onClick={handleCloseEntireScreen}
-                className="w-full bg-rose-600 hover:bg-rose-500 text-white font-extrabold py-3.5 px-4 rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg transition-all active:scale-95 cursor-pointer"
+                className="w-full bg-rose-600 hover:bg-rose-500 text-white font-extrabold py-3 px-4 rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg transition-all active:scale-95 cursor-pointer"
               >
                 <LogOut className="w-4 h-4" />
                 <span>Fechar Esta Aba / Janela</span>
@@ -590,7 +608,7 @@ export function App() {
                   setIsPageClosed(false);
                   setIsBuyAppOpen(true);
                 }}
-                className="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 font-bold py-3 px-4 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                className="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold py-2.5 px-4 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
                 <span>Reabrir Tela de Contratação / 7 Dias Grátis</span>
@@ -618,8 +636,70 @@ export function App() {
             } else {
               handleCreateSalon(newOrUpdatedSalon);
             }
+            setIsAuthenticated(true);
+            setIsPageClosed(false);
           }}
         />
+      </div>
+    );
+  }
+
+  // When user closes entrance modal without logging in or clicks exit:
+  if (isPageClosed || (!isAuthenticated && !isSalonAuthOpen && !isBuyAppOpen)) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 text-slate-100 font-sans select-none">
+        <div className="bg-[#0b1222] border border-slate-800 p-6 sm:p-8 rounded-3xl max-w-md w-full text-center shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-200">
+          <div className="w-14 h-14 bg-slate-800/80 rounded-2xl border border-slate-700 mx-auto flex items-center justify-center text-rose-400 shadow-inner">
+            <LogOut className="w-7 h-7" />
+          </div>
+
+          <div className="space-y-1.5">
+            <span className="bg-rose-500/15 text-rose-300 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wider border border-rose-500/30">
+              Sessão Encerrada
+            </span>
+            <h2 className="text-lg sm:text-xl font-black text-white">
+              Aplicativo Fechado
+            </h2>
+            <p className="text-xs text-slate-400 leading-relaxed">
+              Você saiu da tela de entrada. O acesso ao painel de gestão do salão foi finalizado e bloqueado com segurança.
+            </p>
+          </div>
+
+          <div className="pt-2 space-y-2">
+            <button
+              type="button"
+              onClick={handleCloseEntireScreen}
+              className="w-full bg-rose-600 hover:bg-rose-500 text-white font-extrabold py-3 px-4 rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg transition-all active:scale-95 cursor-pointer"
+            >
+              <LogOut className="w-4 h-4" />
+              <span>Fechar Esta Aba / Janela</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setIsPageClosed(false);
+                setIsSalonAuthOpen(true);
+              }}
+              className="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold py-2.5 px-4 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+            >
+              <RotateCcw className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Entrada Salão / Administrador</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setIsPageClosed(false);
+                handleOpenBuyAppWithPlan(7);
+              }}
+              className="w-full bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 border border-emerald-500/40 font-bold py-2.5 px-4 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+            >
+              <Gift className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Testar 7 Dias Grátis</span>
+            </button>
+          </div>
+        </div>
       </div>
     );
   }
@@ -1281,6 +1361,9 @@ export function App() {
           setIsBuyAppOpen(false);
           setInitialPaymentOrderId(null);
           setSelectedBuyPlanDays(undefined);
+          if (!isAuthenticated) {
+            setIsPageClosed(true);
+          }
         }}
         initialOrderId={initialPaymentOrderId || undefined}
         initialPlanDays={selectedBuyPlanDays}
@@ -1296,6 +1379,8 @@ export function App() {
           } else {
             handleCreateSalon(newOrUpdatedSalon);
           }
+          setIsAuthenticated(true);
+          setIsPageClosed(false);
         }}
       />
 
@@ -1352,7 +1437,12 @@ export function App() {
       {/* Salon Owner & Employee Login Modal */}
       <SalonAuthModal
         isOpen={isSalonAuthOpen}
-        onClose={() => setIsSalonAuthOpen(false)}
+        onClose={() => {
+          setIsSalonAuthOpen(false);
+          if (!isAuthenticated) {
+            setIsPageClosed(true);
+          }
+        }}
         salons={salons}
         initialCpf={salonAuthCredentials.cpf}
         initialToken={salonAuthCredentials.token}
@@ -1362,6 +1452,8 @@ export function App() {
           handleSelectSalon(salon);
           const roleToSet = authenticatedRole || salonAuthMode || 'salao';
           setUserRole(roleToSet);
+          setIsAuthenticated(true);
+          setIsPageClosed(false);
           if (roleToSet === 'funcionario') {
             setActiveTab('agenda');
           }
