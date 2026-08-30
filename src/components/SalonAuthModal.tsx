@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { X, Key, Scissors, CheckCircle2, AlertCircle, Crown, Eye, EyeOff, Store } from 'lucide-react';
+import { X, Key, Scissors, CheckCircle2, AlertCircle, Crown, Eye, EyeOff, Store, ShoppingCart, Gift, Sparkles } from 'lucide-react';
 import { SalonApp, UserRole } from '../types';
 import { Storage } from '../utils/storage';
+import { formatBRL } from '../utils/pricing';
 
 interface SalonAuthModalProps {
   isOpen: boolean;
@@ -11,6 +12,7 @@ interface SalonAuthModalProps {
   initialCpf?: string;
   initialToken?: string;
   initialMode?: 'salao' | 'funcionario';
+  onOpenBuyApp?: (planDays?: number) => void;
 }
 
 export const SalonAuthModal: React.FC<SalonAuthModalProps> = ({
@@ -20,12 +22,16 @@ export const SalonAuthModal: React.FC<SalonAuthModalProps> = ({
   onSuccess,
   initialCpf = '',
   initialToken = '',
+  onOpenBuyApp,
 }) => {
   const [salonCpf, setSalonCpf] = useState('');
   const [passwordOrToken, setPasswordOrToken] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+  const adminPaymentConfig = Storage.getAdminPaymentConfig();
+  const trialDays = adminPaymentConfig.diasGratuitos || 7;
+  const p30Price = adminPaymentConfig.precoPlano30Dias || 30;
 
   useEffect(() => {
     if (isOpen) {
@@ -312,6 +318,70 @@ export const SalonAuthModal: React.FC<SalonAuthModalProps> = ({
               <CheckCircle2 className="w-5 h-5 text-white" />
               <span>Entrar como Salão / Administrador ➔</span>
             </button>
+          </div>
+
+          {/* Divider & Purchase / 7 Days Free Trial Section */}
+          <div className="pt-3 border-t border-slate-800/80 space-y-2.5">
+            <div className="flex items-center justify-between text-[11px] text-slate-400">
+              <span className="font-semibold">Novo por aqui ou quer criar seu salão?</span>
+              <span className="text-[10px] font-extrabold text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded-full border border-emerald-500/30">
+                {trialDays} Dias Grátis
+              </span>
+            </div>
+
+            {/* Main Comprar App Button (styled exactly as image 2) */}
+            <button
+              type="button"
+              id="btn-modal-buy-app"
+              onClick={() => {
+                onClose();
+                if (onOpenBuyApp) {
+                  onOpenBuyApp(30);
+                }
+              }}
+              className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-xs sm:text-sm px-4 py-2.5 rounded-2xl shadow-lg flex items-center justify-between transition-all active:scale-98 border border-emerald-400/40 cursor-pointer select-none group"
+            >
+              <div className="flex items-center gap-2">
+                <ShoppingCart className="w-4 h-4 text-yellow-300 group-hover:scale-110 transition-transform shrink-0" />
+                <span>Comprar App</span>
+              </div>
+              <span className="bg-yellow-400/20 text-yellow-300 font-black text-[11px] sm:text-xs px-2 py-0.5 rounded-lg border border-yellow-300/40 inline-flex items-center">
+                <span>{formatBRL(p30Price)}/mês</span>
+              </span>
+            </button>
+
+            {/* Quick Action Plan Badges / 7 Dias Grátis & Plano 2 */}
+            <div className="grid grid-cols-2 gap-2 pt-0.5">
+              <button
+                type="button"
+                id="btn-modal-trial-7days"
+                onClick={() => {
+                  onClose();
+                  if (onOpenBuyApp) {
+                    onOpenBuyApp(trialDays);
+                  }
+                }}
+                className="bg-slate-900/90 hover:bg-slate-800 text-emerald-300 hover:text-emerald-200 border border-emerald-500/30 hover:border-emerald-500/60 py-2 px-3 rounded-xl font-extrabold text-[11px] flex items-center justify-center gap-1.5 transition-all active:scale-95 cursor-pointer shadow-sm"
+              >
+                <Gift className="w-3.5 h-3.5 text-emerald-400" />
+                <span>{trialDays} Dias Grátis (Teste)</span>
+              </button>
+
+              <button
+                type="button"
+                id="btn-modal-plan-90days"
+                onClick={() => {
+                  onClose();
+                  if (onOpenBuyApp) {
+                    onOpenBuyApp(90);
+                  }
+                }}
+                className="bg-slate-900/90 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700 hover:border-slate-600 py-2 px-3 rounded-xl font-extrabold text-[11px] flex items-center justify-center gap-1.5 transition-all active:scale-95 cursor-pointer shadow-sm"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                <span>Plano 2 (3 Meses)</span>
+              </button>
+            </div>
           </div>
         </form>
 

@@ -1377,7 +1377,7 @@ export const AdminSalonsModal: React.FC<AdminSalonsModalProps> = ({
                     onChange={(e) => setFormPlanDays(Number(e.target.value))}
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500 font-bold"
                   >
-                    <option value={7}>Sete dias grátis (7 Dias)</option>
+                    <option value={7}>7 Dias (Teste Gratuito)</option>
                     <option value={30}>Plano 1 (30 Dias - R$ 30,00)</option>
                     <option value={90}>Plano 2 (3 Meses - R$ 90,00)</option>
                   </select>

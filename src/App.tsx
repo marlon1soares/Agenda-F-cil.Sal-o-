@@ -202,6 +202,7 @@ export function App() {
     } catch {}
     return null;
   });
+  const [selectedBuyPlanDays, setSelectedBuyPlanDays] = useState<number | undefined>(undefined);
   const [salonAuthCredentials, setSalonAuthCredentials] = useState<{ cpf: string; token: string }>({ cpf: '', token: '' });
   const [salonAuthMode, setSalonAuthMode] = useState<'salao' | 'funcionario'>('salao');
 
@@ -211,6 +212,11 @@ export function App() {
     }
     setSalonAuthMode('salao');
     setIsSalonAuthOpen(true);
+  };
+
+  const handleOpenBuyAppWithPlan = (planDays?: number) => {
+    setSelectedBuyPlanDays(planDays);
+    setIsBuyAppOpen(true);
   };
 
   // Initialize Real-time synchronization and detect URL parameters
@@ -1274,8 +1280,10 @@ export function App() {
         onClose={() => {
           setIsBuyAppOpen(false);
           setInitialPaymentOrderId(null);
+          setSelectedBuyPlanDays(undefined);
         }}
         initialOrderId={initialPaymentOrderId || undefined}
+        initialPlanDays={selectedBuyPlanDays}
         userRole={userRole}
         activeSalon={activeSalon}
         onUpdateSalon={handleUpdateSalon}
@@ -1349,6 +1357,7 @@ export function App() {
         initialCpf={salonAuthCredentials.cpf}
         initialToken={salonAuthCredentials.token}
         initialMode={salonAuthMode}
+        onOpenBuyApp={handleOpenBuyAppWithPlan}
         onSuccess={(salon, authenticatedRole) => {
           handleSelectSalon(salon);
           const roleToSet = authenticatedRole || salonAuthMode || 'salao';

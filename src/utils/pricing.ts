@@ -74,8 +74,8 @@ export function getCalculatedLicensePlans(
   if (includeTrial && isTrialEnabled) {
     plans.push({
       days: trialDays,
-      label: trialDays === 7 ? 'Sete Dias Grátis' : `${trialDays} Dias Grátis`,
-      shortLabel: trialDays === 7 ? '7 Dias (Teste Gratuito)' : `${trialDays} Dias (Teste Grátis)`,
+      label: `${trialDays} Dias (Grátis)`,
+      shortLabel: `${trialDays} Dias (Teste Gratuito)`,
       priceStr: 'Grátis (R$ 0)',
       numVal: 0,
       monthlyEquivalentStr: `${trialDays} Dias Sem Custo`,

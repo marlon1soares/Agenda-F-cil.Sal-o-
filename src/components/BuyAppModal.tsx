@@ -23,6 +23,7 @@ interface BuyAppModalProps {
   onUpdateSalon?: (updatedSalon: SalonApp) => void;
   onOpenSalonAuth?: (credentials?: { cpf?: string; token?: string }) => void;
   initialOrderId?: string;
+  initialPlanDays?: number;
 }
 
 export const BuyAppModal: React.FC<BuyAppModalProps> = ({
@@ -34,6 +35,7 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
   onUpdateSalon,
   onOpenSalonAuth,
   initialOrderId,
+  initialPlanDays,
 }) => {
   const [step, setStep] = useState<'form' | 'payment' | 'success'>('form');
   
@@ -151,24 +153,28 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
       setBankOrderStatus('idle');
       setBankReceipt(null);
 
-      // Default plan selection (respects optional query param e.g. ?plano=30, otherwise default to 7)
+      // Default plan selection (respects initialPlanDays or query param e.g. ?plano=30, otherwise default to configuredTrialDays)
       try {
-        const planParam = getUrlParam('plano') || getUrlParam('plan') || getUrlParam('dias');
-        if (planParam) {
-          const days = parseInt(planParam, 10);
-          if ([7, 15, 30, 90, 180, 365].includes(days)) {
-            setPlanDays(days);
+        if (initialPlanDays && [7, 15, 30, 90, 180, 365].includes(initialPlanDays)) {
+          setPlanDays(initialPlanDays);
+        } else {
+          const planParam = getUrlParam('plano') || getUrlParam('plan') || getUrlParam('dias');
+          if (planParam) {
+            const days = parseInt(planParam, 10);
+            if ([7, 15, 30, 90, 180, 365].includes(days)) {
+              setPlanDays(days);
+            } else {
+              setPlanDays(configuredTrialDays || 7);
+            }
           } else {
             setPlanDays(configuredTrialDays || 7);
           }
-        } else {
-          setPlanDays(configuredTrialDays || 7);
         }
       } catch {
         setPlanDays(configuredTrialDays || 7);
       }
     }
-  }, [isOpen, initialOrderId]);
+  }, [isOpen, initialOrderId, initialPlanDays]);
 
   // Auto-fill CEP via ViaCEP
   const handleCepChange = async (val: string) => {
