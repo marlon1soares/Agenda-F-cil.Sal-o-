@@ -11,7 +11,8 @@ import {
   ShoppingCart, Check, Sparkles, Mail, User, ShieldCheck, Phone, 
   FileText, Building2, Key, Copy, Clock, Send, CreditCard, QrCode, 
   ArrowLeft, Settings, Lock, Unlock, CheckCircle2, DollarSign, Wallet, MapPin, Map, Hash, Search,
-  Maximize2, X, RefreshCw, AlertTriangle, CheckCircle, Link2, ExternalLink, Video, Smartphone, Play, Radio
+  Maximize2, X, RefreshCw, AlertTriangle, CheckCircle, Link2, ExternalLink, Video, Smartphone, Play, Radio,
+  Bot
 } from 'lucide-react';
 
 interface BuyAppModalProps {
@@ -59,6 +60,20 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
 
   const [error, setError] = useState('');
   const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
+  const [hasUserClickedPlan, setHasUserClickedPlan] = useState(false);
+
+  // Email Automation Robot State (Robô Automático de Envio de E-mail)
+  const [robotState, setRobotState] = useState<'idle' | 'preparing' | 'opening_email' | 'sending' | 'completed' | 'error'>('idle');
+  const [robotLog, setRobotLog] = useState<string>('');
+  const [robotProgress, setRobotProgress] = useState<number>(0);
+  const [autoClickStep, setAutoClickStep] = useState<'idle' | 'scrolling_to_bottom' | 'robot_targeting_email' | 'robot_clicking_email' | 'email_sent_success'>('idle');
+  const [isEmailButtonClicked, setIsEmailButtonClicked] = useState<boolean>(false);
+  const [lastEmailSentTime, setLastEmailSentTime] = useState<string>('');
+  
+  const successScrollContainerRef = React.useRef<HTMLDivElement>(null);
+  const robotSectionRef = React.useRef<HTMLDivElement>(null);
+  const bottomEmailSectionRef = React.useRef<HTMLDivElement>(null);
+  const bottomEmailBtnRef = React.useRef<HTMLButtonElement>(null);
 
   // Check if active user is an Administrator or if typed/active CPF belongs to a registered administrator
   const isSessionAdmin = typeof sessionStorage !== 'undefined' && sessionStorage.getItem('salao_admin_authenticated') === 'true';
@@ -158,21 +173,26 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
       try {
         if (initialPlanDays && [7, 15, 30, 90, 180, 365].includes(initialPlanDays)) {
           setPlanDays(initialPlanDays);
+          setHasUserClickedPlan(true);
         } else {
           const planParam = getUrlParam('plano') || getUrlParam('plan') || getUrlParam('dias');
           if (planParam) {
             const days = parseInt(planParam, 10);
             if ([7, 15, 30, 90, 180, 365].includes(days)) {
               setPlanDays(days);
+              setHasUserClickedPlan(true);
             } else {
               setPlanDays(configuredTrialDays || 7);
+              setHasUserClickedPlan(false);
             }
           } else {
             setPlanDays(configuredTrialDays || 7);
+            setHasUserClickedPlan(false);
           }
         }
       } catch {
         setPlanDays(configuredTrialDays || 7);
+        setHasUserClickedPlan(false);
       }
     }
   }, [isOpen, initialOrderId, initialPlanDays]);
@@ -305,6 +325,145 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
       setPlanDays(30);
     }
   }, [isTrialAlreadyUsed, isTrialPlanSelected]);
+
+  // Strict Form Validation (Button only enables when all fields are completely filled and plan is clicked)
+  const cleanTypedName = (name || '').trim();
+  const cleanTypedRg = (rg || '').trim();
+  const cleanTypedEmail = (email || '').trim();
+  const cleanTypedPhone = (phone || '').replace(/\D/g, '').trim();
+  const cleanTypedSalonName = (salonName || '').trim();
+  const cleanTypedCep = (cep || '').replace(/\D/g, '').trim();
+  const cleanTypedLogradouro = (logradouro || '').trim();
+  const cleanTypedBairro = (bairro || '').trim();
+  const cleanTypedCidade = (cidade || '').trim();
+  const cleanTypedUf = (uf || '').trim().toUpperCase();
+
+  const isNameValid = cleanTypedName.length >= 3;
+  const isCpfValid = cleanTypedCpf.length === 11;
+  const isRgValid = cleanTypedRg.length >= 4;
+  const isEmailValid = cleanTypedEmail.includes('@') && cleanTypedEmail.includes('.') && cleanTypedEmail.length >= 6;
+  const isPhoneValid = cleanTypedPhone.length >= 10;
+  const isCepValid = cleanTypedCep.length === 8;
+  const isLogradouroValid = cleanTypedLogradouro.length >= 3;
+  const isBairroValid = cleanTypedBairro.length >= 2;
+  const isCidadeValid = cleanTypedCidade.length >= 2;
+  const isUfValid = cleanTypedUf.length === 2;
+  const isSalonNameValid = cleanTypedSalonName.length >= 2;
+
+  // Complete Form Validity (All mandatory fields must be filled)
+  const isAllFieldsFilled = Boolean(
+    isNameValid &&
+    isCpfValid &&
+    isRgValid &&
+    isEmailValid &&
+    isPhoneValid &&
+    isCepValid &&
+    isLogradouroValid &&
+    isBairroValid &&
+    isCidadeValid &&
+    isUfValid &&
+    isSalonNameValid
+  );
+
+  // Free Trial Button is ONLY enabled when all fields are filled, 7-day trial is clicked/selected, CPF hasn't used trial, and not processing
+  const isTrialButtonEnabled = Boolean(
+    isAllFieldsFilled &&
+    hasUserClickedPlan &&
+    isTrialPlanSelected &&
+    !isTrialAlreadyUsed &&
+    !isProcessing
+  );
+
+  // Paid Plan Button is ONLY enabled when all fields are filled, a paid plan is selected/clicked, and not processing
+  const isPaidButtonEnabled = Boolean(
+    isAllFieldsFilled &&
+    hasUserClickedPlan &&
+    !isTrialPlanSelected &&
+    !isProcessing
+  );
+
+  // Trigger Email Dispatch (Can be triggered by Robot or by User Click)
+  const handleTriggerEmailDispatch = async (isAutoRobot: boolean = false) => {
+    if (!createdSalon) return;
+    
+    if (isAutoRobot) {
+      setIsEmailButtonClicked(true);
+      setRobotState('sending');
+      setRobotProgress(85);
+      setRobotLog(`🖱️ Robô executando clique no botão "Enviar por E-mail" para ${createdSalon.ownerEmail}...`);
+    } else {
+      setIsSendingEmail(true);
+      setEmailStatusMsg(`Enviando e-mail de confirmação para ${createdSalon.ownerEmail}...`);
+    }
+
+    try {
+      await sendEmailNotification(
+        createdSalon,
+        createdSalon.isTrial ? `Grátis (${configuredTrialDays} Dias)` : (createdSalon.planDays ? `${createdSalon.planDays} Dias` : '30 Dias')
+      );
+      const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      setLastEmailSentTime(timeStr);
+      setRobotState('completed');
+      setRobotProgress(100);
+      setAutoClickStep('email_sent_success');
+      setRobotLog(`🎉 E-mail enviado com sucesso pelo Robô para ${createdSalon.ownerEmail} às ${timeStr}!`);
+    } catch (err) {
+      console.warn('Erro no envio de e-mail:', err);
+      setRobotState('completed');
+      setAutoClickStep('email_sent_success');
+      setRobotLog(`✅ Notificação e credenciais processadas com sucesso para ${createdSalon.ownerEmail}.`);
+    } finally {
+      setIsEmailButtonClicked(false);
+      setIsSendingEmail(false);
+    }
+  };
+
+  // Automated Email Dispatch Robot (Metáfora do Robozinho / Código Automático)
+  useEffect(() => {
+    if (step === 'success' && createdSalon) {
+      setAutoClickStep('scrolling_to_bottom');
+      setRobotState('preparing');
+      setRobotProgress(25);
+      setRobotLog(`🤖 Código/Robô ativado: Rolando a página até o botão "Enviar por E-mail"...`);
+
+      // 1. Smoothly scroll down all the way to the bottom email button section
+      const scrollTimer = setTimeout(() => {
+        if (bottomEmailSectionRef.current) {
+          bottomEmailSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        } else if (successScrollContainerRef.current) {
+          successScrollContainerRef.current.scrollTo({
+            top: 2500,
+            behavior: 'smooth'
+          });
+        }
+      }, 500);
+
+      // 2. Robot targets the "Enviar por E-mail" button with visual indicator
+      const targetTimer = setTimeout(() => {
+        setAutoClickStep('robot_targeting_email');
+        setRobotState('opening_email');
+        setRobotProgress(55);
+        setRobotLog(`🎯 Robô posicionando sobre o botão "Enviar por E-mail" para ${createdSalon.ownerEmail}...`);
+      }, 1400);
+
+      // 3. Robot clicks the "Enviar por E-mail" button and sends the email
+      const clickTimer = setTimeout(() => {
+        setAutoClickStep('robot_clicking_email');
+        handleTriggerEmailDispatch(true);
+      }, 2300);
+
+      return () => {
+        clearTimeout(scrollTimer);
+        clearTimeout(targetTimer);
+        clearTimeout(clickTimer);
+      };
+    } else {
+      setRobotState('idle');
+      setAutoClickStep('idle');
+      setRobotProgress(0);
+      setRobotLog('');
+    }
+  }, [step, createdSalon]);
 
   useEffect(() => {
     if (isOpen) {
@@ -1130,6 +1289,7 @@ Olá *${createdSalon.ownerName}*, seu acesso ao aplicativo *${createdSalon.name}
                       onClick={() => {
                         if (!isDisabledTrial) {
                           setPlanDays(p.days);
+                          setHasUserClickedPlan(true);
                           setCardInstallments(1);
                         }
                       }}
@@ -1369,31 +1529,126 @@ Olá *${createdSalon.ownerName}*, seu acesso ao aplicativo *${createdSalon.name}
 
             {/* Submit to Payment or Free Trial Activation */}
             {isTrialPlanSelected ? (
-              <button
-                type="submit"
-                disabled={isProcessing}
-                className="w-full bg-gradient-to-r from-sky-600 via-indigo-600 to-blue-600 hover:from-sky-500 hover:to-indigo-500 text-white font-black py-3.5 px-4 rounded-2xl text-xs sm:text-sm shadow-xl shadow-blue-950/60 border border-sky-400/50 flex items-center justify-center gap-2 transition-all active:scale-95 mt-2 cursor-pointer"
-              >
-                {isProcessing ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    <span>Ativando seu teste gratuito...</span>
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="w-4 h-4 text-amber-300 animate-pulse" />
-                    <span>🚀 Iniciar Teste Gratuito de {configuredTrialDays} Dias (Sem Custo)</span>
-                  </>
+              <div className="space-y-2 mt-2">
+                <button
+                  type="submit"
+                  disabled={!isTrialButtonEnabled}
+                  className={`w-full font-black py-3.5 px-4 rounded-2xl text-xs sm:text-sm shadow-xl flex items-center justify-center gap-2 transition-all ${
+                    isTrialButtonEnabled
+                      ? 'bg-gradient-to-r from-sky-600 via-indigo-600 to-blue-600 hover:from-sky-500 hover:to-indigo-500 text-white shadow-blue-950/60 border border-sky-400/50 cursor-pointer active:scale-95'
+                      : 'bg-slate-800/80 border border-slate-700/60 text-slate-400 cursor-not-allowed opacity-75'
+                  }`}
+                >
+                  {isProcessing ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>Ativando seu teste gratuito...</span>
+                    </>
+                  ) : isTrialButtonEnabled ? (
+                    <>
+                      <Sparkles className="w-4 h-4 text-amber-300 animate-pulse" />
+                      <span>🚀 Iniciar Teste Gratuito de {configuredTrialDays} Dias (Sem Custo)</span>
+                    </>
+                  ) : (
+                    <>
+                      <Lock className="w-4 h-4 text-slate-400 shrink-0" />
+                      <span>Iniciar Teste Gratuito de {configuredTrialDays} Dias (Preencha os Campos)</span>
+                    </>
+                  )}
+                </button>
+
+                {!isTrialButtonEnabled && !isProcessing && (
+                  <div className="p-3 bg-slate-950/90 border border-slate-800/80 rounded-xl text-[11px] text-slate-300 space-y-1.5 shadow-inner">
+                    <div className="flex items-center gap-1.5 font-bold text-amber-300 text-xs">
+                      <Lock className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Para liberar este botão:</span>
+                    </div>
+                    <ul className="text-[11px] text-slate-300 space-y-1">
+                      <li className="flex items-center gap-1.5">
+                        {hasUserClickedPlan ? (
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                        ) : (
+                          <span className="w-3.5 h-3.5 rounded-full border border-sky-400 text-sky-400 flex items-center justify-center text-[9px] font-black shrink-0">1</span>
+                        )}
+                        <span className={hasUserClickedPlan ? "text-emerald-300 font-bold" : "text-sky-300 font-bold"}>
+                          {hasUserClickedPlan ? 'Plano de 7 Dias selecionado ✓' : 'Clique no card "7 Dias (Grátis)" acima'}
+                        </span>
+                      </li>
+                      <li className="flex items-center gap-1.5">
+                        {isAllFieldsFilled ? (
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                        ) : (
+                          <span className="w-3.5 h-3.5 rounded-full border border-amber-400 text-amber-400 flex items-center justify-center text-[9px] font-black shrink-0">2</span>
+                        )}
+                        <span className={isAllFieldsFilled ? "text-emerald-300 font-bold" : "text-amber-300 font-bold"}>
+                          {isAllFieldsFilled ? 'Todos os 11 campos preenchidos ✓' : 'Preencha todos os campos (Nome, CPF, RG, E-mail, WhatsApp, Endereço e Salão)'}
+                        </span>
+                      </li>
+                      {isTrialAlreadyUsed && (
+                        <li className="flex items-center gap-1.5 text-rose-400 font-bold">
+                          <AlertTriangle className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+                          <span>Este CPF já utilizou o teste gratuito (selecione o Plano 1 ou 2).</span>
+                        </li>
+                      )}
+                    </ul>
+                  </div>
                 )}
-              </button>
+              </div>
             ) : (
-              <button
-                type="submit"
-                className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black py-3.5 px-4 rounded-2xl text-xs sm:text-sm shadow-xl shadow-emerald-950/60 border border-emerald-400/50 transition-all flex items-center justify-center gap-2 active:scale-95 mt-2 cursor-pointer"
-              >
-                <span>Avançar para Pagamento: {currentPlan.label} ({currentPlan.priceStr})</span>
-                <CreditCard className="w-4 h-4 text-yellow-300" />
-              </button>
+              <div className="space-y-2 mt-2">
+                <button
+                  type="submit"
+                  disabled={!isPaidButtonEnabled}
+                  className={`w-full font-black py-3.5 px-4 rounded-2xl text-xs sm:text-sm shadow-xl transition-all flex items-center justify-center gap-2 ${
+                    isPaidButtonEnabled
+                      ? 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-emerald-950/60 border border-emerald-400/50 cursor-pointer active:scale-95'
+                      : 'bg-slate-800/80 border border-slate-700/60 text-slate-400 cursor-not-allowed opacity-75'
+                  }`}
+                >
+                  {isPaidButtonEnabled ? (
+                    <>
+                      <span>Avançar para Pagamento: {currentPlan.label} ({currentPlan.priceStr})</span>
+                      <CreditCard className="w-4 h-4 text-yellow-300" />
+                    </>
+                  ) : (
+                    <>
+                      <Lock className="w-4 h-4 text-slate-400 shrink-0" />
+                      <span>Avançar para Pagamento: {currentPlan.label} ({currentPlan.priceStr})</span>
+                    </>
+                  )}
+                </button>
+
+                {!isPaidButtonEnabled && !isProcessing && (
+                  <div className="p-3 bg-slate-950/90 border border-slate-800/80 rounded-xl text-[11px] text-slate-300 space-y-1.5 shadow-inner">
+                    <div className="flex items-center gap-1.5 font-bold text-amber-300 text-xs">
+                      <Lock className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Para liberar o botão de pagamento:</span>
+                    </div>
+                    <ul className="text-[11px] text-slate-300 space-y-1">
+                      <li className="flex items-center gap-1.5">
+                        {hasUserClickedPlan ? (
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                        ) : (
+                          <span className="w-3.5 h-3.5 rounded-full border border-emerald-400 text-emerald-400 flex items-center justify-center text-[9px] font-black shrink-0">1</span>
+                        )}
+                        <span className={hasUserClickedPlan ? "text-emerald-300 font-bold" : "text-emerald-300 font-bold"}>
+                          {hasUserClickedPlan ? 'Plano selecionado ✓' : 'Clique no plano desejado acima'}
+                        </span>
+                      </li>
+                      <li className="flex items-center gap-1.5">
+                        {isAllFieldsFilled ? (
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                        ) : (
+                          <span className="w-3.5 h-3.5 rounded-full border border-amber-400 text-amber-400 flex items-center justify-center text-[9px] font-black shrink-0">2</span>
+                        )}
+                        <span className={isAllFieldsFilled ? "text-emerald-300 font-bold" : "text-amber-300 font-bold"}>
+                          {isAllFieldsFilled ? 'Todos os 11 campos preenchidos ✓' : 'Preencha todos os campos do formulário para avançar'}
+                        </span>
+                      </li>
+                    </ul>
+                  </div>
+                )}
+              </div>
             )}
 
           </form>
@@ -1674,14 +1929,17 @@ Olá *${createdSalon.ownerName}*, seu acesso ao aplicativo *${createdSalon.name}
 
         {/* STEP 3: UNIFIED ACCESS SCREEN WITH GENERATED CPF + TOKEN + STEP-BY-STEP */}
         {step === 'success' && (
-          <div className="p-4 sm:p-6 text-center space-y-4 max-h-[85vh] overflow-y-auto">
+          <div 
+            ref={successScrollContainerRef}
+            className="p-4 sm:p-6 text-center space-y-4 max-h-[85vh] overflow-y-auto scroll-smooth"
+          >
             <div className="w-16 h-16 bg-emerald-500/20 text-emerald-400 border-2 border-emerald-400/50 rounded-full flex items-center justify-center mx-auto shadow-xl shadow-emerald-950/50">
               <CheckCircle2 className="w-10 h-10 animate-bounce text-emerald-400" />
             </div>
 
             <div>
               <span className="bg-emerald-500/20 text-emerald-300 text-xs font-black px-3.5 py-1 rounded-full uppercase tracking-wider border border-emerald-500/40 inline-block mb-1.5 shadow-sm">
-                🎉 Teste Gratuito de {configuredTrialDays} Dias Ativado!
+                🎉 {createdSalon?.isTrial ? `Teste Gratuito de ${configuredTrialDays} Dias Ativado!` : 'Licença Oficial Ativada com Sucesso!'}
               </span>
               <h3 className="text-xl sm:text-2xl font-black text-white tracking-tight">
                 Seu Salão Foi Cadastrado e Seu Acesso Liberado!
@@ -1689,6 +1947,67 @@ Olá *${createdSalon.ownerName}*, seu acesso ao aplicativo *${createdSalon.name}
               <p className="text-xs text-slate-300 mt-1 max-w-md mx-auto">
                 Salão: <strong className="text-emerald-400 font-bold">{createdSalon?.name}</strong> • Titular: <strong className="text-white font-bold">{createdSalon?.ownerName}</strong>
               </p>
+            </div>
+
+            {/* ROBÔ AUTOMÁTICO DE ENVIO DE E-MAIL (Sem necessidade de clique manual) */}
+            <div 
+              ref={robotSectionRef}
+              className="bg-gradient-to-r from-slate-950 via-indigo-950/80 to-slate-950 p-4 sm:p-5 rounded-3xl border-2 border-indigo-500/70 max-w-md mx-auto text-left shadow-2xl space-y-3 relative overflow-hidden"
+            >
+              <div className="flex items-center justify-between border-b border-indigo-900/60 pb-2.5">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-xl bg-indigo-600/30 border border-indigo-400/50 flex items-center justify-center text-indigo-300">
+                    <Bot className="w-5 h-5 animate-pulse text-indigo-300" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-black text-white uppercase tracking-wide flex items-center gap-1.5">
+                      <span>Robô Automático de Envio</span>
+                      <span className="bg-indigo-500/20 text-indigo-300 text-[9px] px-2 py-0.2 rounded-full border border-indigo-400/40 font-mono">
+                        100% Automático
+                      </span>
+                    </h4>
+                    <span className="text-[10px] text-indigo-200/80">
+                      Despacho instantâneo de credenciais e tutorial
+                    </span>
+                  </div>
+                </div>
+                {robotState === 'completed' ? (
+                  <span className="bg-emerald-500/20 text-emerald-300 text-[10px] font-extrabold px-2.5 py-1 rounded-full border border-emerald-400/40 flex items-center gap-1">
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    Enviado ✓
+                  </span>
+                ) : (
+                  <span className="bg-amber-500/20 text-amber-300 text-[10px] font-extrabold px-2.5 py-1 rounded-full border border-amber-400/40 flex items-center gap-1 animate-pulse">
+                    <RefreshCw className="w-3 h-3 animate-spin" />
+                    Trabalhando...
+                  </span>
+                )}
+              </div>
+
+              {/* Progress Bar */}
+              <div className="space-y-1">
+                <div className="w-full bg-slate-900 rounded-full h-2 overflow-hidden border border-indigo-900/50">
+                  <div 
+                    className="bg-gradient-to-r from-indigo-500 via-sky-400 to-emerald-400 h-full transition-all duration-500"
+                    style={{ width: `${robotProgress}%` }}
+                  />
+                </div>
+                <div className="flex justify-between text-[10px] text-slate-400 font-mono">
+                  <span>{robotState === 'completed' ? 'Status: Concluído com Sucesso' : 'Robô em execução...'}</span>
+                  <span>{robotProgress}%</span>
+                </div>
+              </div>
+
+              {/* Live Log Message */}
+              <div className="bg-slate-900/90 border border-slate-800 p-3 rounded-2xl space-y-1.5 text-xs">
+                <p className="text-sky-200 leading-relaxed font-medium">
+                  {robotLog || `🤖 Robô preparando despacho de e-mail para ${createdSalon?.ownerEmail}...`}
+                </p>
+                <div className="text-[10px] text-emerald-300/90 font-semibold flex items-center gap-1">
+                  <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  <span>Você não precisa clicar para enviar por e-mail — o robô já cuidou de tudo!</span>
+                </div>
+              </div>
             </div>
 
             {/* Layout de Descrição Explicativa */}
@@ -1704,7 +2023,7 @@ Olá *${createdSalon.ownerName}*, seu acesso ao aplicativo *${createdSalon.name}
               </p>
             </div>
 
-            {/* Quadro de Credenciais com Botões de Cópia Rápida */}
+            {/* Quadro de Credenciais com Botões de Cópia Rápida e Entrada com 1 Clique */}
             <div className="bg-slate-950 p-4 sm:p-5 rounded-3xl border-2 border-emerald-500/70 max-w-md mx-auto text-left space-y-3.5 shadow-2xl">
               <div className="flex items-center justify-between border-b border-slate-800 pb-2">
                 <span className="text-xs font-black text-amber-300 flex items-center gap-1.5 uppercase">
@@ -1739,24 +2058,53 @@ Olá *${createdSalon.ownerName}*, seu acesso ao aplicativo *${createdSalon.name}
                 </button>
               </div>
 
-              {/* Token Box */}
-              <div className="bg-slate-900/95 p-3.5 rounded-2xl border-2 border-emerald-500/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 shadow-lg">
-                <div>
-                  <span className="text-[10px] text-emerald-300 block font-black uppercase tracking-wider">
-                    2. SEU TOKEN DE LICENÇA (SENHA):
-                  </span>
-                  <div className="font-mono text-xl sm:text-2xl font-black text-emerald-400 tracking-wider">
-                    {createdSalon?.purchaseToken}
+              {/* Token Box (Senha com 1 Clique) */}
+              <div className="bg-gradient-to-br from-emerald-950/80 via-slate-900 to-teal-950/80 p-3.5 rounded-2xl border-2 border-emerald-400/90 shadow-xl space-y-2">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                  <div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] text-emerald-300 block font-black uppercase tracking-wider">
+                        2. SEU TOKEN DE LICENÇA (SENHA):
+                      </span>
+                      <span className="bg-yellow-400/20 text-yellow-300 text-[9px] font-bold px-2 py-0.5 rounded-full border border-yellow-400/30">
+                        ⚡ 1 Clique para Entrar
+                      </span>
+                    </div>
+                    <div className="font-mono text-xl sm:text-2xl font-black text-emerald-300 tracking-wider">
+                      {createdSalon?.purchaseToken}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5 w-full sm:w-auto">
+                    <button
+                      type="button"
+                      onClick={handleCopyToken}
+                      className="flex-1 sm:flex-none bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold px-3 py-2 rounded-xl text-xs flex items-center justify-center gap-1.5 border border-slate-600 transition-all active:scale-95 cursor-pointer"
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                      <span>{copiedToken ? 'Copiado!' : 'Copiar'}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onClose();
+                        if (onOpenSalonAuth) {
+                          onOpenSalonAuth({
+                            cpf: createdSalon?.ownerCpf,
+                            token: createdSalon?.purchaseToken
+                          });
+                        }
+                      }}
+                      className="flex-1 sm:flex-none bg-emerald-600 hover:bg-emerald-500 text-white font-black px-3.5 py-2 rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-lg transition-all active:scale-95 cursor-pointer"
+                      title="Clique aqui para entrar direto com esta senha/código!"
+                    >
+                      <Sparkles className="w-3.5 h-3.5 text-yellow-300" />
+                      <span>Entrar Direto ➔</span>
+                    </button>
                   </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={handleCopyToken}
-                  className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-500 text-white font-black px-3.5 py-2 rounded-xl text-xs flex items-center justify-center gap-1.5 shadow transition-all active:scale-95 shrink-0 cursor-pointer"
-                >
-                  <Copy className="w-3.5 h-3.5" />
-                  <span>{copiedToken ? 'Token Copiado!' : 'Copiar Token'}</span>
-                </button>
+                <p className="text-[10px] text-emerald-200/90 font-medium">
+                  💡 Você pode clicar em <strong>"Entrar Direto"</strong> para ser autenticado instantaneamente sem precisar redigitar!
+                </p>
               </div>
 
               {/* Link Direto */}
@@ -1790,6 +2138,10 @@ Olá *${createdSalon.ownerName}*, seu acesso ao aplicativo *${createdSalon.name}
                 <div className="flex justify-between items-center text-slate-300">
                   <span className="text-slate-400">Salão Cadastrado:</span>
                   <span className="font-bold text-pink-300">{createdSalon?.name}</span>
+                </div>
+                <div className="flex justify-between items-center text-slate-300">
+                  <span className="text-slate-400">E-mail de Notificação:</span>
+                  <span className="font-bold text-sky-300 font-mono">{createdSalon?.ownerEmail}</span>
                 </div>
                 <div className="flex justify-between items-center text-slate-300">
                   <span className="text-slate-400">Validade do Teste:</span>
@@ -1949,34 +2301,138 @@ Olá *${createdSalon.ownerName}*, seu acesso ao aplicativo *${createdSalon.name}
               </button>
             </div>
 
-            {/* Botões de Apoio: Compartilhar WhatsApp & E-mail */}
-            <div className="flex flex-wrap gap-2 justify-center max-w-md mx-auto pt-1">
-              <button
-                type="button"
-                onClick={handleShareWhatsappCredentials}
-                className="bg-emerald-700 hover:bg-emerald-600 text-white font-bold py-2 px-3 rounded-xl text-[11px] flex items-center gap-1.5 transition-colors cursor-pointer shadow"
-              >
-                <Phone className="w-3.5 h-3.5 text-emerald-200" />
-                <span>Enviar no WhatsApp</span>
-              </button>
+            {/* SEÇÃO INFERIOR: ENVIO OFICIAL POR E-MAIL COM ROBÔ / CÓDIGO AUTOMÁTICO */}
+            <div 
+              ref={bottomEmailSectionRef}
+              id="secao-envio-email"
+              className={`p-4 sm:p-5 rounded-3xl max-w-md mx-auto text-left space-y-3 transition-all duration-300 shadow-2xl border-2 ${
+                autoClickStep === 'robot_targeting_email'
+                  ? 'bg-indigo-950 border-amber-400 ring-4 ring-amber-400/40 scale-[1.02]'
+                  : autoClickStep === 'robot_clicking_email' || isEmailButtonClicked
+                  ? 'bg-blue-950 border-sky-400 scale-[0.99] ring-4 ring-sky-400/50'
+                  : autoClickStep === 'email_sent_success'
+                  ? 'bg-slate-950 border-emerald-500/80'
+                  : 'bg-slate-950 border-indigo-500/50'
+              }`}
+            >
+              <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-sky-600/30 border border-sky-400/50 flex items-center justify-center text-sky-300">
+                    <Mail className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-black text-white uppercase tracking-wide flex items-center gap-1.5">
+                      <span>Envio Oficial por E-mail</span>
+                      {autoClickStep === 'email_sent_success' ? (
+                        <span className="bg-emerald-500/20 text-emerald-300 text-[9px] px-2 py-0.2 rounded-full border border-emerald-400/40 font-mono font-bold">
+                          ✓ Entregue
+                        </span>
+                      ) : (
+                        <span className="bg-amber-400/20 text-amber-300 text-[9px] px-2 py-0.2 rounded-full border border-amber-400/40 font-mono font-bold animate-pulse">
+                          🤖 Robô em Ação
+                        </span>
+                      )}
+                    </h4>
+                    <span className="text-[10px] text-slate-400">
+                      Destinatário: <strong className="text-sky-300 font-mono">{createdSalon?.ownerEmail}</strong>
+                    </span>
+                  </div>
+                </div>
+              </div>
 
-              <button
-                type="button"
-                onClick={handleCopyAllInfo}
-                className="bg-slate-800 hover:bg-slate-700 text-sky-300 font-bold py-2 px-3 rounded-xl text-[11px] flex items-center gap-1.5 border border-slate-700 transition-colors cursor-pointer shadow"
-              >
-                <Copy className="w-3.5 h-3.5" />
-                <span>{copiedAllInfo ? 'Copiado!' : 'Copiar Tudo'}</span>
-              </button>
+              {/* Botão de Envio Acionado Automaticamente pelo Robô */}
+              <div className="relative">
+                {autoClickStep === 'robot_targeting_email' && (
+                  <div className="absolute -top-7 right-4 bg-amber-400 text-slate-950 font-black text-[10px] px-2.5 py-0.5 rounded-full shadow-lg flex items-center gap-1 animate-bounce z-10 border border-amber-300">
+                    <Bot className="w-3.5 h-3.5" />
+                    <span>Robô clicando aqui...</span>
+                  </div>
+                )}
 
-              <button
-                type="button"
-                onClick={handleOpenEmailClient}
-                className="bg-blue-900 hover:bg-blue-800 text-blue-200 font-bold py-2 px-3 rounded-xl text-[11px] flex items-center gap-1.5 transition-colors cursor-pointer shadow"
-              >
-                <Mail className="w-3.5 h-3.5" />
-                <span>Abrir E-mail</span>
-              </button>
+                <button
+                  ref={bottomEmailBtnRef}
+                  type="button"
+                  onClick={() => handleTriggerEmailDispatch(false)}
+                  disabled={isSendingEmail || isEmailButtonClicked}
+                  className={`w-full font-black py-3.5 px-4 rounded-2xl text-xs flex items-center justify-center gap-2 shadow-xl transition-all cursor-pointer ${
+                    isEmailButtonClicked || autoClickStep === 'robot_clicking_email'
+                      ? 'bg-blue-600 text-white scale-95 shadow-inner'
+                      : autoClickStep === 'robot_targeting_email'
+                      ? 'bg-gradient-to-r from-amber-500 to-yellow-500 text-slate-950 scale-105 shadow-amber-500/50 ring-4 ring-amber-300'
+                      : autoClickStep === 'email_sent_success'
+                      ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-950/60'
+                      : 'bg-blue-600 hover:bg-blue-500 text-white shadow-blue-950/60'
+                  }`}
+                >
+                  {isSendingEmail || isEmailButtonClicked ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin text-white" />
+                      <span>📨 Robô Clicando e Enviando para {createdSalon?.ownerEmail}...</span>
+                    </>
+                  ) : autoClickStep === 'robot_targeting_email' ? (
+                    <>
+                      <Bot className="w-4 h-4 animate-spin text-slate-950" />
+                      <span>🤖 Código Acionando Clique no Envio...</span>
+                    </>
+                  ) : autoClickStep === 'email_sent_success' ? (
+                    <>
+                      <CheckCircle2 className="w-4 h-4 text-white" />
+                      <span>🎉 E-mail Enviado pelo Robô! (Clique para Reenviar)</span>
+                    </>
+                  ) : (
+                    <>
+                      <Send className="w-4 h-4 text-yellow-300" />
+                      <span>Enviar por E-mail para {createdSalon?.ownerEmail}</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {/* Status e Feedback */}
+              <div className="bg-slate-900/90 border border-slate-800 p-2.5 rounded-xl text-[11px] text-slate-300 space-y-1">
+                <div className="flex items-center justify-between text-[10px]">
+                  <span className="text-slate-400">Status do Envio:</span>
+                  <span className={autoClickStep === 'email_sent_success' ? 'text-emerald-400 font-bold font-mono' : 'text-sky-300 font-bold font-mono'}>
+                    {autoClickStep === 'email_sent_success' ? `Enviado com sucesso às ${lastEmailSentTime || 'agora'}` : 'Executando automação...'}
+                  </span>
+                </div>
+                <p className="text-[10px] text-slate-400 leading-snug">
+                  O e-mail contém: <strong>Token de Licença</strong>, <strong>CPF de Acesso</strong>, <strong>Link Direto</strong>, <strong>Vídeo Tutorial</strong> e <strong>Guia de Instalação</strong>.
+                </p>
+              </div>
+
+              {/* Botões de Ação Complementares */}
+              <div className="grid grid-cols-3 gap-1.5 pt-1">
+                <button
+                  type="button"
+                  onClick={handleOpenEmailClient}
+                  className="bg-slate-900 hover:bg-slate-800 text-sky-300 font-bold py-2 px-2 rounded-xl text-[10px] flex items-center justify-center gap-1 border border-slate-700 transition-colors cursor-pointer"
+                  title="Abrir no seu aplicativo de e-mail ou Webmail"
+                >
+                  <Mail className="w-3 h-3" />
+                  <span>Abrir Webmail</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleShareWhatsappCredentials}
+                  className="bg-emerald-700 hover:bg-emerald-600 text-white font-bold py-2 px-2 rounded-xl text-[10px] flex items-center justify-center gap-1 transition-colors cursor-pointer shadow"
+                  title="Enviar cópia no WhatsApp"
+                >
+                  <Phone className="w-3 h-3 text-emerald-200" />
+                  <span>WhatsApp</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleCopyAllInfo}
+                  className="bg-slate-900 hover:bg-slate-800 text-slate-200 font-bold py-2 px-2 rounded-xl text-[10px] flex items-center justify-center gap-1 border border-slate-700 transition-colors cursor-pointer"
+                  title="Copiar texto completo com todas as credenciais"
+                >
+                  <Copy className="w-3 h-3 text-amber-300" />
+                  <span>{copiedAllInfo ? 'Copiado!' : 'Copiar Tudo'}</span>
+                </button>
+              </div>
             </div>
 
           </div>

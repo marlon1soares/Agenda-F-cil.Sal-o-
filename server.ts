@@ -1228,12 +1228,23 @@ app.post("/api/send-purchase-email", async (req, res) => {
     const formattedExpiry = expiresAt || "Indefinida";
     const displayCpf = ownerCpf ? ownerCpf : "Cadastrado no Pedido";
 
+    const isTrialActivation = planDays <= 7 || String(priceStr || '').toLowerCase().includes('grátis') || String(priceStr || '').toLowerCase().includes('teste');
+    const emailSubject = isTrialActivation
+      ? `🎉 Teste Gratuito de 7 Dias Ativado! Token de Acesso: ${purchaseToken} - ${salonName || "Agenda Fácil"}`
+      : `🎉 Compra Confirmada! Token de Acesso: ${purchaseToken} - ${salonName || "Agenda Fácil"}`;
+    const statusBannerTitle = isTrialActivation
+      ? `🎉 Teste Gratuito de 7 Dias Liberado!`
+      : `🎉 Pagamento Autorizado & Salão Liberado!`;
+    const statusBannerSub = isTrialActivation
+      ? `Parabéns <strong>${ownerName || "Cliente"}</strong>! O teste gratuito de 7 dias do seu salão <strong>"${salonName || "Seu Salão"}"</strong> já está 100% ativo e pronto para uso.`
+      : `Parabéns <strong>${ownerName || "Cliente"}</strong>! O sistema do salão <strong>"${salonName || "Seu Salão"}"</strong> já está 100% ativo e pronto para uso.`;
+
     const emailHtml = `
 <!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Compra Confirmada - Agenda Fácil Salão & Barbearia</title>
+  <title>${isTrialActivation ? 'Teste Gratuito 7 Dias Ativado' : 'Compra Confirmada'} - Agenda Fácil Salão & Barbearia</title>
 </head>
 <body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #0b1329; color: #f8fafc; margin: 0; padding: 20px;">
   <div style="max-width: 620px; margin: 0 auto; background-color: #111e38; border-radius: 20px; border: 1px solid #1e3a8a; padding: 30px; box-shadow: 0 20px 40px rgba(0,0,0,0.6);">
@@ -1241,13 +1252,13 @@ app.post("/api/send-purchase-email", async (req, res) => {
     <!-- Header -->
     <div style="text-align: center; border-bottom: 1px solid #1e293b; padding-bottom: 22px; margin-bottom: 22px;">
       <h1 style="color: #38bdf8; font-size: 26px; margin: 0; font-weight: 900; letter-spacing: -0.5px;">💈 Agenda Fácil - Salão & Barbearia</h1>
-      <p style="color: #94a3b8; font-size: 13px; margin-top: 6px; font-weight: 500;">Notificação de Pagamento Aprovado & Liberação do Aplicativo</p>
+      <p style="color: #94a3b8; font-size: 13px; margin-top: 6px; font-weight: 500;">${isTrialActivation ? 'Robô de Liberação Automática do Teste Gratuito de 7 Dias' : 'Robô de Notificação de Pagamento Aprovado & Liberação do Aplicativo'}</p>
     </div>
 
     <!-- Status Banner -->
     <div style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(6, 95, 70, 0.3)); border: 1.5px solid #10b981; border-radius: 14px; padding: 16px; text-align: center; margin-bottom: 25px;">
-      <h2 style="color: #34d399; font-size: 20px; margin: 0; font-weight: 800;">🎉 Pagamento Autorizado & Salão Liberado!</h2>
-      <p style="color: #e2e8f0; font-size: 13px; margin: 6px 0 0 0;">Parabéns <strong>${ownerName || "Cliente"}</strong>! O sistema do salão <strong>"${salonName || "Seu Salão"}"</strong> já está 100% ativo e pronto para uso.</p>
+      <h2 style="color: #34d399; font-size: 20px; margin: 0; font-weight: 800;">${statusBannerTitle}</h2>
+      <p style="color: #e2e8f0; font-size: 13px; margin: 6px 0 0 0;">${statusBannerSub}</p>
     </div>
 
     <!-- Credentials Box (CPF + TOKEN) -->
@@ -1391,7 +1402,7 @@ app.post("/api/send-purchase-email", async (req, res) => {
       const mailOptions = {
         from: fromAddr,
         to: ownerEmail,
-        subject: `🎉 Compra Confirmada! Token de Acesso: ${purchaseToken} - ${salonName || "Agenda Fácil"}`,
+        subject: emailSubject,
         html: emailHtml,
       };
 
