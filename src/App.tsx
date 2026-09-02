@@ -240,6 +240,7 @@ export function App() {
     return null;
   });
   const [selectedBuyPlanDays, setSelectedBuyPlanDays] = useState<number | undefined>(undefined);
+  const [selectedBuyCpf, setSelectedBuyCpf] = useState<string | undefined>(undefined);
   const [salonAuthCredentials, setSalonAuthCredentials] = useState<{ cpf: string; token: string }>({ cpf: '', token: '' });
   const [salonAuthMode, setSalonAuthMode] = useState<'salao' | 'funcionario'>('salao');
 
@@ -251,8 +252,9 @@ export function App() {
     setIsSalonAuthOpen(true);
   };
 
-  const handleOpenBuyAppWithPlan = (planDays?: number) => {
+  const handleOpenBuyAppWithPlan = (planDays?: number, buyerCpf?: string) => {
     setSelectedBuyPlanDays(planDays);
+    setSelectedBuyCpf(buyerCpf);
     setIsBuyAppOpen(true);
   };
 
@@ -1395,12 +1397,14 @@ export function App() {
           setIsBuyAppOpen(false);
           setInitialPaymentOrderId(null);
           setSelectedBuyPlanDays(undefined);
+          setSelectedBuyCpf(undefined);
           if (!isAuthenticated) {
             setIsPageClosed(true);
           }
         }}
         initialOrderId={initialPaymentOrderId || undefined}
         initialPlanDays={selectedBuyPlanDays}
+        initialBuyerCpf={selectedBuyCpf}
         userRole={userRole}
         activeSalon={activeSalon}
         onUpdateSalon={handleUpdateSalon}
@@ -1488,8 +1492,13 @@ export function App() {
           setUserRole(roleToSet);
           setIsAuthenticated(true);
           setIsPageClosed(false);
-          if (roleToSet === 'funcionario') {
+          if (roleToSet === 'admin') {
+            setActiveTab('todos_saloes');
+            setIsAdminSalonsOpen(true);
+          } else if (roleToSet === 'funcionario') {
             setActiveTab('agenda');
+          } else {
+            setActiveTab('dashboard');
           }
           setIsSalonAuthOpen(false);
         }}

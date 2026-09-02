@@ -25,6 +25,7 @@ interface BuyAppModalProps {
   onOpenSalonAuth?: (credentials?: { cpf?: string; token?: string }) => void;
   initialOrderId?: string;
   initialPlanDays?: number;
+  initialBuyerCpf?: string;
 }
 
 export const BuyAppModal: React.FC<BuyAppModalProps> = ({
@@ -37,6 +38,7 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
   onOpenSalonAuth,
   initialOrderId,
   initialPlanDays,
+  initialBuyerCpf,
 }) => {
   const [step, setStep] = useState<'form' | 'payment' | 'success'>('form');
   
@@ -152,7 +154,7 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
       setError('');
       setName('');
       setRg('');
-      setCpf('');
+      setCpf(initialBuyerCpf || '');
       setEmail('');
       setPhone('');
       setSalonName('');

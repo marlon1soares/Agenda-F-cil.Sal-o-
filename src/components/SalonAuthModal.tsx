@@ -12,7 +12,7 @@ interface SalonAuthModalProps {
   initialCpf?: string;
   initialToken?: string;
   initialMode?: 'salao' | 'funcionario';
-  onOpenBuyApp?: (planDays?: number) => void;
+  onOpenBuyApp?: (planDays?: number, buyerCpf?: string) => void;
 }
 
 export const SalonAuthModal: React.FC<SalonAuthModalProps> = ({
@@ -28,6 +28,7 @@ export const SalonAuthModal: React.FC<SalonAuthModalProps> = ({
   const [passwordOrToken, setPasswordOrToken] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [showQuickAccessOptions, setShowQuickAccessOptions] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
   const adminPaymentConfig = Storage.getAdminPaymentConfig();
   const trialDays = adminPaymentConfig.diasGratuitos || 7;
@@ -39,6 +40,7 @@ export const SalonAuthModal: React.FC<SalonAuthModalProps> = ({
       setPasswordOrToken(initialToken || '');
       setShowPassword(false);
       setErrorMsg('');
+      setShowQuickAccessOptions(false);
       setSuccessMsg('');
     }
   }, [isOpen, initialCpf, initialToken]);
@@ -63,11 +65,13 @@ export const SalonAuthModal: React.FC<SalonAuthModalProps> = ({
   const handleSalonCpfChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSalonCpf(formatCPF(e.target.value));
     setErrorMsg('');
+    setShowQuickAccessOptions(false);
   };
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
+    setShowQuickAccessOptions(false);
     setSuccessMsg('');
 
     const cleanSalonCpf = salonCpf.replace(/\D/g, '').trim();
@@ -75,7 +79,7 @@ export const SalonAuthModal: React.FC<SalonAuthModalProps> = ({
     const cleanToken = passwordOrToken.trim().toUpperCase();
 
     if (!cleanSalonCpf && !rawPass) {
-      setErrorMsg('Por favor, preencha o CPF e a senha/token de acesso.');
+      setErrorMsg('Por favor, digite o seu CPF e a Senha ou Token de Acesso.');
       return;
     }
 
@@ -87,7 +91,7 @@ export const SalonAuthModal: React.FC<SalonAuthModalProps> = ({
       config: Storage.getConfig()
     } as SalonApp;
 
-    // 1. CHECK IF USER IS MASTER GESTÃO ADMINISTRATOR
+    // 1. CHECK IF USER IS A REGISTERED ADMINISTRATOR (MASTER GESTÃO)
     const adminCredsList = Storage.getAdminCredentialsList();
     const defaultMaster = Storage.getAdminCredentials();
     const allAdminCreds = [...adminCredsList, defaultMaster];
@@ -126,15 +130,15 @@ export const SalonAuthModal: React.FC<SalonAuthModalProps> = ({
         localStorage.setItem('salao_admin_authenticated', 'true');
       } catch {}
 
-      // Master Admin gets full access to the panel
-      setSuccessMsg(`👑 Administrador de Gestão Autenticado! Acessando painel completo do salão...`);
+      // Master Admin goes DIRECTLY to the Administrator Panel (Gestão de Salões / Todos os Salões)
+      setSuccessMsg(`👑 Administrador de Gestão Autenticado! Acessando painel geral do administrador...`);
       setTimeout(() => {
-        onSuccess(fallbackSalon, 'salao');
-      }, 400);
+        onSuccess(fallbackSalon, 'admin');
+      }, 350);
       return;
     }
 
-    // 2. SALÃO / ADMINISTRADOR LOGIN VALIDATION (FULL PANEL)
+    // 2. CHECK IF USER IS A REGISTERED SALON OWNER WITH VALID TOKEN/PASSWORD
     const matchedSalon = currentSalons.find((s) => {
       const salonCpfClean = (s.ownerCpf || '').replace(/\D/g, '').trim();
       const salonToken = (s.purchaseToken || '').trim().toUpperCase();
@@ -145,18 +149,18 @@ export const SalonAuthModal: React.FC<SalonAuthModalProps> = ({
       const inputMatchesEmail = salonCpf.toLowerCase().trim() === salonEmail;
 
       const matchesCpfAndToken = (cleanSalonCpf || inputMatchesEmail) && 
-        ((salonCpfClean && salonCpfClean === cleanSalonCpf) || inputMatchesEmail || cleanSalonCpf === '12345678900') && 
+        ((salonCpfClean && salonCpfClean === cleanSalonCpf) || inputMatchesEmail) && 
         (salonToken === cleanToken || salonCode === cleanToken || salonId === cleanToken || (cleanToken.length >= 4 && salonToken.includes(cleanToken)) || rawPass === 'admin' || rawPass === '123456');
 
       const matchesTokenOnly = !cleanSalonCpf && (salonToken === cleanToken || salonCode === cleanToken);
-      const matchesDemo = (cleanSalonCpf === '12345678900' || !cleanSalonCpf) && (cleanToken === 'DEMO' || cleanToken === '123456');
+      const matchesDemo = cleanSalonCpf === '12345678900' && (cleanToken === 'DEMO' || cleanToken === '123456');
 
       return matchesCpfAndToken || matchesTokenOnly || (matchesDemo && s.id === currentSalons[0]?.id);
     });
 
     if (matchedSalon) {
       if (matchedSalon.status === 'blocked') {
-        setErrorMsg('Este salão está com o acesso bloqueado pelo Administrador da plataforma.');
+        setErrorMsg('Este salão está temporariamente com o acesso bloqueado pelo Administrador da plataforma.');
         return;
       }
 
@@ -168,11 +172,11 @@ export const SalonAuthModal: React.FC<SalonAuthModalProps> = ({
       setSuccessMsg(`💈 Administrador do Salão autenticado! Entrando no painel de ${matchedSalon.config?.nomeSalao || matchedSalon.name}...`);
       setTimeout(() => {
         onSuccess(matchedSalon, 'salao');
-      }, 400);
+      }, 350);
       return;
     }
 
-    // 3. ASYNCHRONOUS SERVER-SIDE VALIDATION FALLBACK
+    // 3. ASYNCHRONOUS SERVER-SIDE VALIDATION FALLBACK (IF NODE SERVER RUNNING)
     fetch('/api/auth/salon-login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -196,13 +200,17 @@ export const SalonAuthModal: React.FC<SalonAuthModalProps> = ({
           setSuccessMsg(`Autenticado com sucesso! Entrando no sistema de ${fetchedSalon.config?.nomeSalao || fetchedSalon.name}...`);
           setTimeout(() => {
             onSuccess(fetchedSalon, 'salao');
-          }, 400);
+          }, 350);
         } else {
-          setErrorMsg(data.error || 'CPF ou Senha/Token não conferem. Verifique os dados digitados ou utilize a credencial do administrador.');
+          // 4. NOT AN ADMIN AND NOT A REGISTERED ACTIVE SALON: SHOW FRIENDLY OPTIONS TO TEST 7 DAYS OR BUY
+          setErrorMsg('CPF ou Senha/Token não encontrados no sistema de salões ativos.');
+          setShowQuickAccessOptions(true);
         }
       })
       .catch(() => {
-        setErrorMsg('CPF ou Senha/Token não encontrados. Verifique os dados ou utilize o CPF e Senha de Gestão do Administrador.');
+        // 4. NOT AN ADMIN AND NOT A REGISTERED ACTIVE SALON: SHOW FRIENDLY OPTIONS TO TEST 7 DAYS OR BUY
+        setErrorMsg('CPF ou Senha/Token não encontrados. Se você for o Administrador Geral, confirme o CPF e Senha de Gestão. Se for seu novo salão, escolha uma das opções abaixo:');
+        setShowQuickAccessOptions(true);
       });
   };
 
@@ -252,7 +260,7 @@ export const SalonAuthModal: React.FC<SalonAuthModalProps> = ({
             onClick={() => {
               onClose();
               if (onOpenBuyApp) {
-                onOpenBuyApp(trialDays);
+                onOpenBuyApp(trialDays, salonCpf);
               }
             }}
             className="w-full bg-gradient-to-r from-emerald-950/90 via-slate-900 to-emerald-950/90 hover:from-emerald-900 hover:to-emerald-900/90 border border-emerald-500/50 hover:border-emerald-400 p-2 rounded-xl flex items-center justify-between text-left transition-all active:scale-98 shadow-sm group cursor-pointer"
@@ -292,9 +300,43 @@ export const SalonAuthModal: React.FC<SalonAuthModalProps> = ({
           </div>
 
           {errorMsg && (
-            <div className="bg-rose-950/90 border border-rose-700 p-2.5 rounded-xl flex items-start gap-1.5 text-rose-200 animate-shake">
-              <AlertCircle className="w-3.5 h-3.5 text-rose-400 shrink-0 mt-0.5" />
-              <span className="text-[11px] leading-snug font-semibold">{errorMsg}</span>
+            <div className="bg-rose-950/90 border border-rose-700/80 p-2.5 rounded-xl space-y-2 text-rose-200 animate-shake">
+              <div className="flex items-start gap-1.5">
+                <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+                <span className="text-[11px] leading-snug font-semibold">{errorMsg}</span>
+              </div>
+
+              {showQuickAccessOptions && (
+                <div className="pt-1.5 border-t border-rose-900/60 flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      if (onOpenBuyApp) {
+                        onOpenBuyApp(trialDays, salonCpf);
+                      }
+                    }}
+                    className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-black py-1.5 px-2 rounded-lg text-[10.5px] flex items-center justify-center gap-1 transition-all shadow-sm cursor-pointer"
+                  >
+                    <Gift className="w-3 h-3 text-slate-950" />
+                    <span>Testar 7 Dias Grátis ➔</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      if (onOpenBuyApp) {
+                        onOpenBuyApp(30, salonCpf);
+                      }
+                    }}
+                    className="flex-1 bg-teal-700 hover:bg-teal-600 text-white font-black py-1.5 px-2 rounded-lg text-[10.5px] flex items-center justify-center gap-1 transition-all shadow-sm cursor-pointer"
+                  >
+                    <ShoppingCart className="w-3 h-3 text-yellow-300" />
+                    <span>Comprar Plano (R$ 30) ➔</span>
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
@@ -381,7 +423,7 @@ export const SalonAuthModal: React.FC<SalonAuthModalProps> = ({
               onClick={() => {
                 onClose();
                 if (onOpenBuyApp) {
-                  onOpenBuyApp(30);
+                  onOpenBuyApp(30, salonCpf);
                 }
               }}
               className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-xs px-3 py-2 rounded-xl shadow-md flex items-center justify-between transition-all active:scale-98 border border-emerald-400/30 cursor-pointer select-none group"
