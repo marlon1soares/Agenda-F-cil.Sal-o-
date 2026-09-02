@@ -405,16 +405,7 @@ class SyncEngine {
         try { localStorage.setItem('salaoUsedTrialCpfs', JSON.stringify(state.usedTrialCpfs)); } catch {}
       }
 
-      // Play chime if another device booked an appointment or sent a message
-      if (senderId && senderId !== CLIENT_ID) {
-        if (appointmentsChanged) {
-          soundEffects.playBookingChime();
-        } else if (messagesChanged) {
-          soundEffects.playMessagePing();
-        }
-      }
-
-      // Notify entire app of synced remote data
+      // Atualizações de dados processadas silenciosamente sem emitir nenhum som
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('salao_sync_data', { detail: { source: 'remote', state } }));
       }
