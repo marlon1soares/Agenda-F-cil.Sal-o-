@@ -1,5 +1,7 @@
 import { FullSyncState } from '../types/sync';
 import { soundEffects } from './audio';
+import { db } from '../lib/firebase';
+import { doc, getDoc, setDoc, onSnapshot, collection, deleteDoc } from 'firebase/firestore';
 
 function getSafeClientId(): string {
   try {
@@ -22,6 +24,11 @@ function getSafeClientId(): string {
 
 const CLIENT_ID = getSafeClientId();
 
+function sanitizeForFirestore(obj: any): any {
+  if (obj === undefined) return null;
+  return JSON.parse(JSON.stringify(obj));
+}
+
 class SyncEngine {
   private eventSource: EventSource | null = null;
   private isInitialized = false;
@@ -29,6 +36,8 @@ class SyncEngine {
   private pendingUpdates: Partial<FullSyncState> = {};
   private isApplyingRemote = false;
   private presenceInterval: any = null;
+  private unsubscribeFirestore: (() => void) | null = null;
+  private unsubscribePresence: (() => void) | null = null;
 
   public getClientId(): string {
     return CLIENT_ID;
@@ -38,20 +47,23 @@ class SyncEngine {
     if (this.isInitialized || typeof window === 'undefined') return;
     this.isInitialized = true;
 
-    // 1. Initial State Fetch from Server
+    // 1. Initialize Firestore Real-time listener
+    this.initFirestoreSync();
+
+    // 2. Initial State Fetch from Local Server (fallback if running Node server)
     this.fetchServerState();
 
-    // 2. Connect to Server-Sent Events for Real-time Streaming
+    // 3. Connect to Server-Sent Events for Real-time Streaming (fallback)
     this.connectSSE();
 
-    // 3. Start Periodic Presence Heartbeat & Background Polling
+    // 4. Start Periodic Presence Heartbeat & Background Polling
     this.startPresenceHeartbeat();
     this.startBackupPolling();
 
-    // 4. Send immediate presence on initialization
+    // 5. Send immediate presence on initialization
     this.broadcastCurrentPresence();
 
-    // 4. Listen to window focus or online to re-sync
+    // 6. Listen to window focus or online to re-sync
     try {
       window.addEventListener('online', () => {
         this.fetchServerState();
@@ -72,6 +84,115 @@ class SyncEngine {
     }
   }
 
+  private initFirestoreSync() {
+    if (!db) {
+      console.warn('[SyncEngine] Firestore db instance not ready.');
+      return;
+    }
+
+    try {
+      const globalDocRef = doc(db, 'system', 'global_sync_state');
+
+      // Realtime listener for all database changes across all devices & Vercel
+      this.unsubscribeFirestore = onSnapshot(globalDocRef, (snapshot) => {
+        if (snapshot.exists()) {
+          const remoteData = snapshot.data() as FullSyncState & { lastSenderId?: string };
+          if (remoteData) {
+            this.applyRemoteState(remoteData, remoteData.lastSenderId);
+          }
+        } else {
+          // Document does not exist yet in Firestore - seed from current local state
+          this.seedInitialFirestoreState(globalDocRef);
+        }
+      }, (error) => {
+        console.warn('[SyncEngine] Firestore onSnapshot error:', error);
+      });
+
+      // Realtime presence listener
+      try {
+        const presenceCollRef = collection(db, 'presence');
+        this.unsubscribePresence = onSnapshot(presenceCollRef, (snap) => {
+          const now = Date.now();
+          const activeUsers: any[] = [];
+          snap.forEach((d) => {
+            const user = d.data();
+            // Active within last 45 seconds
+            if (user && user.lastSeen && (now - user.lastSeen < 45000)) {
+              activeUsers.push(user);
+            }
+          });
+          if (activeUsers.length > 0) {
+            try {
+              localStorage.setItem('salaoOnlineUsers', JSON.stringify(activeUsers));
+              window.dispatchEvent(new CustomEvent('salao_sync_data', { detail: { key: 'salaoOnlineUsers' } }));
+            } catch {}
+          }
+        }, (err) => {
+          console.warn('[SyncEngine] Presence onSnapshot error:', err);
+        });
+      } catch (err) {
+        console.warn('[SyncEngine] Presence setup error:', err);
+      }
+    } catch (err) {
+      console.warn('[SyncEngine] Error configuring Firestore listener:', err);
+    }
+  }
+
+  private async seedInitialFirestoreState(docRef: any) {
+    try {
+      const getLocalOrFallback = (key: string) => {
+        try {
+          const raw = localStorage.getItem(key);
+          return raw ? JSON.parse(raw) : null;
+        } catch {
+          return null;
+        }
+      };
+
+      const seedData: any = {
+        lastSenderId: CLIENT_ID,
+        lastUpdated: Date.now()
+      };
+
+      const salons = getLocalOrFallback('salaoAppsList');
+      if (salons) seedData.salons = salons;
+
+      const config = getLocalOrFallback('salaoConfig');
+      if (config) seedData.config = config;
+
+      const appointments = getLocalOrFallback('salaoAgenda');
+      if (appointments) seedData.appointments = appointments;
+
+      const transactions = getLocalOrFallback('salaoLancamentos');
+      if (transactions) seedData.transactions = transactions;
+
+      const adjustments = getLocalOrFallback('salaoAjustesHorarios');
+      if (adjustments) seedData.timeAdjustments = adjustments;
+
+      const profs = getLocalOrFallback('salaoProfissionais');
+      if (profs) seedData.professionals = profs;
+
+      const services = getLocalOrFallback('salaoServicos');
+      if (services) seedData.services = services;
+
+      const clients = getLocalOrFallback('salaoClientes');
+      if (clients) seedData.clients = clients;
+
+      const adminPay = getLocalOrFallback('salaoAdminPaymentConfig');
+      if (adminPay) seedData.adminPaymentConfig = adminPay;
+
+      const adminCreds = getLocalOrFallback('salaoAdminCredentials');
+      if (adminCreds) seedData.adminCredentials = adminCreds;
+
+      const adminList = getLocalOrFallback('salaoAdminCredentialsList');
+      if (adminList) seedData.adminCredentialsList = adminList;
+
+      await setDoc(docRef, sanitizeForFirestore(seedData), { merge: true });
+    } catch (err) {
+      console.warn('[SyncEngine] Failed to seed initial Firestore state:', err);
+    }
+  }
+
   public sendPresence(user: { id?: string; name: string; role: string; salonId?: string; salonName?: string; status?: string }) {
     if (typeof window === 'undefined') return;
     try {
@@ -84,6 +205,16 @@ class SyncEngine {
         status: user.status || 'online',
         lastSeen: Date.now()
       };
+
+      // 1. Push to Firestore Presence
+      if (db) {
+        try {
+          const userDocRef = doc(db, 'presence', payload.id);
+          setDoc(userDocRef, sanitizeForFirestore(payload), { merge: true }).catch(() => {});
+        } catch {}
+      }
+
+      // 2. Secondary fallback via local server
       fetch('/api/presence/heartbeat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -109,7 +240,7 @@ class SyncEngine {
   }
 
   private startBackupPolling() {
-    // Background polling fallback every 12 seconds in case SSE stream was paused by OS
+    // Background polling fallback every 12 seconds in case SSE stream or snapshot was suspended
     setInterval(() => {
       if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
         this.fetchServerState();
@@ -127,7 +258,7 @@ class SyncEngine {
         return data.state;
       }
     } catch (e) {
-      console.warn('[SyncEngine] Could not reach server for initial sync:', e);
+      // serverless / static vercel environment without express API - expected
     }
     return null;
   }
@@ -163,15 +294,15 @@ class SyncEngine {
           try {
             this.eventSource.close();
           } catch {}
-          this.eventSource = null;
+            this.eventSource = null;
         }
-        // Auto-reconnect after 4 seconds
+        // Auto-reconnect after 8 seconds
         setTimeout(() => {
           this.connectSSE();
-        }, 4000);
+        }, 8000);
       };
     } catch (err) {
-      console.warn('[SyncEngine] SSE connection error:', err);
+      // expected if deployed as static bundle on Vercel
     }
   }
 
@@ -184,10 +315,10 @@ class SyncEngine {
       let appointmentsChanged = false;
       let messagesChanged = false;
 
-      if (state.salons && Array.isArray(state.salons)) {
+      if (state.salons && Array.isArray(state.salons) && state.salons.length > 0) {
         try { localStorage.setItem('salaoAppsList', JSON.stringify(state.salons)); } catch {}
       }
-      if (state.config) {
+      if (state.config && state.config.nomeSalao) {
         try { localStorage.setItem('salaoConfig', JSON.stringify(state.config)); } catch {}
       }
       if (state.appointments) {
@@ -200,16 +331,16 @@ class SyncEngine {
       if (state.timeAdjustments) {
         try { localStorage.setItem('salaoAjustesHorarios', JSON.stringify(state.timeAdjustments)); } catch {}
       }
-      if (state.professionals && Array.isArray(state.professionals)) {
+      if (state.professionals && Array.isArray(state.professionals) && state.professionals.length > 0) {
         try { localStorage.setItem('salaoProfissionais', JSON.stringify(state.professionals)); } catch {}
       }
-      if (state.services && Array.isArray(state.services)) {
+      if (state.services && Array.isArray(state.services) && state.services.length > 0) {
         try { localStorage.setItem('salaoServicos', JSON.stringify(state.services)); } catch {}
       }
       if (state.clients && Array.isArray(state.clients)) {
         try { localStorage.setItem('salaoClientes', JSON.stringify(state.clients)); } catch {}
       }
-      if (state.adminPaymentConfig) {
+      if (state.adminPaymentConfig && state.adminPaymentConfig.chavePix) {
         try { localStorage.setItem('salaoAdminPaymentConfig', JSON.stringify(state.adminPaymentConfig)); } catch {}
       }
       if (state.adminCredentials && state.adminCredentials.cpf) {
@@ -302,10 +433,24 @@ class SyncEngine {
     const toSend = {
       ...this.pendingUpdates,
       ...partial,
+      lastSenderId: CLIENT_ID,
       lastUpdated: Date.now()
     };
     this.pendingUpdates = {};
 
+    // 1. Direct Push to Firestore Database (Works everywhere, including Vercel & Mobile)
+    if (db) {
+      try {
+        const globalDocRef = doc(db, 'system', 'global_sync_state');
+        setDoc(globalDocRef, sanitizeForFirestore(toSend), { merge: true }).catch((err) => {
+          console.warn('[SyncEngine] Firestore immediate push error:', err);
+        });
+      } catch (err) {
+        console.warn('[SyncEngine] Error triggering Firestore setDoc:', err);
+      }
+    }
+
+    // 2. Fallback Push to Node Server
     try {
       fetch('/api/sync/state', {
         method: 'POST',
@@ -314,12 +459,8 @@ class SyncEngine {
           updates: toSend,
           clientId: CLIENT_ID,
         }),
-      }).catch((e) => {
-        console.warn('[SyncEngine] Immediate push failed:', e);
-      });
-    } catch (e) {
-      console.warn('[SyncEngine] Immediate push error:', e);
-    }
+      }).catch(() => {});
+    } catch {}
   }
 
   public pushUpdate(partial: Partial<FullSyncState>) {
@@ -328,6 +469,7 @@ class SyncEngine {
     this.pendingUpdates = {
       ...this.pendingUpdates,
       ...partial,
+      lastSenderId: CLIENT_ID,
       lastUpdated: Date.now()
     };
 
@@ -341,9 +483,24 @@ class SyncEngine {
   }
 
   private async sendPendingUpdates() {
-    const toSend = { ...this.pendingUpdates };
+    const toSend = { 
+      ...this.pendingUpdates,
+      lastSenderId: CLIENT_ID,
+      lastUpdated: Date.now()
+    };
     this.pendingUpdates = {};
 
+    // 1. Push to Firebase Firestore in real-time
+    if (db) {
+      try {
+        const globalDocRef = doc(db, 'system', 'global_sync_state');
+        await setDoc(globalDocRef, sanitizeForFirestore(toSend), { merge: true });
+      } catch (err) {
+        console.warn('[SyncEngine] Firestore debounced push error:', err);
+      }
+    }
+
+    // 2. Secondary push to local backend API
     try {
       await fetch('/api/sync/state', {
         method: 'POST',
@@ -354,9 +511,10 @@ class SyncEngine {
         }),
       });
     } catch (e) {
-      console.warn('[SyncEngine] Failed to push update to server:', e);
+      // expected on static / serverless Vercel
     }
   }
 }
 
 export const syncEngine = new SyncEngine();
+

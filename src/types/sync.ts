@@ -16,5 +16,6 @@ export interface FullSyncState {
   notices?: SystemBroadcastNotice[];
   onlineUsers?: LivePresenceUser[];
   usedTrialCpfs?: string[];
+  lastSenderId?: string;
   lastUpdated: number;
 }
