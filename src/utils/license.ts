@@ -265,10 +265,11 @@ export function getSalonLicenseInfo(salon: SalonApp | undefined | null): SalonLi
 
   const msPerDay = 1000 * 60 * 60 * 24;
   const daysUsed = Math.max(0, Math.floor((nowDateOnly.getTime() - startDateOnly.getTime()) / msPerDay));
-  const daysRemaining = Math.max(0, Math.ceil((expDateOnly.getTime() - nowDateOnly.getTime()) / msPerDay));
-
-  const isTimeExpired = nowDateOnly.getTime() > expDateOnly.getTime();
+  const rawRemaining = Math.max(0, Math.ceil((expDateOnly.getTime() - nowDateOnly.getTime()) / msPerDay));
+  
+  const isTimeExpired = (salon.planDays === 0) || (nowDateOnly.getTime() > expDateOnly.getTime()) || (expDateOnly.getTime() <= nowDateOnly.getTime() && rawRemaining <= 0);
   const isExpiredOrBlocked = salon.status === 'blocked' || salon.status === 'expired' || isTimeExpired;
+  const daysRemaining = (salon.planDays === 0 || isExpiredOrBlocked) ? 0 : rawRemaining;
 
   const formattedExpiresAt = expiresAtDate.toLocaleDateString('pt-BR');
 

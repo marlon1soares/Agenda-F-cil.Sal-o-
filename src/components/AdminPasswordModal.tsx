@@ -37,11 +37,7 @@ export const AdminPasswordModal: React.FC<AdminPasswordModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
-      const list = Storage.getAdminCredentialsList();
-      const current = list.length > 0 ? list[0] : Storage.getAdminCredentials();
-      if (!loginCpf) {
-        setLoginCpf(current.cpf || '226.224.488-05');
-      }
+      setLoginCpf('');
       setLoginPassword('');
       setLoginError('');
     }

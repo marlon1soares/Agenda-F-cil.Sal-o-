@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { SalonApp, SalonConfig } from '../types';
 import { THEMES } from '../data/mockData';
 import { Storage } from '../utils/storage';
+import { getSalonLicenseInfo } from '../utils/license';
 import { 
   Building2, Plus, Search, Check, Trash2, Edit3, ExternalLink, 
   X, Sparkles, User, Mail, Phone, Palette, Scissors, Copy, ShieldCheck, Share2,
@@ -207,6 +208,19 @@ export const AdminSalonsModal: React.FC<AdminSalonsModalProps> = ({
     setShowCreateForm(true);
   };
 
+  const handleZeroLicensePeriod = (salon: SalonApp) => {
+    // Set expiration to yesterday (0 remaining days) so the license immediately expires
+    const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+    const updated: SalonApp = {
+      ...salon,
+      status: 'expired',
+      planDays: 0,
+      expiresAt: yesterday
+    };
+    onUpdateSalon(updated);
+    showFeedback(`Período do salão "${salon.name}" foi ZERADO (0 dias restantes). O tempo de utilização expirou e exigirá renovação/compra.`);
+  };
+
   const handleToggleApproveSalon = (salon: SalonApp) => {
     const newStatus = salon.status === 'pending_approval' || salon.status === 'blocked' ? 'active' : 'blocked';
     const updated: SalonApp = {
@@ -219,14 +233,23 @@ export const AdminSalonsModal: React.FC<AdminSalonsModalProps> = ({
   };
 
   const handleExtendLicense = (salon: SalonApp, extraDays: number) => {
-    const currentExp = salon.expiresAt ? new Date(salon.expiresAt) : new Date();
-    currentExp.setDate(currentExp.getDate() + extraDays);
-    const newExpiresAt = currentExp.toISOString().split('T')[0];
+    const now = new Date();
+    let baseDate = now;
+    if (salon.expiresAt && salon.planDays !== 0 && salon.status !== 'expired') {
+      const parsed = new Date(salon.expiresAt);
+      if (!isNaN(parsed.getTime()) && parsed > now) {
+        baseDate = parsed;
+      }
+    }
+    const newExp = new Date(baseDate);
+    newExp.setDate(newExp.getDate() + extraDays);
+    const newExpiresAt = newExp.toISOString().split('T')[0];
 
+    const currentDays = (salon.planDays === 0 || salon.status === 'expired') ? 0 : (salon.planDays || 0);
     const updated: SalonApp = {
       ...salon,
       status: 'active',
-      planDays: (salon.planDays || 365) + extraDays,
+      planDays: currentDays + extraDays,
       expiresAt: newExpiresAt
     };
     onUpdateSalon(updated);
@@ -754,10 +777,14 @@ export const AdminSalonsModal: React.FC<AdminSalonsModalProps> = ({
                       {/* Stat 1: License & Expiration */}
                       <div className="bg-slate-900 p-4 rounded-xl border border-slate-800 space-y-1">
                         <span className="text-[10px] text-slate-400 uppercase font-extrabold tracking-wider block">Licença & Prazo</span>
-                        <div className="text-base font-black text-amber-300">
+                        <div className={`text-base font-black ${getSalonLicenseInfo(inspectedSalon).isExpiredOrBlocked || inspectedSalon.planDays === 0 ? 'text-rose-400' : 'text-amber-300'}`}>
                           {inspectedSalon.expiresAt ? `Expira em: ${inspectedSalon.expiresAt}` : 'Vitalício'}
                         </div>
-                        <p className="text-xs text-slate-400">Plano Contratado: <strong>{inspectedSalon.planDays || 365} dias</strong></p>
+                        <p className="text-xs text-slate-400">
+                          Plano: <strong className={getSalonLicenseInfo(inspectedSalon).isExpiredOrBlocked || inspectedSalon.planDays === 0 ? 'text-rose-400' : 'text-emerald-400'}>
+                            {inspectedSalon.planDays === 0 || getSalonLicenseInfo(inspectedSalon).isExpiredOrBlocked ? '0 dias (Expirado)' : `${getSalonLicenseInfo(inspectedSalon).daysRemaining} dias restantes`}
+                          </strong>
+                        </p>
                       </div>
 
                       {/* Stat 2: Document CPF & RG */}
@@ -806,6 +833,16 @@ export const AdminSalonsModal: React.FC<AdminSalonsModalProps> = ({
                     <div className="p-4 bg-slate-900/60 border-t border-slate-800 flex flex-wrap items-center justify-between gap-3">
                       <div className="flex items-center gap-2 flex-wrap">
                         
+                        {/* Botão Zerar Período - Fica antes do Bloquear */}
+                        <button
+                          onClick={() => handleZeroLicensePeriod(inspectedSalon)}
+                          className="bg-red-950/60 hover:bg-red-600 text-red-300 hover:text-white border border-red-500/50 px-3.5 py-2 rounded-xl text-xs font-extrabold transition-all flex items-center gap-1.5 shadow-sm"
+                          title="Zerar tempo de utilização do aplicativo (Expirar imediatamente)"
+                        >
+                          <Clock className="w-4 h-4 text-red-400" />
+                          <span>Zerar Período (0d)</span>
+                        </button>
+
                         <button
                           onClick={() => handleToggleApproveSalon(inspectedSalon)}
                           className={`px-3.5 py-2 rounded-xl text-xs font-extrabold transition-all flex items-center gap-1.5 shadow-sm ${
@@ -821,8 +858,18 @@ export const AdminSalonsModal: React.FC<AdminSalonsModalProps> = ({
                         </button>
 
                         <button
+                          onClick={() => handleExtendLicense(inspectedSalon, 15)}
+                          className="bg-indigo-600/30 hover:bg-indigo-600 text-indigo-300 hover:text-white border border-indigo-500/40 px-3.5 py-2 rounded-xl text-xs font-extrabold transition-all flex items-center gap-1.5"
+                          title="Prorrogar por mais 15 dias"
+                        >
+                          <Calendar className="w-4 h-4" />
+                          <span>Prorrogar +15 Dias</span>
+                        </button>
+
+                        <button
                           onClick={() => handleExtendLicense(inspectedSalon, 30)}
                           className="bg-blue-600/30 hover:bg-blue-600 text-blue-300 hover:text-white border border-blue-500/40 px-3.5 py-2 rounded-xl text-xs font-extrabold transition-all flex items-center gap-1.5"
+                          title="Prorrogar por mais 30 dias"
                         >
                           <Calendar className="w-4 h-4" />
                           <span>Prorrogar +30 Dias</span>
@@ -1011,11 +1058,15 @@ export const AdminSalonsModal: React.FC<AdminSalonsModalProps> = ({
 
                               {/* Validity & Expiration */}
                               <td className="p-3.5 whitespace-nowrap">
-                                <div className="text-[11px] font-bold text-amber-300">
-                                  {salon.expiresAt ? salon.expiresAt : '1 Ano (Vitalício)'}
+                                <div className={`text-[11px] font-bold ${getSalonLicenseInfo(salon).isExpiredOrBlocked || salon.planDays === 0 ? 'text-rose-400' : 'text-amber-300'}`}>
+                                  {salon.expiresAt ? salon.expiresAt : 'Vitalício'}
                                 </div>
                                 <div className="text-[10px] text-slate-400 font-mono">
-                                  Plano: {salon.planDays || 365} dias
+                                  {salon.planDays === 0 || getSalonLicenseInfo(salon).isExpiredOrBlocked ? (
+                                    <span className="text-rose-400 font-bold">0 dias (Expirado)</span>
+                                  ) : (
+                                    <span>{getSalonLicenseInfo(salon).daysRemaining} dias restantes</span>
+                                  )}
                                 </div>
                               </td>
 
@@ -1269,11 +1320,34 @@ export const AdminSalonsModal: React.FC<AdminSalonsModalProps> = ({
                     {/* Card Footer Actions */}
                     <div className="p-3 bg-slate-900/60 border-t border-slate-800 flex items-center justify-between gap-2">
                       <div className="text-[10px] text-slate-400 font-bold">
-                        <span>Expira: <strong className="text-amber-300">{salon.expiresAt || 'Vitalício'}</strong> ({salon.planDays || 365}d)</span>
+                        {(() => {
+                          const licInfo = getSalonLicenseInfo(salon);
+                          const isZeroOrExp = salon.planDays === 0 || licInfo.isExpiredOrBlocked;
+                          return (
+                            <span>
+                              Expira: <strong className={isZeroOrExp ? 'text-rose-400 font-mono' : 'text-amber-300 font-mono'}>
+                                {salon.expiresAt || 'Vitalício'}
+                              </strong>{' '}
+                              <span className={isZeroOrExp ? 'text-rose-400 font-black' : 'text-emerald-400 font-bold'}>
+                                ({isZeroOrExp ? '0d' : `${licInfo.daysRemaining}d`})
+                              </span>
+                            </span>
+                          );
+                        })()}
                       </div>
 
                       <div className="flex items-center gap-1.5">
                         
+                        {/* Botão de Zerar Período - Fica antes do Bloquear */}
+                        <button
+                          onClick={() => handleZeroLicensePeriod(salon)}
+                          className="bg-red-950/50 hover:bg-red-600 text-red-300 hover:text-white border border-red-500/40 px-2 py-1.5 rounded-xl text-[11px] font-bold transition-all flex items-center gap-1"
+                          title="Zerar tempo de utilização do aplicativo (Expirar licença agora)"
+                        >
+                          <Clock className="w-3.5 h-3.5 text-red-400" />
+                          <span>Zerar</span>
+                        </button>
+
                         {/* Approval / Status Toggle */}
                         <button
                           onClick={() => handleToggleApproveSalon(salon)}
@@ -1287,6 +1361,14 @@ export const AdminSalonsModal: React.FC<AdminSalonsModalProps> = ({
                         >
                           <CheckCircle2 className="w-3.5 h-3.5" />
                           <span>{isPending ? 'Aprovar Permissão' : salon.status === 'blocked' ? 'Desbloquear' : 'Bloquear'}</span>
+                        </button>
+
+                        <button
+                          onClick={() => handleExtendLicense(salon, 15)}
+                          className="bg-indigo-600/30 hover:bg-indigo-600 text-indigo-300 hover:text-white border border-indigo-500/30 px-2 py-1.5 rounded-xl text-[11px] font-bold transition-all"
+                          title="Prorrogar por mais 15 dias"
+                        >
+                          +15d
                         </button>
 
                         <button
