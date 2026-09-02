@@ -1486,7 +1486,7 @@ export function App() {
         initialToken={salonAuthCredentials.token}
         initialMode={salonAuthMode}
         onOpenBuyApp={handleOpenBuyAppWithPlan}
-        onSuccess={(salon, authenticatedRole) => {
+        onSuccess={(salon, authenticatedRole, matchedEmployeeName) => {
           handleSelectSalon(salon);
           const roleToSet = authenticatedRole || salonAuthMode || 'salao';
           setUserRole(roleToSet);
@@ -1494,9 +1494,15 @@ export function App() {
           setIsPageClosed(false);
           if (roleToSet === 'admin') {
             setActiveTab('todos_saloes');
-            setIsAdminSalonsOpen(true);
+            setIsAdminSalonsOpen(false);
           } else if (roleToSet === 'funcionario') {
+            if (matchedEmployeeName) {
+              setEmployeeName(matchedEmployeeName);
+              try { localStorage.setItem('salao_active_employee_name', matchedEmployeeName); } catch {}
+            }
             setActiveTab('agenda');
+          } else if (roleToSet === 'cliente') {
+            setActiveTab('agendamento');
           } else {
             setActiveTab('dashboard');
           }

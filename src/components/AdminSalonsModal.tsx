@@ -402,118 +402,145 @@ export const AdminSalonsModal: React.FC<AdminSalonsModalProps> = ({
       {/* Primary Modal Container */}
       <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-[98vw] text-white shadow-2xl relative my-auto overflow-hidden flex flex-col h-[94vh] max-h-[94vh] animate-in fade-in zoom-in-95 duration-200">
         
-        {/* Modal Header Bar - Organized, Clean, and Perfectly Sized */}
-        <div className="bg-slate-950 px-3 sm:px-4 py-2 border-b border-slate-800 flex flex-wrap items-center justify-between gap-2 shrink-0">
-          <div className="flex items-center gap-2 min-w-0">
-            <div className="p-1.5 bg-blue-600/20 border border-blue-500/40 rounded-lg text-blue-400 shrink-0">
-              <Building2 className="w-4 h-4" />
+        {/* Modal Header Bar - Responsive, Organized, and Clean for Desktop, Tablet, and Mobile */}
+        <div className="bg-slate-950 border-b border-slate-800 shrink-0">
+          
+          {/* Top Row: Title + Primary Action & Close */}
+          <div className="px-3 sm:px-5 py-2.5 flex items-center justify-between gap-3 border-b border-slate-900">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="p-1.5 sm:p-2 bg-blue-600/20 border border-blue-500/40 rounded-xl text-blue-400 shrink-0 shadow-sm">
+                <Building2 className="w-4 h-4 sm:w-5 h-5" />
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h2 className="text-xs sm:text-sm md:text-base font-black text-white tracking-tight truncate">
+                    Meus Salões & Clientes
+                  </h2>
+                  <span className="bg-blue-600/30 text-blue-300 text-[10px] sm:text-xs font-bold px-2.5 py-0.5 rounded-full border border-blue-500/30 shrink-0">
+                    {salons.length} {salons.length === 1 ? 'salão' : 'salões'}
+                  </span>
+                  {pendingCount > 0 && (
+                    <span className="bg-amber-500 text-slate-950 text-[10px] font-black px-2 py-0.5 rounded-full shadow-sm animate-pulse shrink-0">
+                      {pendingCount} pendente(s)
+                    </span>
+                  )}
+                </div>
+                <p className="text-[10px] sm:text-xs text-slate-400 truncate hidden sm:block">
+                  Painel Geral de Gestão, Licenças e Controle da Plataforma
+                </p>
+              </div>
             </div>
-            <div className="min-w-0">
-              <h2 className="text-xs sm:text-sm font-black text-white tracking-tight flex items-center gap-1.5 truncate">
-                <span className="truncate">Meus Salões</span>
-                <span className="bg-blue-600/30 text-blue-300 text-[10px] font-bold px-2 py-0.5 rounded-full border border-blue-500/30 shrink-0">
-                  {salons.length} {salons.length === 1 ? 'cadastrado' : 'cadastrados'}
-                </span>
-              </h2>
+
+            {/* Quick Primary Actions and Close */}
+            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+              <button
+                onClick={openCreateModal}
+                className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black px-3 py-1.5 sm:py-2 rounded-xl text-xs flex items-center gap-1.5 shadow-md transition-all active:scale-95 border border-emerald-400/40 cursor-pointer"
+                title="Cadastrar novo salão ou registrar compra"
+              >
+                <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+                <span className="hidden xs:inline sm:inline tracking-tight">+ Novo Salão</span>
+                <span className="inline xs:hidden sm:hidden text-[11px] font-bold">Novo</span>
+              </button>
+
+              <button
+                onClick={onClose}
+                className="text-slate-400 hover:text-white p-1.5 sm:p-2 rounded-xl bg-slate-900/80 hover:bg-slate-800 transition-colors border border-slate-800 hover:border-slate-700 cursor-pointer shrink-0"
+                title="Fechar Janela"
+              >
+                <X className="w-4 h-4 sm:w-5 sm:h-5" />
+              </button>
             </div>
           </div>
 
-          {/* Top Action Buttons - Compact, concise labels, perfect spacing */}
-          <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
-            {onOpenLiveHub && (
-              <button
-                onClick={onOpenLiveHub}
-                className="bg-gradient-to-r from-emerald-700 to-teal-700 hover:from-emerald-600 hover:to-teal-600 text-white font-extrabold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1.5 shadow-sm transition-all active:scale-95 border border-emerald-400/40 cursor-pointer"
-                title="Abrir Central de Conexão Tripla, Chat com Salões/Clientes e Mural de Comunicados Oficiais"
-              >
-                <Activity className="w-3.5 h-3.5 text-emerald-300 animate-pulse shrink-0" />
-                <span className="tracking-tight">Central Ao Vivo</span>
-              </button>
-            )}
+          {/* Action Tools Bar - Organized in clean responsive strip with horizontal scroll on mobile/tablet */}
+          <div className="px-3 sm:px-5 py-2 bg-slate-950/90 flex items-center justify-between gap-2 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+            <div className="flex items-center gap-1.5 sm:gap-2 flex-nowrap shrink-0">
+              
+              {onOpenLiveHub && (
+                <button
+                  onClick={onOpenLiveHub}
+                  className="bg-gradient-to-r from-emerald-700 to-teal-700 hover:from-emerald-600 hover:to-teal-600 text-white font-extrabold px-2.5 sm:px-3 py-1.5 rounded-xl text-[11px] sm:text-xs flex items-center gap-1.5 shadow-sm transition-all active:scale-95 border border-emerald-400/40 cursor-pointer whitespace-nowrap shrink-0"
+                  title="Abrir Central de Conexão Tripla e Chat"
+                >
+                  <Activity className="w-3.5 h-3.5 text-emerald-300 animate-pulse shrink-0" />
+                  <span>Central Ao Vivo</span>
+                </button>
+              )}
 
-            {onOpenSalonLink && (
-              <button
-                onClick={onOpenSalonLink}
-                className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white font-extrabold px-2.5 py-1.5 rounded-xl text-xs flex items-center gap-1.5 shadow-sm transition-all active:scale-95 border border-violet-400/30 cursor-pointer"
-                title="Criar e enviar link de compra/salão para proprietários de salões e barbearias"
-              >
-                <Link2 className="w-3.5 h-3.5 text-violet-200 shrink-0" />
-                <span className="tracking-tight">Link Compra</span>
-              </button>
-            )}
+              {onOpenSalonLink && (
+                <button
+                  onClick={onOpenSalonLink}
+                  className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white font-extrabold px-2.5 sm:px-3 py-1.5 rounded-xl text-[11px] sm:text-xs flex items-center gap-1.5 shadow-sm transition-all active:scale-95 border border-violet-400/30 cursor-pointer whitespace-nowrap shrink-0"
+                  title="Criar e enviar link de compra para novos salões"
+                >
+                  <Link2 className="w-3.5 h-3.5 text-violet-200 shrink-0" />
+                  <span>Link Compra</span>
+                </button>
+              )}
 
-            {onOpenSalonAccessLink && (
-              <button
-                onClick={onOpenSalonAccessLink}
-                className="bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1.5 shadow-sm transition-all active:scale-95 border border-emerald-400/40 cursor-pointer"
-                title="Criar e enviar link de acesso ao salão com CPF e Token"
-              >
-                <Key className="w-3.5 h-3.5 text-white shrink-0" />
-                <span className="tracking-tight">Link Acesso</span>
-              </button>
-            )}
+              {onOpenSalonAccessLink && (
+                <button
+                  onClick={onOpenSalonAccessLink}
+                  className="bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold px-2.5 sm:px-3 py-1.5 rounded-xl text-[11px] sm:text-xs flex items-center gap-1.5 shadow-sm transition-all active:scale-95 border border-emerald-400/40 cursor-pointer whitespace-nowrap shrink-0"
+                  title="Criar e enviar link de acesso ao salão com CPF e Token"
+                >
+                  <Key className="w-3.5 h-3.5 text-white shrink-0" />
+                  <span>Link Acesso</span>
+                </button>
+              )}
 
-            {onOpenVideoTutorial && (
-              <button
-                onClick={onOpenVideoTutorial}
-                className="bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-extrabold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1.5 shadow-sm transition-all active:scale-95 border border-red-400/40 cursor-pointer"
-                title="Assistir à Demonstração & Vídeo Tutorial Interativo"
-              >
-                <Play className="w-3.5 h-3.5 fill-white shrink-0" />
-                <span className="tracking-tight">Vídeo Tutorial</span>
-              </button>
-            )}
+              <div className="h-4 w-px bg-slate-800 shrink-0 hidden sm:block" />
 
-            {onOpenVideoConfig && (
-              <button
-                onClick={onOpenVideoConfig}
-                className="bg-slate-900 hover:bg-slate-800 text-rose-300 border border-rose-500/40 font-extrabold px-2.5 py-1.5 rounded-xl text-xs flex items-center gap-1.5 shadow-sm transition-all active:scale-95 cursor-pointer"
-                title="Configurar Link do Vídeo (YouTube/MP4) e Roteiro de Narração por Voz"
-              >
-                <Video className="w-3.5 h-3.5 text-rose-400 shrink-0" />
-                <span>Config Vídeo/Voz</span>
-              </button>
-            )}
+              {onOpenVideoTutorial && (
+                <button
+                  onClick={onOpenVideoTutorial}
+                  className="bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-extrabold px-2.5 sm:px-3 py-1.5 rounded-xl text-[11px] sm:text-xs flex items-center gap-1.5 shadow-sm transition-all active:scale-95 border border-red-400/40 cursor-pointer whitespace-nowrap shrink-0"
+                  title="Assistir à Demonstração & Vídeo Tutorial Interativo"
+                >
+                  <Play className="w-3 h-3 fill-white shrink-0" />
+                  <span>Vídeo Tutorial</span>
+                </button>
+              )}
 
-            {onOpenPaymentConfig && (
-              <button
-                onClick={onOpenPaymentConfig}
-                className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-black px-2.5 py-1.5 rounded-xl text-xs flex items-center gap-1.5 shadow-sm transition-all active:scale-95 border border-amber-300/40 cursor-pointer"
-                title="Configurar Recebimento, Pix e Cartão"
-              >
-                <Settings className="w-3.5 h-3.5 shrink-0" />
-                <span>Pix / Cartão</span>
-              </button>
-            )}
+              {onOpenVideoConfig && (
+                <button
+                  onClick={onOpenVideoConfig}
+                  className="bg-slate-900 hover:bg-slate-800 text-rose-300 border border-rose-500/40 font-extrabold px-2.5 sm:px-3 py-1.5 rounded-xl text-[11px] sm:text-xs flex items-center gap-1.5 shadow-sm transition-all active:scale-95 cursor-pointer whitespace-nowrap shrink-0"
+                  title="Configurar Link do Vídeo e Narração por Voz"
+                >
+                  <Video className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+                  <span>Config Vídeo/Voz</span>
+                </button>
+              )}
 
-            <button
-              onClick={openCreateModal}
-              className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold px-2.5 py-1.5 rounded-xl text-xs flex items-center gap-1.5 shadow-sm transition-all active:scale-95 border border-emerald-400/40 cursor-pointer"
-              title="Cadastrar novo salão ou registrar compra"
-            >
-              <Plus className="w-3.5 h-3.5 shrink-0" />
-              <span>+ Novo Salão</span>
-            </button>
+              <div className="h-4 w-px bg-slate-800 shrink-0 hidden sm:block" />
 
-            {onOpenAdminChangePassword && (
-              <button
-                onClick={onOpenAdminChangePassword}
-                className="bg-slate-900 hover:bg-slate-800 text-emerald-400 border border-emerald-500/40 font-extrabold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1.5 shadow-sm transition-all active:scale-95 cursor-pointer"
-                title="Alterar Senha do Administrador e Gerenciar Usuários/Acessos"
-              >
-                <Key className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                <span>Alterar Senha Admin</span>
-              </button>
-            )}
+              {onOpenPaymentConfig && (
+                <button
+                  onClick={onOpenPaymentConfig}
+                  className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-black px-2.5 sm:px-3 py-1.5 rounded-xl text-[11px] sm:text-xs flex items-center gap-1.5 shadow-sm transition-all active:scale-95 border border-amber-300/40 cursor-pointer whitespace-nowrap shrink-0"
+                  title="Configurar Recebimento, Pix e Cartão"
+                >
+                  <Settings className="w-3.5 h-3.5 shrink-0" />
+                  <span>Pix / Cartão</span>
+                </button>
+              )}
 
-            <button
-              onClick={onClose}
-              className="text-slate-400 hover:text-white p-1.5 rounded-xl hover:bg-slate-800 transition-colors border border-transparent hover:border-slate-700 ml-1 cursor-pointer shrink-0"
-              title="Fechar Janela"
-            >
-              <X className="w-4 h-4" />
-            </button>
+              {onOpenAdminChangePassword && (
+                <button
+                  onClick={onOpenAdminChangePassword}
+                  className="bg-slate-900 hover:bg-slate-800 text-emerald-400 border border-emerald-500/40 font-extrabold px-2.5 sm:px-3 py-1.5 rounded-xl text-[11px] sm:text-xs flex items-center gap-1.5 shadow-sm transition-all active:scale-95 cursor-pointer whitespace-nowrap shrink-0"
+                  title="Alterar Senha do Administrador"
+                >
+                  <Key className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  <span>Alterar Senha Admin</span>
+                </button>
+              )}
+
+            </div>
           </div>
+
         </div>
 
         {/* Global Action Feedback Alert */}
@@ -524,15 +551,15 @@ export const AdminSalonsModal: React.FC<AdminSalonsModalProps> = ({
           </div>
         )}
 
-        {/* Navigation Tabs Bar & Search Box - Compact & Responsive */}
-        <div className="bg-slate-900/95 px-3 sm:px-4 py-2 border-b border-slate-800 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-2 shrink-0">
+        {/* Navigation Tabs Bar & Search Box - Optimized for Mobile, Tablet & Desktop */}
+        <div className="bg-slate-900/95 px-3 sm:px-5 py-2 border-b border-slate-800 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-2.5 shrink-0">
           
-          {/* Primary View Switcher Tabs without native scrollbar glitch */}
+          {/* Primary View Switcher Tabs with smooth responsive scroll on mobile */}
           <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800 overflow-x-auto max-w-full [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden shrink-0">
             
             <button
               onClick={() => setActiveTab('cards')}
-              className={`px-2.5 py-1.5 rounded-lg text-xs font-extrabold flex items-center gap-1.5 transition-all whitespace-nowrap cursor-pointer ${
+              className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-extrabold flex items-center gap-1.5 transition-all whitespace-nowrap cursor-pointer ${
                 activeTab === 'cards'
                   ? 'bg-blue-600 text-white shadow-md'
                   : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
@@ -547,7 +574,7 @@ export const AdminSalonsModal: React.FC<AdminSalonsModalProps> = ({
 
             <button
               onClick={() => setActiveTab('pending')}
-              className={`px-2.5 py-1.5 rounded-lg text-xs font-extrabold flex items-center gap-1.5 transition-all whitespace-nowrap cursor-pointer ${
+              className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-extrabold flex items-center gap-1.5 transition-all whitespace-nowrap cursor-pointer ${
                 activeTab === 'pending'
                   ? 'bg-amber-500 text-slate-950 shadow-md font-black ring-2 ring-amber-400/40'
                   : pendingCount > 0
@@ -564,7 +591,7 @@ export const AdminSalonsModal: React.FC<AdminSalonsModalProps> = ({
 
             <button
               onClick={() => setActiveTab('connected')}
-              className={`px-2.5 py-1.5 rounded-lg text-xs font-extrabold flex items-center gap-1.5 transition-all whitespace-nowrap cursor-pointer ${
+              className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-extrabold flex items-center gap-1.5 transition-all whitespace-nowrap cursor-pointer ${
                 activeTab === 'connected'
                   ? 'bg-emerald-600 text-white shadow-md'
                   : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
@@ -579,7 +606,7 @@ export const AdminSalonsModal: React.FC<AdminSalonsModalProps> = ({
 
             <button
               onClick={() => setActiveTab('inspector')}
-              className={`px-2.5 py-1.5 rounded-lg text-xs font-extrabold flex items-center gap-1.5 transition-all whitespace-nowrap cursor-pointer ${
+              className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-extrabold flex items-center gap-1.5 transition-all whitespace-nowrap cursor-pointer ${
                 activeTab === 'inspector'
                   ? 'bg-purple-600 text-white shadow-md'
                   : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
@@ -591,7 +618,7 @@ export const AdminSalonsModal: React.FC<AdminSalonsModalProps> = ({
 
             <button
               onClick={() => setActiveTab('location_table')}
-              className={`px-2.5 py-1.5 rounded-lg text-xs font-extrabold flex items-center gap-1.5 transition-all whitespace-nowrap cursor-pointer ${
+              className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-extrabold flex items-center gap-1.5 transition-all whitespace-nowrap cursor-pointer ${
                 activeTab === 'location_table'
                   ? 'bg-teal-600 text-white shadow-md'
                   : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
@@ -607,7 +634,7 @@ export const AdminSalonsModal: React.FC<AdminSalonsModalProps> = ({
           </div>
 
           {/* Search Input Box */}
-          <div className="relative w-full md:w-56 lg:w-72 shrink-0">
+          <div className="relative w-full md:w-60 lg:w-72 shrink-0">
             <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-2.5" />
             <input
               type="text"
@@ -1317,9 +1344,9 @@ export const AdminSalonsModal: React.FC<AdminSalonsModalProps> = ({
 
                     </div>
 
-                    {/* Card Footer Actions */}
-                    <div className="p-3 bg-slate-900/60 border-t border-slate-800 flex items-center justify-between gap-2">
-                      <div className="text-[10px] text-slate-400 font-bold">
+                    {/* Card Footer Actions - Responsive for Mobile, Tablet, and Desktop */}
+                    <div className="p-3 bg-slate-900/60 border-t border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">
+                      <div className="text-[10px] sm:text-[11px] text-slate-400 font-bold">
                         {(() => {
                           const licInfo = getSalonLicenseInfo(salon);
                           const isZeroOrExp = salon.planDays === 0 || licInfo.isExpiredOrBlocked;
@@ -1336,22 +1363,22 @@ export const AdminSalonsModal: React.FC<AdminSalonsModalProps> = ({
                         })()}
                       </div>
 
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1.5 flex-wrap justify-end w-full sm:w-auto">
                         
-                        {/* Botão de Zerar Período - Fica antes do Bloquear */}
+                        {/* Botão de Zerar Período */}
                         <button
                           onClick={() => handleZeroLicensePeriod(salon)}
-                          className="bg-red-950/50 hover:bg-red-600 text-red-300 hover:text-white border border-red-500/40 px-2 py-1.5 rounded-xl text-[11px] font-bold transition-all flex items-center gap-1"
+                          className="bg-red-950/50 hover:bg-red-600 text-red-300 hover:text-white border border-red-500/40 px-2 py-1.5 rounded-xl text-[11px] font-bold transition-all flex items-center gap-1 cursor-pointer"
                           title="Zerar tempo de utilização do aplicativo (Expirar licença agora)"
                         >
-                          <Clock className="w-3.5 h-3.5 text-red-400" />
+                          <Clock className="w-3.5 h-3.5 text-red-400 shrink-0" />
                           <span>Zerar</span>
                         </button>
 
                         {/* Approval / Status Toggle */}
                         <button
                           onClick={() => handleToggleApproveSalon(salon)}
-                          className={`px-2.5 py-1.5 rounded-xl text-xs font-extrabold transition-all flex items-center gap-1 ${
+                          className={`px-2.5 py-1.5 rounded-xl text-xs font-extrabold transition-all flex items-center gap-1 cursor-pointer ${
                             isPending
                               ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-md'
                               : salon.status === 'blocked'
@@ -1359,13 +1386,13 @@ export const AdminSalonsModal: React.FC<AdminSalonsModalProps> = ({
                               : 'bg-amber-600/30 text-amber-300 hover:bg-amber-600 hover:text-white border border-amber-500/40'
                           }`}
                         >
-                          <CheckCircle2 className="w-3.5 h-3.5" />
-                          <span>{isPending ? 'Aprovar Permissão' : salon.status === 'blocked' ? 'Desbloquear' : 'Bloquear'}</span>
+                          <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                          <span>{isPending ? 'Aprovar' : salon.status === 'blocked' ? 'Desbloquear' : 'Bloquear'}</span>
                         </button>
 
                         <button
                           onClick={() => handleExtendLicense(salon, 15)}
-                          className="bg-indigo-600/30 hover:bg-indigo-600 text-indigo-300 hover:text-white border border-indigo-500/30 px-2 py-1.5 rounded-xl text-[11px] font-bold transition-all"
+                          className="bg-indigo-600/30 hover:bg-indigo-600 text-indigo-300 hover:text-white border border-indigo-500/30 px-2 py-1.5 rounded-xl text-[11px] font-bold transition-all cursor-pointer"
                           title="Prorrogar por mais 15 dias"
                         >
                           +15d
@@ -1373,7 +1400,7 @@ export const AdminSalonsModal: React.FC<AdminSalonsModalProps> = ({
 
                         <button
                           onClick={() => handleExtendLicense(salon, 30)}
-                          className="bg-blue-600/30 hover:bg-blue-600 text-blue-300 hover:text-white border border-blue-500/30 px-2 py-1.5 rounded-xl text-[11px] font-bold transition-all"
+                          className="bg-blue-600/30 hover:bg-blue-600 text-blue-300 hover:text-white border border-blue-500/30 px-2 py-1.5 rounded-xl text-[11px] font-bold transition-all cursor-pointer"
                           title="Prorrogar por mais 30 dias"
                         >
                           +30d
@@ -1384,7 +1411,7 @@ export const AdminSalonsModal: React.FC<AdminSalonsModalProps> = ({
                             onSelectSalon(salon);
                             onClose();
                           }}
-                          className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition-all flex items-center gap-1 shadow-md ${
+                          className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition-all flex items-center gap-1 shadow-md cursor-pointer ${
                             isActive
                               ? 'bg-emerald-600 text-white border border-emerald-400/50'
                               : 'bg-blue-600 hover:bg-blue-500 text-white'
