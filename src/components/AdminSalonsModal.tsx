@@ -83,7 +83,7 @@ export const AdminSalonsModal: React.FC<AdminSalonsModalProps> = ({
   const [formBairro, setFormBairro] = useState('');
   const [formCidade, setFormCidade] = useState('');
   const [formUf, setFormUf] = useState('');
-  const [formPlanDays, setFormPlanDays] = useState<number>(30);
+  const [formPlanDays, setFormPlanDays] = useState<number>(7);
   const [formTemaKey, setFormTemaKey] = useState('azul');
   const [formCorCustom, setFormCorCustom] = useState('#2563eb');
   const [formLogoUrl, setFormLogoUrl] = useState('');
@@ -174,7 +174,7 @@ export const AdminSalonsModal: React.FC<AdminSalonsModalProps> = ({
     setFormBairro('');
     setFormCidade('');
     setFormUf('');
-    setFormPlanDays(365);
+    setFormPlanDays(7);
     setFormTemaKey('azul');
     setFormCorCustom('#2563eb');
     setFormLogoUrl('');
@@ -206,7 +206,7 @@ export const AdminSalonsModal: React.FC<AdminSalonsModalProps> = ({
     setFormBairro(salon.bairro || '');
     setFormCidade(salon.cidade || '');
     setFormUf(salon.uf || '');
-    setFormPlanDays(salon.planDays || 365);
+    setFormPlanDays(salon.planDays ?? 7);
     setFormTemaKey(salon.config.temaKey || 'azul');
     setFormCorCustom(salon.config.corCustom || '#2563eb');
     setFormLogoUrl(salon.config.logoUrl || '');
@@ -258,14 +258,21 @@ export const AdminSalonsModal: React.FC<AdminSalonsModalProps> = ({
     const newExpiresAt = newExp.toISOString().split('T')[0];
 
     const currentDays = (salon.planDays === 0 || salon.status === 'expired') ? 0 : (salon.planDays || 0);
+    const newDays = Math.max(0, currentDays + extraDays);
+    const isNowExpired = newDays === 0 || newExp < now;
+
     const updated: SalonApp = {
       ...salon,
-      status: 'active',
-      planDays: currentDays + extraDays,
+      status: isNowExpired ? 'expired' : 'active',
+      planDays: newDays,
       expiresAt: newExpiresAt
     };
     onUpdateSalon(updated);
-    showFeedback(`Prazo de licença prorrogado em +${extraDays} dias para o salão "${salon.name}"!`);
+    if (extraDays > 0) {
+      showFeedback(`Prazo de licença aumentado em +${extraDays} dias para o salão "${salon.name}".`);
+    } else {
+      showFeedback(`Prazo de licença reduzido em ${Math.abs(extraDays)} dias para o salão "${salon.name}".`);
+    }
   };
 
   const handleRegenerateToken = (salon: SalonApp) => {
@@ -986,21 +993,38 @@ _🤖 Mensagem automática enviada pelo Robô de Despacho Agenda Fácil._`;
                         </button>
 
                         <button
-                          onClick={() => handleExtendLicense(inspectedSalon, 15)}
-                          className="bg-indigo-600/30 hover:bg-indigo-600 text-indigo-300 hover:text-white border border-indigo-500/40 px-3.5 py-2 rounded-xl text-xs font-extrabold transition-all flex items-center gap-1.5"
-                          title="Prorrogar por mais 15 dias"
+                          onClick={() => handleExtendLicense(inspectedSalon, -7)}
+                          className="bg-amber-950/60 hover:bg-amber-600 text-amber-300 hover:text-white border border-amber-500/40 px-3 py-2 rounded-xl text-xs font-extrabold transition-all flex items-center gap-1 cursor-pointer"
+                          title="Diminuir 7 dias de licença"
+                        >
+                          <span>-7 Dias</span>
+                        </button>
+
+                        <button
+                          onClick={() => handleExtendLicense(inspectedSalon, 7)}
+                          className="bg-emerald-600/30 hover:bg-emerald-600 text-emerald-300 hover:text-white border border-emerald-500/40 px-3 py-2 rounded-xl text-xs font-extrabold transition-all flex items-center gap-1.5 cursor-pointer"
+                          title="Aumentar +7 dias de licença"
                         >
                           <Calendar className="w-4 h-4" />
-                          <span>Prorrogar +15 Dias</span>
+                          <span>+7 Dias</span>
+                        </button>
+
+                        <button
+                          onClick={() => handleExtendLicense(inspectedSalon, 15)}
+                          className="bg-indigo-600/30 hover:bg-indigo-600 text-indigo-300 hover:text-white border border-indigo-500/40 px-3 py-2 rounded-xl text-xs font-extrabold transition-all flex items-center gap-1.5 cursor-pointer"
+                          title="Aumentar +15 dias"
+                        >
+                          <Calendar className="w-4 h-4" />
+                          <span>+15 Dias</span>
                         </button>
 
                         <button
                           onClick={() => handleExtendLicense(inspectedSalon, 30)}
-                          className="bg-blue-600/30 hover:bg-blue-600 text-blue-300 hover:text-white border border-blue-500/40 px-3.5 py-2 rounded-xl text-xs font-extrabold transition-all flex items-center gap-1.5"
-                          title="Prorrogar por mais 30 dias"
+                          className="bg-blue-600/30 hover:bg-blue-600 text-blue-300 hover:text-white border border-blue-500/40 px-3.5 py-2 rounded-xl text-xs font-extrabold transition-all flex items-center gap-1.5 cursor-pointer"
+                          title="Aumentar +30 dias"
                         >
                           <Calendar className="w-4 h-4" />
-                          <span>Prorrogar +30 Dias</span>
+                          <span>+30 Dias</span>
                         </button>
 
                         <button
@@ -1491,10 +1515,28 @@ _🤖 Mensagem automática enviada pelo Robô de Despacho Agenda Fácil._`;
                           <span>{isPending ? 'Aprovar' : salon.status === 'blocked' ? 'Desbloquear' : 'Bloquear'}</span>
                         </button>
 
+                        {/* Diminuir Dias */}
+                        <button
+                          onClick={() => handleExtendLicense(salon, -7)}
+                          className="bg-amber-950/40 hover:bg-amber-600 text-amber-300 hover:text-white border border-amber-500/30 px-2 py-1.5 rounded-xl text-[11px] font-bold transition-all cursor-pointer"
+                          title="Diminuir 7 dias"
+                        >
+                          -7d
+                        </button>
+
+                        {/* Aumentar Dias */}
+                        <button
+                          onClick={() => handleExtendLicense(salon, 7)}
+                          className="bg-emerald-600/30 hover:bg-emerald-600 text-emerald-300 hover:text-white border border-emerald-500/30 px-2 py-1.5 rounded-xl text-[11px] font-bold transition-all cursor-pointer"
+                          title="Aumentar +7 dias"
+                        >
+                          +7d
+                        </button>
+
                         <button
                           onClick={() => handleExtendLicense(salon, 15)}
                           className="bg-indigo-600/30 hover:bg-indigo-600 text-indigo-300 hover:text-white border border-indigo-500/30 px-2 py-1.5 rounded-xl text-[11px] font-bold transition-all cursor-pointer"
-                          title="Prorrogar por mais 15 dias"
+                          title="Aumentar +15 dias"
                         >
                           +15d
                         </button>
@@ -1502,7 +1544,7 @@ _🤖 Mensagem automática enviada pelo Robô de Despacho Agenda Fácil._`;
                         <button
                           onClick={() => handleExtendLicense(salon, 30)}
                           className="bg-blue-600/30 hover:bg-blue-600 text-blue-300 hover:text-white border border-blue-500/30 px-2 py-1.5 rounded-xl text-[11px] font-bold transition-all cursor-pointer"
-                          title="Prorrogar por mais 30 dias"
+                          title="Aumentar +30 dias"
                         >
                           +30d
                         </button>
@@ -1601,16 +1643,48 @@ _🤖 Mensagem automática enviada pelo Robô de Despacho Agenda Fácil._`;
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-xs font-extrabold text-slate-300">Prazo do Plano (Dias)</label>
-                  <select
-                    value={formPlanDays}
-                    onChange={(e) => setFormPlanDays(Number(e.target.value))}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500 font-bold"
-                  >
-                    <option value={7}>7 Dias (Teste Gratuito)</option>
-                    <option value={30}>Plano 1 (30 Dias - R$ 30,00)</option>
-                    <option value={90}>Plano 2 (3 Meses - R$ 90,00)</option>
-                  </select>
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-extrabold text-slate-300">Prazo do Salão (Dias)</label>
+                    <span className="text-[10px] font-black text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-500/30">
+                      {formPlanDays} {formPlanDays === 1 ? 'dia' : 'dias'}
+                    </span>
+                  </div>
+                  
+                  <div className="flex items-center gap-1.5">
+                    <select
+                      value={formPlanDays}
+                      onChange={(e) => setFormPlanDays(Number(e.target.value))}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-2 text-xs text-white focus:outline-none focus:border-blue-500 font-bold"
+                    >
+                      <option value={7}>7 Dias (Padrão de Criação / Teste)</option>
+                      <option value={15}>15 Dias (2 Semanas)</option>
+                      <option value={30}>30 Dias (1 Mês - R$ 30,00)</option>
+                      <option value={60}>60 Dias (2 Meses)</option>
+                      <option value={90}>90 Dias (3 Meses - R$ 90,00)</option>
+                      <option value={180}>180 Dias (Semestral)</option>
+                      <option value={365}>365 Dias (1 Ano)</option>
+                    </select>
+
+                    {/* Botões rápidos de ajuste fino para o administrador */}
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setFormPlanDays(prev => Math.max(1, prev - 1))}
+                        className="bg-slate-800 hover:bg-slate-700 text-slate-200 px-2 py-2 rounded-lg text-xs font-black border border-slate-700 cursor-pointer"
+                        title="Diminuir 1 dia"
+                      >
+                        -1d
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setFormPlanDays(prev => prev + 1)}
+                        className="bg-slate-800 hover:bg-slate-700 text-slate-200 px-2 py-2 rounded-lg text-xs font-black border border-slate-700 cursor-pointer"
+                        title="Aumentar 1 dia"
+                      >
+                        +1d
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
 
