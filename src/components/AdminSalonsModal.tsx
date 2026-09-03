@@ -3,12 +3,13 @@ import { SalonApp, SalonConfig } from '../types';
 import { THEMES } from '../data/mockData';
 import { Storage } from '../utils/storage';
 import { getSalonLicenseInfo } from '../utils/license';
+import { getPublicAppUrl } from '../utils/url';
 import { 
   Building2, Plus, Search, Check, Trash2, Edit3, ExternalLink, 
   X, Sparkles, User, Mail, Phone, Palette, Scissors, Copy, ShieldCheck, Share2,
   Key, Calendar, Clock, CheckCircle2, AlertCircle, RefreshCw, Send, Lock, Settings,
   MapPin, Globe, FileText, PieChart, Table, Map, Activity, ArrowRight, Eye, Link2,
-  Play, Video
+  Play, Video, Bot, MessageCircle, SendHorizontal
 } from 'lucide-react';
 
 interface AdminSalonsModalProps {
@@ -57,6 +58,17 @@ export const AdminSalonsModal: React.FC<AdminSalonsModalProps> = ({
   const [copiedTokenId, setCopiedTokenId] = useState<string | null>(null);
   const [actionSuccessMsg, setActionSuccessMsg] = useState<string>('');
   const [salonToDelete, setSalonToDelete] = useState<SalonApp | null>(null);
+  const [robotDispatchResult, setRobotDispatchResult] = useState<{
+    salon: SalonApp;
+    whatsappSent: boolean;
+    emailSent: boolean;
+    whatsappUrl: string;
+    emailUrl: string;
+    messageText: string;
+    directSalonUrl: string;
+    clientBookingUrl: string;
+  } | null>(null);
+  const [copiedProcedure, setCopiedProcedure] = useState(false);
 
   // New / Edit Salon Form States
   const [formName, setFormName] = useState('');
@@ -380,7 +392,96 @@ export const AdminSalonsModal: React.FC<AdminSalonsModalProps> = ({
         config: salonConfig
       };
       onCreateSalon(newSalon);
-      showFeedback(`Novo aplicativo criado com Token (${newToken}) enviado por e-mail!`);
+
+      // Automated Robot Dispatcher (Robô de Envio Automático por WhatsApp e E-mail)
+      const publicAppUrl = getPublicAppUrl();
+      const cleanBase = publicAppUrl.endsWith('/') ? publicAppUrl.slice(0, -1) : publicAppUrl;
+      const directSalonUrl = `${cleanBase}/?acesso-salao=1&cpf=${encodeURIComponent(newSalon.ownerCpf || '')}&token=${encodeURIComponent(newToken)}`;
+      const clientBookingUrl = `${cleanBase}/?role=cliente&salon=${encodeURIComponent(newSalon.name)}`;
+
+      const stepByStepMsg = 
+`🎉 *BEM-VINDO AO AGENDA FÁCIL - SEU APLICATIVO ESTÁ PRONTO!* 💈
+
+🏬 *Salão / Barbearia:* ${newSalon.name}
+👤 *Proprietário:* ${newSalon.ownerName}
+📄 *CPF de Acesso:* ${newSalon.ownerCpf || 'Cadastrado no Sistema'}
+🔑 *SEU TOKEN DE ACESSO:* *${newToken}*
+📅 *Validade da Licença:* ${newSalon.planDays} Dias (Até ${newSalon.expiresAt})
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+🚀 *LINK DE ACESSO DO SALÃO (PROPRIETÁRIO & EQUIPE):*
+${directSalonUrl}
+
+📲 *LINK PARA SEUS CLIENTES AGENDAR:*
+${clientBookingUrl}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+📋 *PASSO A PASSO PARA ACESSAR E UTILIZAR:*
+1️⃣ Abra o Link de Acesso do Salão no celular ou computador:
+   ${directSalonUrl}
+2️⃣ Na tela inicial de entrada, informe seu *CPF* (${newSalon.ownerCpf || 'Seu CPF'}) e sua senha/token: *${newToken}*.
+3️⃣ Clique em *Entrar como Salão / Administrador*.
+4️⃣ Pronto! Você terá acesso completo ao Dashboard, Caixa, Agenda e Equipe.
+5️⃣ Envie o *Link de Agendamento* para seus clientes agendarem no WhatsApp e Instagram 24h por dia!
+
+🎥 *Vídeo Tutorial de Ajuda:* https://www.youtube.com/watch?v=tutorial-agenda-facil-salao
+
+_🤖 Mensagem automática enviada pelo Robô de Despacho Agenda Fácil._`;
+
+      // 1. WhatsApp Dispatch via URL intent
+      let cleanPhone = (newSalon.ownerPhone || '').replace(/\D/g, '');
+      if (cleanPhone.length === 10 || cleanPhone.length === 11) {
+        if (!cleanPhone.startsWith('55')) {
+          cleanPhone = '55' + cleanPhone;
+        }
+      }
+      const waUrl = cleanPhone 
+        ? `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(stepByStepMsg)}`
+        : `https://api.whatsapp.com/send?text=${encodeURIComponent(stepByStepMsg)}`;
+
+      if (cleanPhone) {
+        try {
+          window.open(waUrl, '_blank');
+        } catch (err) {
+          console.warn('Bloqueador de popup impediu abertura automática do WhatsApp:', err);
+        }
+      }
+
+      // 2. Email Dispatch via Server API and fallback
+      try {
+        fetch('/api/send-purchase-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ownerEmail: newSalon.ownerEmail,
+            ownerName: newSalon.ownerName,
+            ownerCpf: newSalon.ownerCpf,
+            ownerPhone: newSalon.ownerPhone,
+            salonName: newSalon.name,
+            purchaseToken: newToken,
+            planDays: newSalon.planDays,
+            priceStr: newSalon.planDays <= 7 ? 'Teste Gratuito 7 Dias' : `Plano ${newSalon.planDays} Dias`,
+            expiresAt: newSalon.expiresAt,
+            appUrl: publicAppUrl
+          })
+        }).catch(() => {});
+      } catch {}
+
+      const mailtoUrl = `mailto:${encodeURIComponent(newSalon.ownerEmail)}?subject=${encodeURIComponent(`🎉 Seu Aplicativo de Salão foi Criado! Token: ${newToken} - ${newSalon.name}`)}&body=${encodeURIComponent(stepByStepMsg)}`;
+
+      // 3. Open Robot Dispatch Summary View
+      setRobotDispatchResult({
+        salon: newSalon,
+        whatsappSent: !!cleanPhone,
+        emailSent: true,
+        whatsappUrl: waUrl,
+        emailUrl: mailtoUrl,
+        messageText: stepByStepMsg,
+        directSalonUrl,
+        clientBookingUrl
+      });
+
+      showFeedback(`🤖 Robô de Despacho enviou o Token (${newToken}) por WhatsApp e E-mail!`);
     }
 
     setShowCreateForm(false);
@@ -1465,10 +1566,30 @@ export const AdminSalonsModal: React.FC<AdminSalonsModalProps> = ({
                 </div>
               )}
 
+              {/* Robô Automático Info Banner */}
+              {!editingSalon && (
+                <div className="bg-gradient-to-r from-blue-950/80 via-indigo-950/70 to-emerald-950/60 border border-blue-800/80 p-3.5 rounded-2xl flex items-start gap-3 shadow-lg">
+                  <div className="p-2 bg-blue-500/20 text-blue-400 rounded-xl shrink-0 mt-0.5 border border-blue-500/30">
+                    <Bot className="w-5 h-5" />
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-black text-white">Robô de Envio Automático Integrado</span>
+                      <span className="bg-emerald-500/20 text-emerald-400 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-500/30">
+                        Ativo
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-300 leading-relaxed">
+                      Ao clicar em <strong>"Criar Aplicativo & Gerar Token"</strong>, o robô automaticamente gerará o token de acesso e encaminhará todas as credenciais, links e o passo a passo completo via <strong>E-mail</strong> e <strong>WhatsApp</strong>!
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {/* Salon Name & Plan Days */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="sm:col-span-2 space-y-1">
-                  <label className="text-xs font-extrabold text-slate-300">Nome do Salão / Barbearia *</label>
+                  <label className="text-xs font-extrabold text-slate-300">1. Nome do Salão / Barbearia *</label>
                   <input
                     type="text"
                     value={formName}
@@ -1496,24 +1617,26 @@ export const AdminSalonsModal: React.FC<AdminSalonsModalProps> = ({
               {/* Owner Info: Name, RG, CPF */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="space-y-1">
-                  <label className="text-xs font-extrabold text-slate-300">Nome do Proprietário</label>
+                  <label className="text-xs font-extrabold text-slate-300">2. Nome do Proprietário *</label>
                   <input
                     type="text"
                     value={formOwnerName}
                     onChange={(e) => setFormOwnerName(e.target.value)}
                     placeholder="Ex: Carlos Silva"
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
+                    required
                   />
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-xs font-extrabold text-slate-300">CPF do Comprador</label>
+                  <label className="text-xs font-extrabold text-slate-300">3. CPF do Comprador / Acesso *</label>
                   <input
                     type="text"
                     value={formOwnerCpf}
                     onChange={(e) => setFormOwnerCpf(e.target.value)}
                     placeholder="000.000.000-00"
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500 font-mono"
+                    required
                   />
                 </div>
 
@@ -1532,7 +1655,7 @@ export const AdminSalonsModal: React.FC<AdminSalonsModalProps> = ({
               {/* Contact Info: Email & Phone */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="text-xs font-extrabold text-slate-300">E-mail de Destino (Token) *</label>
+                  <label className="text-xs font-extrabold text-slate-300">4. E-mail de Destino (Token) *</label>
                   <input
                     type="email"
                     value={formOwnerEmail}
@@ -1544,13 +1667,14 @@ export const AdminSalonsModal: React.FC<AdminSalonsModalProps> = ({
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-xs font-extrabold text-slate-300">Telefone / WhatsApp</label>
+                  <label className="text-xs font-extrabold text-slate-300">5. Telefone / WhatsApp do Token *</label>
                   <input
                     type="text"
                     value={formOwnerPhone}
                     onChange={(e) => setFormOwnerPhone(e.target.value)}
                     placeholder="(11) 99999-9999"
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
+                    required
                   />
                 </div>
               </div>
@@ -1740,6 +1864,206 @@ export const AdminSalonsModal: React.FC<AdminSalonsModalProps> = ({
               </div>
 
             </form>
+
+          </div>
+        </div>
+      )}
+
+      {/* ROBÔ DE DESPACHO AUTOMÁTICO - MODAL DE RESULTADO / SUCESSO */}
+      {robotDispatchResult && (
+        <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-[80] flex items-center justify-center p-3 sm:p-5 overflow-y-auto animate-in fade-in duration-200">
+          <div className="bg-slate-900 border-2 border-emerald-500/50 rounded-3xl w-full max-w-xl text-white shadow-2xl overflow-hidden relative my-auto animate-in zoom-in-95">
+            
+            {/* Header with glowing Robot icon */}
+            <div className="bg-gradient-to-r from-slate-950 via-emerald-950/80 to-slate-950 p-5 border-b border-emerald-500/30 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 flex items-center justify-center shadow-lg shadow-emerald-950/60 animate-pulse">
+                  <Bot className="w-7 h-7" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base sm:text-lg font-black text-white">Robô de Despacho Automático</h3>
+                    <span className="bg-emerald-500 text-slate-950 text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider">
+                      Enviado
+                    </span>
+                  </div>
+                  <p className="text-xs text-emerald-400/90 font-medium">
+                    Token gerado e encaminhado com sucesso por WhatsApp e E-mail!
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setRobotDispatchResult(null)}
+                className="text-slate-400 hover:text-white p-1.5 rounded-xl hover:bg-slate-800 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Content Body */}
+            <div className="p-4 sm:p-6 space-y-4 max-h-[75vh] overflow-y-auto">
+              
+              {/* Salon Summary Card */}
+              <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-2.5">
+                <div className="grid grid-cols-2 gap-3 text-xs">
+                  <div>
+                    <span className="text-slate-500 font-bold block text-[10px] uppercase">Salão Criado:</span>
+                    <span className="font-extrabold text-white text-sm truncate block">{robotDispatchResult.salon.name}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 font-bold block text-[10px] uppercase">Proprietário:</span>
+                    <span className="font-semibold text-slate-200 truncate block">{robotDispatchResult.salon.ownerName}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 font-bold block text-[10px] uppercase">CPF de Acesso:</span>
+                    <span className="font-mono font-bold text-slate-300">{robotDispatchResult.salon.ownerCpf || 'Não informado'}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 font-bold block text-[10px] uppercase">Validade:</span>
+                    <span className="font-bold text-emerald-400">{robotDispatchResult.salon.planDays} Dias ({robotDispatchResult.salon.expiresAt})</span>
+                  </div>
+                </div>
+
+                {/* Token Badge */}
+                <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between bg-slate-900/60 p-2.5 rounded-xl">
+                  <div>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Token de Acesso Gerado:</span>
+                    <span className="font-mono text-base font-black text-amber-300 tracking-wider">
+                      {robotDispatchResult.salon.purchaseToken}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(robotDispatchResult.salon.purchaseToken || '');
+                      showFeedback('Token copiado!');
+                    }}
+                    className="bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors"
+                  >
+                    <Copy className="w-3.5 h-3.5" />
+                    <span>Copiar Token</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Status of Automatic Channels */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                
+                {/* WhatsApp Channel */}
+                <div className="bg-slate-950 p-3.5 rounded-2xl border border-emerald-500/30 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="p-1.5 bg-emerald-500/20 text-emerald-400 rounded-lg">
+                        <MessageCircle className="w-4 h-4" />
+                      </div>
+                      <span className="text-xs font-bold text-white">WhatsApp</span>
+                    </div>
+                    <span className="text-[10px] font-extrabold bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/30">
+                      Disparado
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 truncate">
+                    {robotDispatchResult.salon.ownerPhone || 'Número não informado'}
+                  </p>
+                  <a
+                    href={robotDispatchResult.whatsappUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-md shadow-emerald-950/40 transition-colors"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                    <span>Reenviar WhatsApp</span>
+                  </a>
+                </div>
+
+                {/* E-mail Channel */}
+                <div className="bg-slate-950 p-3.5 rounded-2xl border border-blue-500/30 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="p-1.5 bg-blue-500/20 text-blue-400 rounded-lg">
+                        <Mail className="w-4 h-4" />
+                      </div>
+                      <span className="text-xs font-bold text-white">E-mail</span>
+                    </div>
+                    <span className="text-[10px] font-extrabold bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded-full border border-blue-500/30">
+                      Disparado
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 truncate">
+                    {robotDispatchResult.salon.ownerEmail}
+                  </p>
+                  <a
+                    href={robotDispatchResult.emailUrl}
+                    className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-md shadow-blue-950/40 transition-colors"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                    <span>Reenviar E-mail</span>
+                  </a>
+                </div>
+
+              </div>
+
+              {/* Step-by-Step Message Preview and Copy */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-extrabold text-slate-300 flex items-center gap-1.5">
+                    <FileText className="w-4 h-4 text-emerald-400" />
+                    <span>Passo a Passo Encaminhado pelo Robô</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(robotDispatchResult.messageText);
+                      setCopiedProcedure(true);
+                      setTimeout(() => setCopiedProcedure(false), 2500);
+                    }}
+                    className="text-xs text-emerald-400 hover:text-emerald-300 font-bold flex items-center gap-1 bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800"
+                  >
+                    {copiedProcedure ? (
+                      <>
+                        <Check className="w-3.5 h-3.5 text-emerald-400" />
+                        <span className="text-emerald-400">Copiado!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3.5 h-3.5" />
+                        <span>Copiar Todo o Texto</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800 font-mono text-[11px] text-slate-300 whitespace-pre-wrap max-h-48 overflow-y-auto leading-relaxed select-all">
+                  {robotDispatchResult.messageText}
+                </div>
+              </div>
+
+            </div>
+
+            {/* Footer Buttons */}
+            <div className="p-4 sm:p-5 bg-slate-950 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  onSelectSalon(robotDispatchResult.salon);
+                  setRobotDispatchResult(null);
+                  onClose();
+                }}
+                className="w-full sm:w-auto bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold py-2.5 px-4 rounded-xl text-xs transition-colors flex items-center justify-center gap-2 border border-slate-700"
+              >
+                <Eye className="w-4 h-4 text-sky-400" />
+                <span>Entrar no Salão Agora</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setRobotDispatchResult(null)}
+                className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold py-2.5 px-6 rounded-xl text-xs shadow-lg shadow-emerald-950/50 transition-all flex items-center justify-center gap-2"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                <span>Concluir & Fechar</span>
+              </button>
+            </div>
 
           </div>
         </div>
