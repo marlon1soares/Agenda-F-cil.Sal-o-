@@ -41,17 +41,27 @@ const getGenAI = () => {
 };
 
 const getTransporter = () => {
+  const user = process.env.SMTP_USER || "marlon1soares28@gmail.com";
+  const pass = process.env.SMTP_PASS || "Ana1@@theo";
   const host = process.env.SMTP_HOST || "smtp.gmail.com";
   const port = parseInt(process.env.SMTP_PORT || "587", 10);
-  const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS;
 
   if (user && pass) {
+    // If it's a Gmail account, use service: 'gmail' or direct smtp.gmail.com with TLS
+    if (user.includes("@gmail.com")) {
+      return nodemailer.createTransport({
+        service: "gmail",
+        auth: { user, pass },
+      });
+    }
     return nodemailer.createTransport({
       host,
       port,
       secure: port === 465,
       auth: { user, pass },
+      tls: {
+        rejectUnauthorized: false,
+      },
     });
   }
   return null;
@@ -1398,7 +1408,7 @@ app.post("/api/send-purchase-email", async (req, res) => {
     const transporter = getTransporter();
 
     if (transporter) {
-      const fromAddr = process.env.SMTP_FROM || `"Agenda Fácil" <${process.env.SMTP_USER}>`;
+      const fromAddr = process.env.SMTP_FROM || `"Agenda Fácil" <${process.env.SMTP_USER || 'marlon1soares28@gmail.com'}>`;
       const mailOptions = {
         from: fromAddr,
         to: ownerEmail,
@@ -1407,7 +1417,7 @@ app.post("/api/send-purchase-email", async (req, res) => {
       };
 
       const info = await transporter.sendMail(mailOptions);
-      console.log("E-mail enviado com sucesso:", info.messageId);
+      console.log("E-mail enviado com sucesso pelo robô:", info.messageId);
       return res.json({
         success: true,
         delivered: true,
