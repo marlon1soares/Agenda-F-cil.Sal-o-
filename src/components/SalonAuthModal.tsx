@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Key, Scissors, CheckCircle2, AlertCircle, Crown, Eye, EyeOff, Store, ShoppingCart, Gift, User, Users } from 'lucide-react';
+import { X, Key, Scissors, CheckCircle2, AlertCircle, Crown, Eye, EyeOff, Store, ShoppingCart, Gift } from 'lucide-react';
 import { SalonApp, UserRole } from '../types';
 import { Storage } from '../utils/storage';
 import { formatBRL } from '../utils/pricing';
@@ -462,39 +462,6 @@ export const SalonAuthModal: React.FC<SalonAuthModalProps> = ({
               <span className="bg-yellow-400/20 text-yellow-300 font-black text-[10px] sm:text-[11px] px-2 py-0.5 rounded-md border border-yellow-300/40 inline-flex items-center">
                 <span>{formatBRL(p30Price)}/mês</span>
               </span>
-            </button>
-          </div>
-
-          {/* Quick Direct Client & Staff Access Links */}
-          <div className="pt-1.5 border-t border-slate-800/80 flex items-center justify-between gap-2 text-[11px]">
-            <button
-              type="button"
-              id="btn-quick-client-access"
-              onClick={() => {
-                const currentSalons = Storage.getSalons();
-                const fallback = currentSalons[0] || { id: 'salao-principal', name: 'Salão & Barbearia', status: 'active', config: Storage.getConfig() } as SalonApp;
-                onSuccess(fallback, 'cliente');
-              }}
-              className="flex-1 py-1.5 px-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-rose-300 hover:text-rose-200 border border-rose-500/30 font-extrabold flex items-center justify-center gap-1 transition-colors cursor-pointer text-[10.5px]"
-            >
-              <User className="w-3 h-3 text-rose-400 shrink-0" />
-              <span>Entrar como Cliente</span>
-            </button>
-
-            <button
-              type="button"
-              id="btn-quick-staff-access"
-              onClick={() => {
-                const currentSalons = Storage.getSalons();
-                const fallback = currentSalons[0] || { id: 'salao-principal', name: 'Salão & Barbearia', status: 'active', config: Storage.getConfig() } as SalonApp;
-                const profs = Storage.getProfessionals();
-                const defaultProf = profs[0]?.name || '';
-                onSuccess(fallback, 'funcionario', defaultProf);
-              }}
-              className="flex-1 py-1.5 px-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-teal-300 hover:text-teal-200 border border-teal-500/30 font-extrabold flex items-center justify-center gap-1 transition-colors cursor-pointer text-[10.5px]"
-            >
-              <Users className="w-3 h-3 text-teal-400 shrink-0" />
-              <span>Entrar como Equipe</span>
             </button>
           </div>
         </form>
