@@ -62,8 +62,10 @@ export const AdminSalonsModal: React.FC<AdminSalonsModalProps> = ({
     salon: SalonApp;
     whatsappSent: boolean;
     emailSent: boolean;
+    emailDeliveryMethod: 'smtp' | 'webmail';
     whatsappUrl: string;
     emailUrl: string;
+    gmailWebUrl: string;
     messageText: string;
     directSalonUrl: string;
     clientBookingUrl: string;
@@ -446,49 +448,72 @@ _🤖 Mensagem automática enviada pelo Robô de Despacho Agenda Fácil._`;
         ? `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(stepByStepMsg)}`
         : `https://api.whatsapp.com/send?text=${encodeURIComponent(stepByStepMsg)}`;
 
+      // Automatically trigger WhatsApp in new window/tab
       if (cleanPhone) {
         try {
-          window.open(waUrl, '_blank');
+          const wRef = window.open(waUrl, '_blank');
+          if (!wRef) {
+            console.warn('Bloqueador de popup do navegador interceptou a aba do WhatsApp.');
+          }
         } catch (err) {
-          console.warn('Bloqueador de popup impediu abertura automática do WhatsApp:', err);
+          console.warn('Erro ao abrir WhatsApp automaticamente:', err);
         }
       }
 
-      // 2. Email Dispatch via Server API and fallback
-      try {
-        fetch('/api/send-purchase-email', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            ownerEmail: newSalon.ownerEmail,
-            ownerName: newSalon.ownerName,
-            ownerCpf: newSalon.ownerCpf,
-            ownerPhone: newSalon.ownerPhone,
-            salonName: newSalon.name,
-            purchaseToken: newToken,
-            planDays: newSalon.planDays,
-            priceStr: newSalon.planDays <= 7 ? 'Teste Gratuito 7 Dias' : `Plano ${newSalon.planDays} Dias`,
-            expiresAt: newSalon.expiresAt,
-            appUrl: publicAppUrl
-          })
-        }).catch(() => {});
-      } catch {}
+      // 2. Email Dispatch Preparation
+      const emailSubject = `🎉 Seu Aplicativo de Salão foi Criado! Token: ${newToken} - ${newSalon.name}`;
+      const mailtoUrl = `mailto:${encodeURIComponent(newSalon.ownerEmail)}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(stepByStepMsg)}`;
+      const gmailWebUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(newSalon.ownerEmail)}&su=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(stepByStepMsg)}`;
 
-      const mailtoUrl = `mailto:${encodeURIComponent(newSalon.ownerEmail)}?subject=${encodeURIComponent(`🎉 Seu Aplicativo de Salão foi Criado! Token: ${newToken} - ${newSalon.name}`)}&body=${encodeURIComponent(stepByStepMsg)}`;
-
-      // 3. Open Robot Dispatch Summary View
+      // Set initial robot dispatch modal
       setRobotDispatchResult({
         salon: newSalon,
         whatsappSent: !!cleanPhone,
         emailSent: true,
+        emailDeliveryMethod: 'webmail',
         whatsappUrl: waUrl,
         emailUrl: mailtoUrl,
+        gmailWebUrl: gmailWebUrl,
         messageText: stepByStepMsg,
         directSalonUrl,
         clientBookingUrl
       });
 
-      showFeedback(`🤖 Robô de Despacho enviou o Token (${newToken}) por WhatsApp e E-mail!`);
+      // 3. Email Dispatch via Server SMTP API
+      fetch('/api/send-purchase-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ownerEmail: newSalon.ownerEmail,
+          ownerName: newSalon.ownerName,
+          ownerCpf: newSalon.ownerCpf,
+          ownerPhone: newSalon.ownerPhone,
+          salonName: newSalon.name,
+          purchaseToken: newToken,
+          planDays: newSalon.planDays,
+          priceStr: newSalon.planDays <= 7 ? 'Teste Gratuito 7 Dias' : `Plano ${newSalon.planDays} Dias`,
+          expiresAt: newSalon.expiresAt,
+          appUrl: publicAppUrl
+        })
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.delivered) {
+          setRobotDispatchResult(prev => prev ? { ...prev, emailDeliveryMethod: 'smtp' } : null);
+        } else {
+          // If SMTP is not active on server, automatically trigger Gmail Web compose in background/popup
+          try {
+            window.open(gmailWebUrl, '_blank');
+          } catch {}
+        }
+      })
+      .catch(() => {
+        try {
+          window.open(gmailWebUrl, '_blank');
+        } catch {}
+      });
+
+      showFeedback(`🤖 Robô de Despacho ativado! Token (${newToken}) pronto para envio.`);
     }
 
     setShowCreateForm(false);
@@ -2024,7 +2049,7 @@ _🤖 Mensagem automática enviada pelo Robô de Despacho Agenda Fácil._`;
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 
                 {/* WhatsApp Channel */}
-                <div className="bg-slate-950 p-3.5 rounded-2xl border border-emerald-500/30 space-y-2">
+                <div className="bg-slate-950 p-4 rounded-2xl border border-emerald-500/30 space-y-2.5">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <div className="p-1.5 bg-emerald-500/20 text-emerald-400 rounded-lg">
@@ -2039,19 +2064,21 @@ _🤖 Mensagem automática enviada pelo Robô de Despacho Agenda Fácil._`;
                   <p className="text-[11px] text-slate-400 truncate">
                     {robotDispatchResult.salon.ownerPhone || 'Número não informado'}
                   </p>
-                  <a
-                    href={robotDispatchResult.whatsappUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-md shadow-emerald-950/40 transition-colors"
-                  >
-                    <Send className="w-3.5 h-3.5" />
-                    <span>Reenviar WhatsApp</span>
-                  </a>
+                  <div className="space-y-1.5 pt-1">
+                    <a
+                      href={robotDispatchResult.whatsappUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-md shadow-emerald-950/40 transition-colors"
+                    >
+                      <Send className="w-3.5 h-3.5" />
+                      <span>Abrir WhatsApp Web</span>
+                    </a>
+                  </div>
                 </div>
 
                 {/* E-mail Channel */}
-                <div className="bg-slate-950 p-3.5 rounded-2xl border border-blue-500/30 space-y-2">
+                <div className="bg-slate-950 p-4 rounded-2xl border border-blue-500/30 space-y-2.5">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <div className="p-1.5 bg-blue-500/20 text-blue-400 rounded-lg">
@@ -2059,22 +2086,47 @@ _🤖 Mensagem automática enviada pelo Robô de Despacho Agenda Fácil._`;
                       </div>
                       <span className="text-xs font-bold text-white">E-mail</span>
                     </div>
-                    <span className="text-[10px] font-extrabold bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded-full border border-blue-500/30">
-                      Disparado
+                    <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full border ${
+                      robotDispatchResult.emailDeliveryMethod === 'smtp'
+                        ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+                        : 'bg-blue-500/20 text-blue-400 border-blue-500/30'
+                    }`}>
+                      {robotDispatchResult.emailDeliveryMethod === 'smtp' ? 'Enviado (SMTP)' : 'Disparado (Gmail)'}
                     </span>
                   </div>
                   <p className="text-[11px] text-slate-400 truncate">
                     {robotDispatchResult.salon.ownerEmail}
                   </p>
-                  <a
-                    href={robotDispatchResult.emailUrl}
-                    className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-md shadow-blue-950/40 transition-colors"
-                  >
-                    <Send className="w-3.5 h-3.5" />
-                    <span>Reenviar E-mail</span>
-                  </a>
+                  <div className="grid grid-cols-2 gap-1.5 pt-1">
+                    <a
+                      href={robotDispatchResult.gmailWebUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-2 rounded-xl text-[11px] flex items-center justify-center gap-1 shadow-md shadow-blue-950/40 transition-colors"
+                      title="Abrir diretamente no Gmail Web"
+                    >
+                      <ExternalLink className="w-3 h-3" />
+                      <span>Gmail Web</span>
+                    </a>
+                    <a
+                      href={robotDispatchResult.emailUrl}
+                      className="bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold py-2 px-2 rounded-xl text-[11px] flex items-center justify-center gap-1 border border-slate-700 transition-colors"
+                      title="Abrir no aplicativo de e-mail padrão do computador ou celular"
+                    >
+                      <Send className="w-3 h-3" />
+                      <span>App E-mail</span>
+                    </a>
+                  </div>
                 </div>
 
+              </div>
+
+              {/* Informative Note regarding Background Robot Delivery */}
+              <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-3 flex items-start gap-2 text-[11px] text-slate-400">
+                <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                <span>
+                  <strong>Robô de Envio Automático:</strong> Os links de acesso e o token foram preparados para envio imediato ao WhatsApp ({robotDispatchResult.salon.ownerPhone || 'telefone'}) e ao E-mail ({robotDispatchResult.salon.ownerEmail}).
+                </span>
               </div>
 
               {/* Step-by-Step Message Preview and Copy */}
