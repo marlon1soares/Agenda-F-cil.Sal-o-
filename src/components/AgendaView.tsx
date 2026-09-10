@@ -6,7 +6,7 @@ import { getUrlParam } from '../utils/url';
 import { 
   Calendar as CalendarIcon, Clock, Lock, Plus, RotateCcw, CheckCircle2, ChevronUp, 
   ChevronDown, DollarSign, X, MessageSquare, Phone, AlertCircle,
-  Download, Printer, Users, User
+  Download, Printer, Users, User, Settings
 } from 'lucide-react';
 
 interface AgendaViewProps {
@@ -22,6 +22,7 @@ interface AgendaViewProps {
   onResetDaySchedule: (date: string) => void;
   onConvertToPOS: (ap: Appointment) => void;
   onOpenLiveHub?: () => void;
+  onOpenConfig?: () => void;
 }
 
 export const AgendaView: React.FC<AgendaViewProps> = ({
@@ -37,6 +38,7 @@ export const AgendaView: React.FC<AgendaViewProps> = ({
   onResetDaySchedule,
   onConvertToPOS,
   onOpenLiveHub,
+  onOpenConfig,
 }) => {
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [activeModal, setActiveModal] = useState<'book' | 'block' | null>(null);
@@ -285,6 +287,17 @@ export const AgendaView: React.FC<AgendaViewProps> = ({
                 <AlertCircle className="w-3 h-3 text-rose-600 shrink-0" />
                 <span>Fechado / Folga nesta data</span>
               </span>
+            )}
+            {onOpenConfig && (userRole === 'salao' || userRole === 'admin') && (
+              <button
+                type="button"
+                onClick={onOpenConfig}
+                className="bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 text-[11px] font-bold px-2.5 py-1 rounded-lg flex items-center gap-1 transition-colors cursor-pointer shadow-2xs active:scale-98"
+                title="Configurar horários de expediente e funcionamento deste salão"
+              >
+                <Settings className="w-3 h-3 text-amber-700" />
+                <span>Alterar Horários</span>
+              </button>
             )}
           </div>
 

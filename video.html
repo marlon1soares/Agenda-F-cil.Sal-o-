@@ -1,0 +1,1065 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vídeo Tutorial Passo a Passo - Agenda Mais Fácil Salão &amp; Barbearia</title>
+  <meta name="description" content="Vídeo tutorial passo a passo com a apresentadora Luna (Disney Pixar 3D) ensinando o proprietário a usar o aplicativo Agenda Mais Fácil Salão. Baixe o vídeo em MP4 para postar nas redes sociais.">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+    }
+    @keyframes pulseSlow {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.85; transform: scale(1.03); }
+    }
+    .animate-pulse-slow {
+      animation: pulseSlow 3s infinite ease-in-out;
+    }
+    @keyframes wave {
+      0%, 100% { height: 6px; }
+      50% { height: 26px; }
+    }
+    .wave-bar:nth-child(1) { animation: wave 0.7s infinite ease-in-out 0.05s; }
+    .wave-bar:nth-child(2) { animation: wave 0.7s infinite ease-in-out 0.15s; }
+    .wave-bar:nth-child(3) { animation: wave 0.7s infinite ease-in-out 0.25s; }
+    .wave-bar:nth-child(4) { animation: wave 0.7s infinite ease-in-out 0.35s; }
+    .wave-bar:nth-child(5) { animation: wave 0.7s infinite ease-in-out 0.45s; }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col selection:bg-rose-500 selection:text-white">
+
+  <!-- Standalone Header -->
+  <header class="bg-slate-900/90 border-b border-slate-800 backdrop-blur-md sticky top-0 z-50">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-rose-600 via-pink-500 to-amber-400 p-0.5 shadow-lg shadow-rose-950">
+          <img 
+            src="/tutorial-assets/pixar_female_host_1788749082734.jpg" 
+            alt="Luna Pixar 3D" 
+            class="w-full h-full object-cover rounded-[10px]"
+          />
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-base sm:text-lg font-black tracking-tight text-white">Vídeo Tutorial Passo a Passo</h1>
+            <span class="bg-rose-500/20 text-rose-300 border border-rose-500/30 text-[10px] font-bold px-2 py-0.5 rounded-full">
+              Link Externo Dedicado
+            </span>
+          </div>
+          <p class="text-xs text-slate-400">Apresentado por Luna (Disney Pixar) • Narração Dinâmica Contínua • 8 Blocos Conectados</p>
+        </div>
+      </div>
+
+      <!-- Quick Export Buttons -->
+      <div class="flex items-center gap-2">
+        <button 
+          id="btn-download-script"
+          onclick="downloadScriptText()"
+          class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold px-3 py-1.5 rounded-xl transition-all shadow flex items-center gap-1.5 cursor-pointer"
+          title="Baixar roteiro completo com legendas e hashtags da Luna"
+        >
+          <span>📋 Roteiro (.txt)</span>
+        </button>
+        <a 
+          href="/api/download-tutorial-mp4"
+          download="video_tutorial_agenda_mais_facil_luna.mp4"
+          class="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-xs px-3.5 py-1.5 rounded-xl transition-all shadow-md shadow-emerald-950 flex items-center gap-1.5 cursor-pointer"
+          title="Baixar vídeo oficial completo em formato MP4 (H.264)"
+        >
+          <span>🎬 Baixar Vídeo (.mp4)</span>
+        </a>
+        <button 
+          id="btn-download-video"
+          onclick="startVideoRecording()"
+          class="bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-500 hover:to-pink-500 text-white font-extrabold text-xs px-3.5 py-1.5 rounded-xl transition-all shadow-md shadow-rose-950 flex items-center gap-1.5 cursor-pointer"
+          title="Gravar tela e converter para MP4 universal para redes sociais"
+        >
+          <span>🎥 Gravar Tela (.mp4)</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="flex-1 max-w-6xl w-full mx-auto px-4 py-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+    <!-- Left / Top Column: The Video Stage -->
+    <div class="lg:col-span-8 flex flex-col gap-4">
+
+      <!-- Interactive Video Canvas Player -->
+      <div class="relative bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl flex flex-col">
+        
+        <!-- Video Screen Display -->
+        <div class="relative aspect-video bg-gradient-to-br from-slate-950 via-slate-900 to-rose-950/40 flex items-center justify-center overflow-hidden">
+          
+          <!-- Canvas for rendering and recording video -->
+          <canvas id="video-canvas" width="1280" height="720" class="w-full h-full object-contain"></canvas>
+
+          <!-- Floating Luna Host Bubble in top right -->
+          <div class="absolute top-3 right-3 flex items-center gap-2 bg-slate-900/85 backdrop-blur-md border border-rose-500/40 p-1.5 rounded-2xl shadow-xl z-20">
+            <div class="relative w-12 h-12 rounded-xl overflow-hidden border border-rose-400/50 shadow shrink-0">
+              <img 
+                src="/tutorial-assets/pixar_female_host_1788749082734.jpg" 
+                alt="Luna Pixar Host" 
+                class="w-full h-full object-cover"
+              />
+              <div id="speaking-pulse" class="hidden absolute inset-0 border-2 border-rose-400 rounded-xl animate-ping"></div>
+            </div>
+            <div class="pr-2">
+              <div class="flex items-center gap-1">
+                <span class="text-xs font-black text-rose-300">Luna</span>
+                <span class="bg-rose-500/30 text-rose-200 text-[9px] font-bold px-1 rounded">Pixar 3D</span>
+              </div>
+              <div id="speaking-wave" class="hidden flex items-center gap-0.5 mt-1 h-3">
+                <span class="wave-bar w-1 bg-rose-400 rounded-full"></span>
+                <span class="wave-bar w-1 bg-pink-400 rounded-full"></span>
+                <span class="wave-bar w-1 bg-rose-400 rounded-full"></span>
+                <span class="wave-bar w-1 bg-amber-400 rounded-full"></span>
+                <span class="wave-bar w-1 bg-rose-400 rounded-full"></span>
+              </div>
+              <div id="speaking-idle" class="text-[10px] text-slate-400">Pronta p/ falar</div>
+            </div>
+          </div>
+
+          <!-- Floating Chapter Badge in top left -->
+          <div class="absolute top-3 left-3 bg-slate-900/85 backdrop-blur-md border border-slate-700/60 px-3 py-1.5 rounded-xl shadow-lg z-20">
+            <div class="text-[10px] text-rose-400 font-bold uppercase tracking-wider" id="badge-chapter-num">Bloco 1 de 8</div>
+            <div class="text-xs font-extrabold text-white" id="badge-chapter-title">Importância & Vantagens</div>
+          </div>
+
+          <!-- Video Controls Overlay on Hover or Pause -->
+          <div id="play-overlay" onclick="togglePlay()" class="absolute inset-0 bg-slate-950/40 backdrop-blur-[2px] flex items-center justify-center cursor-pointer z-20 transition-all hover:bg-slate-950/20">
+            <div class="w-20 h-20 rounded-full bg-rose-600 hover:bg-rose-500 text-white flex items-center justify-center shadow-2xl shadow-rose-950 transform hover:scale-110 transition-all">
+              <svg id="icon-play-overlay" class="w-10 h-10 fill-white ml-1" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Video Player Bottom Controls Bar -->
+        <div class="bg-slate-950/90 border-t border-slate-800 p-3 flex flex-col gap-2 z-30">
+          
+          <!-- Progress Scrub Bar -->
+          <div class="relative w-full h-2.5 bg-slate-800 rounded-full cursor-pointer group" onclick="seekVideo(event)">
+            <div id="progress-bar" class="h-full bg-gradient-to-r from-rose-600 to-pink-500 rounded-full w-0 transition-all duration-150"></div>
+          </div>
+
+          <!-- Player Controls -->
+          <div class="flex items-center justify-between text-xs text-slate-300">
+            
+            <div class="flex items-center gap-3">
+              <!-- Play / Pause Button -->
+              <button 
+                id="btn-play-pause" 
+                onclick="togglePlay()" 
+                class="bg-slate-800 hover:bg-slate-700 text-white p-2 rounded-xl border border-slate-700 cursor-pointer transition-all active:scale-95"
+                title="Reproduzir / Pausar"
+              >
+                <svg id="icon-play-btn" class="w-4 h-4 fill-white" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                <svg id="icon-pause-btn" class="w-4 h-4 fill-white hidden" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+              </button>
+
+              <!-- Prev Chapter -->
+              <button 
+                onclick="prevChapter()" 
+                class="p-1.5 hover:text-white cursor-pointer transition-transform active:scale-90" 
+                title="Bloco Anterior"
+              >
+                ⏮️
+              </button>
+
+              <!-- Next Chapter -->
+              <button 
+                onclick="nextChapter()" 
+                class="p-1.5 hover:text-white cursor-pointer transition-transform active:scale-90" 
+                title="Próximo Bloco"
+              >
+                ⏭️
+              </button>
+
+              <!-- Time Counter -->
+              <span id="time-display" class="font-mono font-bold text-slate-300 text-xs">00:00 / 02:40</span>
+            </div>
+
+            <!-- Right Controls: Speed and Voice Toggle -->
+            <div class="flex items-center gap-2.5">
+              
+              <!-- Voice Toggle -->
+              <button 
+                id="btn-toggle-voice" 
+                onclick="toggleVoice()" 
+                class="bg-rose-950/60 border border-rose-500/40 text-rose-300 text-xs px-2.5 py-1 rounded-lg font-bold hover:bg-rose-900/60 cursor-pointer"
+                title="Ligar ou Desligar Voz da Luna"
+              >
+                🔊 Voz da Luna: <span id="label-voice-status" class="text-emerald-400">Ligada</span>
+              </button>
+
+              <!-- Speed Selector -->
+              <select 
+                id="select-speed" 
+                onchange="changeSpeed(this.value)" 
+                class="bg-slate-900 border border-slate-700 text-slate-200 text-xs px-2 py-1 rounded-lg font-bold cursor-pointer"
+              >
+                <option value="1">1x Normal</option>
+                <option value="1.15" selected>1.15x Dinâmico</option>
+                <option value="1.3">1.3x Ágil</option>
+              </select>
+
+            </div>
+
+          </div>
+
+        </div>
+
+      </div>
+
+      <!-- Live Spoken Subtitles & Transcript Box -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-lg flex flex-col gap-2">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-black uppercase text-rose-400 tracking-wider flex items-center gap-1.5">
+            💬 Narração Contínua da Luna (Disney Pixar)
+          </span>
+          <span class="text-[11px] text-emerald-400 font-semibold flex items-center gap-1">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            Transição Dinâmica Sem Intervalos Mortos
+          </span>
+        </div>
+        <p id="live-subtitle" class="text-sm sm:text-base text-slate-100 font-semibold leading-relaxed min-h-[4rem] bg-slate-950/80 p-3.5 rounded-xl border border-slate-800/80 transition-all">
+          "Olá, todas e todos. Meu nome é Luna! E hoje vou te guiar passo a passo..."
+        </p>
+      </div>
+
+    </div>
+
+    <!-- Right Column: 8 Chapters List & Social Media Downloads -->
+    <div class="lg:col-span-4 flex flex-col gap-4">
+
+      <!-- Download Pack for Social Media Card -->
+      <div class="bg-gradient-to-br from-rose-950/50 via-slate-900 to-emerald-950/30 border border-rose-500/40 rounded-2xl p-4 shadow-xl">
+        <div class="flex items-center gap-2 mb-2">
+          <span class="text-xl">📲</span>
+          <h2 class="text-sm font-extrabold text-white">Baixar em MP4 (Redes Sociais)</h2>
+        </div>
+        <p class="text-xs text-slate-300 mb-3">
+          Vídeo oficial em formato <strong>MP4 (H.264)</strong> apresentado por Luna, pronto para WhatsApp, Instagram Reels, TikTok, YouTube e Facebook:
+        </p>
+        
+        <div class="flex flex-col gap-2">
+          <!-- Direct 1-Click MP4 Download of Official Tutorial Video -->
+          <a 
+            href="/api/download-tutorial-mp4"
+            download="video_tutorial_agende_mais_facil_luna.mp4"
+            class="w-full bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-xs py-2.5 px-3 rounded-xl shadow-md shadow-emerald-950/50 transition-all flex items-center justify-between cursor-pointer active:scale-98"
+          >
+            <span class="flex items-center gap-2">
+              <span>🎬</span>
+              <span>Baixar Vídeo Oficial (.mp4)</span>
+            </span>
+            <span class="text-[10px] bg-white/20 px-2 py-0.5 rounded font-bold">1 Clique</span>
+          </a>
+
+          <!-- Live Canvas Recording with automatic server-side conversion to MP4 -->
+          <button 
+            onclick="startVideoRecording()"
+            class="w-full bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-500 hover:to-pink-500 text-white font-extrabold text-xs py-2.5 px-3 rounded-xl shadow-md transition-all flex items-center justify-between cursor-pointer active:scale-98"
+          >
+            <span class="flex items-center gap-2">
+              <span>🎥</span>
+              <span>Gravar Tela Customizada (.mp4)</span>
+            </span>
+            <span id="recording-indicator" class="text-[10px] bg-white/20 px-2 py-0.5 rounded font-bold">Gravar</span>
+          </button>
+
+          <button 
+            onclick="downloadScriptText()"
+            class="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-xs py-2 px-3 rounded-xl transition-all flex items-center justify-between cursor-pointer active:scale-98"
+          >
+            <span class="flex items-center gap-2">
+              <span>📋</span>
+              <span>Baixar Roteiro da Luna</span>
+            </span>
+            <span class="text-[10px] text-slate-400">TXT</span>
+          </button>
+
+          <div class="grid grid-cols-2 gap-2 mt-1">
+            <a 
+              href="/tutorial-assets/pixar_female_host_1788749082734.jpg" 
+              download="luna_celular_agenda_mais_facil.jpg"
+              class="bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700 text-[11px] font-bold py-1.5 px-2 rounded-lg text-center transition-all flex items-center justify-center gap-1"
+              title="Imagem da Luna segurando o celular com o aplicativo Agenda Mais Fácil visível no cabeçalho"
+            >
+              📱 Luna &amp; Celular HD
+            </a>
+            <a 
+              href="/tutorial-assets/real_salon_people_1788749097357.jpg" 
+              download="salao_pessoas_reais.jpg"
+              class="bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700 text-[11px] font-bold py-1.5 px-2 rounded-lg text-center transition-all flex items-center justify-center gap-1"
+            >
+              🖼️ Fotos Salão HD
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- 8 Connected Chapters Interactive List -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl flex flex-col flex-1">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-xs font-black uppercase text-slate-400 tracking-wider">
+            Blocos Conectados da Luna
+          </h2>
+          <span class="text-[10px] text-rose-400 font-bold">Toque para saltar</span>
+        </div>
+
+        <div class="flex flex-col gap-1.5 overflow-y-auto max-h-[420px] pr-1" id="chapters-container">
+          <!-- Populated dynamically -->
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- Standalone Footer -->
+  <footer class="bg-slate-950 border-t border-slate-800/80 py-4 mt-auto text-center text-xs text-slate-500">
+    <p>Agenda Mais Fácil Salão &amp; Barbearia • Vídeo Explicativo Passo a Passo com Luna Pixar 3D</p>
+    <p class="mt-1 text-[11px] text-slate-600">Página independente para treinamento e divulgação em redes sociais.</p>
+  </footer>
+
+  <!-- Script Logic -->
+  <script>
+    // Connected chapters - conversations flow seamlessly from one screen to the next
+    const chapters = [
+      {
+        id: 1,
+        title: "Importância & Vantagens",
+        estimatedDuration: 22,
+        narration: "Olá, todas e todos. Meu nome é Luna! E hoje eu vou te mostrar como o Agenda Mais Fácil Salão vai transformar a gestão do seu negócio. Ter um sistema próprio garante autonomia total: seus clientes agendam 24 horas por dia e cem por cento do lucro fica no seu bolso, sem intermediários. E para você começar a usar agora mesmo...",
+        keyPoints: ["Lucro 100% direto no seu bolso", "Sem taxas abusivas ou intermediários", "Agendamento online 24h automático"],
+        buttonTarget: "Visão Geral do Negócio",
+        image: "/tutorial-assets/real_salon_people_1788749097357.jpg"
+      },
+      {
+        id: 2,
+        title: "Como Acessar o Sistema",
+        estimatedDuration: 18,
+        narration: "...o primeiro passo é super rápido! Basta clicar no botão 'Entrada Salão / Administrador' no topo da tela, preencher o seu CPF cadastrado e o seu Token de Licença. Em um segundo o painel do seu salão se abre por completo! E preste muita atenção agora no próximo detalhe...",
+        keyPoints: ["Clique em 'Entrada Salão / Administrador'", "Informe seu CPF de proprietário", "Digite seu Token de Licença exclusivo"],
+        buttonTarget: "Botão 'Entrada Salão / Administrador'",
+        image: "/tutorial-assets/pixar_female_host_1788749082734.jpg"
+      },
+      {
+        id: 3,
+        title: "O Botão Mais Importante",
+        estimatedDuration: 20,
+        narration: "...porque este é o botão mais importante de todos! Veja aquele botão vermelho no topo: 'Criar Link p/ Clientes'. Clicando nele, você copia o link exclusivo do seu salão, cola direto na bio do seu Instagram e manda pelo WhatsApp para todos os clientes agendarem sozinhos. E para que eles escolham o que desejam...",
+        keyPoints: ["Botão vermelho 'Criar Link p/ Clientes'", "Cole o link na Bio do seu Instagram", "Envie para a lista de clientes no WhatsApp"],
+        buttonTarget: "Botão 'Criar Link p/ Clientes'",
+        image: "/tutorial-assets/real_barber_client_1788749113025.jpg"
+      },
+      {
+        id: 4,
+        title: "Cardápio de Serviços",
+        estimatedDuration: 18,
+        narration: "...nós vamos personalizar o seu cardápio! Na aba 'Serviços', clique em '+ Novo Serviço'. Cadastre cortes, barba, mechas, manicure ou escova, definindo os valores em reais e o tempo de cada atendimento para que a agenda nunca encavale horários. E para quem vai realizar esses procedimentos...",
+        keyPoints: ["Aba 'Serviços' e botão '+ Novo Serviço'", "Preços em Reais (R$) e duração em minutos", "Bloqueio automático contra choque de horários"],
+        buttonTarget: "Aba 'Serviços' ➔ '+ Novo Serviço'",
+        image: "/tutorial-assets/real_salon_people_1788749097357.jpg"
+      },
+      {
+        id: 5,
+        title: "Gestão da Equipe & Comissões",
+        estimatedDuration: 20,
+        narration: "...nós cadastramos a sua equipe de profissionais! Na aba 'Equipe', clique em '+ Novo Profissional'. Você adiciona seus barbeiros e cabeleireiras e define a comissão de cada um, como 50%, 60% ou 70%. O sistema calcula o pagamento da equipe automaticamente a cada corte finalizado. E no dia a dia do salão...",
+        keyPoints: ["Aba 'Equipe' e botão '+ Novo Profissional'", "Configuração individual de comissão (%)", "Cálculo exato e automático do pagamento"],
+        buttonTarget: "Aba 'Equipe' ➔ '+ Novo Profissional'",
+        image: "/tutorial-assets/pixar_female_host_1788749082734.jpg"
+      },
+      {
+        id: 6,
+        title: "Fluxo da Agenda no Dia a Dia",
+        estimatedDuration: 20,
+        narration: "...tudo acontece de forma muito simples na aba 'Agenda'! Você visualiza a fila de atendimentos do dia com filtros por profissional. Ao atender, basta tocar no agendamento para avançar o status de 'Agendado' para 'Em Atendimento' e depois 'Concluído', deixando a recepção sempre organizada. E no fim do expediente...",
+        keyPoints: ["Aba 'Agenda' com visão diária e por profissional", "Status: Agendado ➔ Em Atendimento ➔ Concluído", "Fila organizada em tempo real"],
+        buttonTarget: "Aba 'Agenda' ➔ Status do Agendamento",
+        image: "/tutorial-assets/real_barber_client_1788749113025.jpg"
+      },
+      {
+        id: 7,
+        title: "Controle de Caixa & Lucro",
+        estimatedDuration: 19,
+        narration: "...o controle financeiro fica impecável! Na aba 'Caixa' e no 'Dashboard', você acompanha cada centavo recebido no Pix, cartão ou dinheiro vivo. O sistema separa sozinho a comissão dos profissionais e o lucro líquido do salão, sem você precisar quebrar a cabeça com planilhas. E para fechar com chave de ouro...",
+        keyPoints: ["Aba 'Caixa' e 'Dashboard' em tempo real", "Entradas por Pix, Cartão e Dinheiro", "Separação automática: comissão vs lucro do salão"],
+        buttonTarget: "Aba 'Caixa' ➔ Painel Financeiro",
+        image: "/tutorial-assets/real_salon_people_1788749097357.jpg"
+      },
+      {
+        id: 8,
+        title: "Robô Automático & Instalação",
+        estimatedDuration: 21,
+        narration: "...o nosso robô automático cuida dos lembretes no WhatsApp e e-mail dos clientes! E você ainda pode instalar este aplicativo direto na tela inicial do seu celular, seja no Android ou no iPhone, em menos de dois cliques. Muito obrigada, eu sou a Luna e desejo muito sucesso e agenda cheia para o seu salão!",
+        keyPoints: ["Robô de despacho automático por WhatsApp e E-mail", "Instale no Android (Chrome ➔ Instalar)", "Instale no iPhone (Safari ➔ Tela de Início)"],
+        buttonTarget: "Robô de Despacho & Instalação",
+        image: "/tutorial-assets/pixar_female_host_1788749082734.jpg"
+      }
+    ];
+
+    // Compute cumulative start/end times based on dynamic estimated durations
+    let accumTime = 0;
+    chapters.forEach(chap => {
+      chap.timeStart = accumTime;
+      chap.timeEnd = accumTime + chap.estimatedDuration;
+      chap.duration = chap.estimatedDuration;
+      accumTime += chap.estimatedDuration;
+    });
+    const TOTAL_SECONDS = accumTime; // Approx ~158 seconds (~2m 38s of dynamic, continuous audio)
+
+    let currentTime = 0;
+    let isPlaying = false;
+    let currentChapterIndex = 0;
+    let playbackSpeed = 1.15; // Natural dynamic pace
+    let isVoiceEnabled = true;
+    let timerInterval = null;
+    let nextChapterTimeout = null;
+    let speechSynth = window.speechSynthesis;
+    let currentUtterance = null;
+
+    // Canvas & Animation
+    const canvas = document.getElementById('video-canvas');
+    const ctx = canvas.getContext('2d');
+
+    // Preload Images
+    const loadedImages = {};
+    const imageUrls = [
+      "/tutorial-assets/pixar_female_host_1788749082734.jpg",
+      "/tutorial-assets/real_salon_people_1788749097357.jpg",
+      "/tutorial-assets/real_barber_client_1788749113025.jpg"
+    ];
+
+    imageUrls.forEach(url => {
+      const img = new Image();
+      img.src = url;
+      img.onload = () => {
+        loadedImages[url] = img;
+        drawCanvasFrame();
+      };
+    });
+
+    // Populate Chapter List in Sidebar
+    function renderChaptersList() {
+      const container = document.getElementById('chapters-container');
+      container.innerHTML = '';
+
+      chapters.forEach((chap, idx) => {
+        const isActive = idx === currentChapterIndex;
+        const btn = document.createElement('button');
+        btn.onclick = () => jumpToChapter(idx);
+        btn.className = `w-full text-left p-2.5 rounded-xl border transition-all flex items-start gap-2.5 cursor-pointer ${
+          isActive 
+            ? 'bg-rose-950/60 border-rose-500/80 text-white shadow-md ring-1 ring-rose-400/40' 
+            : 'bg-slate-950/40 border-slate-800 text-slate-300 hover:bg-slate-800/60 hover:text-white'
+        }`;
+
+        const formatMinutes = (sec) => {
+          const m = Math.floor(sec / 60);
+          const s = Math.floor(sec % 60);
+          return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+        };
+
+        btn.innerHTML = `
+          <div class="w-6 h-6 rounded-lg ${isActive ? 'bg-rose-600 text-white' : 'bg-slate-800 text-slate-400'} flex items-center justify-center text-xs font-black shrink-0">
+            ${chap.id}
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold truncate ${isActive ? 'text-rose-200 font-extrabold' : 'text-slate-200'}">${chap.title}</span>
+              <span class="text-[10px] font-mono text-slate-400 shrink-0">${formatMinutes(chap.timeStart)}</span>
+            </div>
+            <p class="text-[11px] text-slate-400 truncate mt-0.5">${chap.buttonTarget}</p>
+          </div>
+        `;
+        container.appendChild(btn);
+      });
+    }
+
+    // Format Seconds to MM:SS
+    function formatTime(sec) {
+      const m = Math.floor(sec / 60);
+      const s = Math.floor(sec % 60);
+      return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    }
+
+    // Draw Video Frame on Canvas
+    function drawCanvasFrame() {
+      const chap = chapters[currentChapterIndex];
+      const w = canvas.width;
+      const h = canvas.height;
+
+      // Dark background with gradient
+      const bgGrad = ctx.createLinearGradient(0, 0, w, h);
+      bgGrad.addColorStop(0, '#0f172a');
+      bgGrad.addColorStop(0.5, '#020617');
+      bgGrad.addColorStop(1, '#1e1b4b');
+      ctx.fillStyle = bgGrad;
+      ctx.fillRect(0, 0, w, h);
+
+      // Top Branding Header Bar in Video Canvas
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
+      ctx.fillRect(0, 0, w, 65);
+      ctx.strokeStyle = '#1e293b';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(0, 65);
+      ctx.lineTo(w, 65);
+      ctx.stroke();
+
+      // Top Brand Logo & App Name (Agenda Mais Fácil)
+      ctx.fillStyle = '#e11d48';
+      ctx.beginPath();
+      ctx.roundRect(60, 16, 34, 34, 8);
+      ctx.fill();
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '900 20px "Plus Jakarta Sans", sans-serif';
+      ctx.fillText('✂', 68, 40);
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '900 20px "Plus Jakarta Sans", sans-serif';
+      ctx.fillText('AGENDA MAIS FÁCIL', 105, 40);
+      ctx.fillStyle = '#f43f5e';
+      ctx.font = 'bold 15px "Plus Jakarta Sans", sans-serif';
+      ctx.fillText('• VÍDEO TUTORIAL OFICIAL', 320, 40);
+
+      ctx.fillStyle = '#94a3b8';
+      ctx.font = 'bold 14px "Plus Jakarta Sans", sans-serif';
+      ctx.textAlign = 'right';
+      ctx.fillText('LUNA • DISNEY PIXAR 3D', 1220, 40);
+      ctx.textAlign = 'left';
+
+      // Draw Main Feature Image if loaded
+      const img = loadedImages[chap.image];
+      if (img) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.roundRect(60, 95, 520, 530, 24);
+        ctx.clip();
+        ctx.drawImage(img, 60, 95, 520, 530);
+        ctx.restore();
+
+        // Border around image
+        ctx.strokeStyle = '#e11d48';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.roundRect(60, 95, 520, 530, 24);
+        ctx.stroke();
+
+        // If it is Luna holding phone, add subtle pill badge
+        if (chap.image.includes('pixar_female_host')) {
+          ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+          ctx.beginPath();
+          ctx.roundRect(80, 575, 230, 36, 12);
+          ctx.fill();
+          ctx.strokeStyle = '#f43f5e';
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+          ctx.fillStyle = '#ffffff';
+          ctx.font = 'bold 13px "Plus Jakarta Sans", sans-serif';
+          ctx.fillText('📱 App Agenda Mais Fácil', 95, 598);
+        }
+      }
+
+      // Draw Right Content Card
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
+      ctx.beginPath();
+      ctx.roundRect(620, 100, 600, 520, 24);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(225, 29, 72, 0.45)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // Header Tag: Chapter
+      ctx.fillStyle = '#f43f5e';
+      ctx.font = 'bold 22px "Plus Jakarta Sans", sans-serif';
+      ctx.fillText(`BLOCO ${chap.id} DE 8  •  FLUXO DINÂMICO`, 660, 150);
+
+      // Chapter Title
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '900 36px "Plus Jakarta Sans", sans-serif';
+      ctx.fillText(chap.title, 660, 200);
+
+      // Target Button Action Box
+      ctx.fillStyle = '#881337';
+      ctx.beginPath();
+      ctx.roundRect(660, 230, 520, 60, 16);
+      ctx.fill();
+      ctx.strokeStyle = '#f43f5e';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      ctx.fillStyle = '#ffe4e6';
+      ctx.font = 'bold 20px "Plus Jakarta Sans", sans-serif';
+      ctx.fillText(`🎯 Botão Exato: ${chap.buttonTarget}`, 680, 268);
+
+      // Bullet Points
+      ctx.font = '600 21px "Plus Jakarta Sans", sans-serif';
+      chap.keyPoints.forEach((pt, i) => {
+        const yPos = 340 + (i * 55);
+        ctx.fillStyle = '#22c55e';
+        ctx.fillText('✓', 660, yPos);
+        ctx.fillStyle = '#e2e8f0';
+        ctx.fillText(pt, 690, yPos);
+      });
+
+      // Luna Pixar Avatar badge at bottom right inside card
+      const lunaImg = loadedImages["/tutorial-assets/pixar_female_host_1788749082734.jpg"];
+      if (lunaImg) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.roundRect(660, 520, 70, 70, 16);
+        ctx.clip();
+        ctx.drawImage(lunaImg, 660, 520, 70, 70);
+        ctx.restore();
+      }
+
+      ctx.fillStyle = '#fb7185';
+      ctx.font = 'bold 18px "Plus Jakarta Sans", sans-serif';
+      ctx.fillText('Luna • Apresentadora Especialista', 745, 550);
+      ctx.fillStyle = '#94a3b8';
+      ctx.font = '15px "Plus Jakarta Sans", sans-serif';
+      ctx.fillText('Disney Pixar 3D Animation • Locução Dinâmica (pt-BR)', 745, 575);
+    }
+
+    // Dynamic Speech & Studio Audio Narration Handler
+    let currentAudioObj = null;
+
+    function speakNarration(text) {
+      if (!isVoiceEnabled) return;
+
+      if (nextChapterTimeout) {
+        clearTimeout(nextChapterTimeout);
+        nextChapterTimeout = null;
+      }
+      if (currentAudioObj) {
+        try { currentAudioObj.pause(); currentAudioObj = null; } catch {}
+      }
+      if (speechSynth) {
+        speechSynth.cancel();
+      }
+
+      const chap = chapters[currentChapterIndex];
+      const audioUrl = `/tutorial_audio/chapter_${chap.id}.mp3`;
+      const audio = new Audio(audioUrl);
+      audio.playbackRate = playbackSpeed;
+      currentAudioObj = audio;
+
+      audio.onplay = () => {
+        document.getElementById('speaking-pulse').classList.remove('hidden');
+        document.getElementById('speaking-wave').classList.remove('hidden');
+        document.getElementById('speaking-idle').classList.add('hidden');
+      };
+
+      audio.onended = () => {
+        document.getElementById('speaking-pulse').classList.add('hidden');
+        document.getElementById('speaking-wave').classList.add('hidden');
+        document.getElementById('speaking-idle').classList.remove('hidden');
+
+        if (isPlaying && isVoiceEnabled) {
+          nextChapterTimeout = setTimeout(() => {
+            if (isPlaying) {
+              if (currentChapterIndex < chapters.length - 1) {
+                currentChapterIndex++;
+                currentTime = chapters[currentChapterIndex].timeStart;
+                onChapterChange();
+              } else {
+                pauseVideo();
+                jumpToChapter(0);
+              }
+            }
+          }, 350 / playbackSpeed);
+        }
+      };
+
+      audio.onerror = () => {
+        console.warn("Studio audio load notice, falling back to browser synthesis...");
+        speakNarrationSynth(text);
+      };
+
+      audio.play().catch(e => {
+        console.warn("Audio autoplay blocked or failed, fallback to synthesis:", e);
+        speakNarrationSynth(text);
+      });
+    }
+
+    function speakNarrationSynth(text) {
+      if (!isVoiceEnabled || !('speechSynthesis' in window)) return;
+      try {
+        currentUtterance = new SpeechSynthesisUtterance(text);
+        currentUtterance.lang = 'pt-BR';
+        currentUtterance.rate = playbackSpeed;
+        currentUtterance.pitch = 1.05;
+        
+        const voices = speechSynth.getVoices();
+        const ptVoice = voices.find(v => v.lang === 'pt-BR' && (v.name.includes('Luciana') || v.name.includes('Francisca') || v.name.includes('Google') || v.name.includes('Maria') || v.name.includes('Helena'))) 
+                     || voices.find(v => v.lang.startsWith('pt'));
+        if (ptVoice) {
+          currentUtterance.voice = ptVoice;
+        }
+
+        currentUtterance.onstart = () => {
+          document.getElementById('speaking-pulse').classList.remove('hidden');
+          document.getElementById('speaking-wave').classList.remove('hidden');
+          document.getElementById('speaking-idle').classList.add('hidden');
+        };
+
+        currentUtterance.onend = () => {
+          document.getElementById('speaking-pulse').classList.add('hidden');
+          document.getElementById('speaking-wave').classList.add('hidden');
+          document.getElementById('speaking-idle').classList.remove('hidden');
+
+          if (isPlaying && isVoiceEnabled) {
+            nextChapterTimeout = setTimeout(() => {
+              if (isPlaying) {
+                if (currentChapterIndex < chapters.length - 1) {
+                  currentChapterIndex++;
+                  currentTime = chapters[currentChapterIndex].timeStart;
+                  onChapterChange();
+                } else {
+                  pauseVideo();
+                  jumpToChapter(0);
+                }
+              }
+            }, 350 / playbackSpeed);
+          }
+        };
+
+        speechSynth.speak(currentUtterance);
+      } catch (e) {
+        console.error("Speech synth error", e);
+      }
+    }
+
+    // Toggle Play / Pause
+    function togglePlay() {
+      if (isPlaying) {
+        pauseVideo();
+      } else {
+        playVideo();
+      }
+    }
+
+    function playVideo() {
+      isPlaying = true;
+      document.getElementById('play-overlay').classList.add('hidden');
+      document.getElementById('icon-play-btn').classList.add('hidden');
+      document.getElementById('icon-pause-btn').classList.remove('hidden');
+
+      const chap = chapters[currentChapterIndex];
+      if (currentAudioObj && currentAudioObj.paused && currentAudioObj.currentTime > 0) {
+        currentAudioObj.play().catch(() => speakNarration(chap.narration));
+      } else {
+        speakNarration(chap.narration);
+      }
+
+      if (timerInterval) clearInterval(timerInterval);
+      timerInterval = setInterval(() => {
+        currentTime += 1;
+        updateUIProgress();
+
+        // Fallback advancement if voice is off or muted
+        if (!isVoiceEnabled) {
+          const activeChap = chapters[currentChapterIndex];
+          if (currentTime >= activeChap.timeEnd) {
+            if (currentChapterIndex < chapters.length - 1) {
+              currentChapterIndex++;
+              onChapterChange();
+            } else {
+              pauseVideo();
+              currentTime = 0;
+              currentChapterIndex = 0;
+              updateUIProgress();
+            }
+          }
+        }
+      }, 1000 / playbackSpeed);
+    }
+
+    function pauseVideo() {
+      isPlaying = false;
+      document.getElementById('play-overlay').classList.remove('hidden');
+      document.getElementById('icon-play-btn').classList.remove('hidden');
+      document.getElementById('icon-pause-btn').classList.add('hidden');
+      if (timerInterval) clearInterval(timerInterval);
+      if (nextChapterTimeout) {
+        clearTimeout(nextChapterTimeout);
+        nextChapterTimeout = null;
+      }
+      if (currentAudioObj) {
+        try { currentAudioObj.pause(); } catch {}
+      }
+      if (speechSynth) speechSynth.cancel();
+      document.getElementById('speaking-pulse').classList.add('hidden');
+      document.getElementById('speaking-wave').classList.add('hidden');
+      document.getElementById('speaking-idle').classList.remove('hidden');
+    }
+
+    function updateUIProgress() {
+      const progressPercent = Math.min(100, (currentTime / TOTAL_SECONDS) * 100);
+      document.getElementById('progress-bar').style.width = `${progressPercent}%`;
+      document.getElementById('time-display').innerText = `${formatTime(currentTime)} / ${formatTime(TOTAL_SECONDS)}`;
+
+      const chap = chapters[currentChapterIndex];
+      document.getElementById('badge-chapter-num').innerText = `Bloco ${chap.id} de 8`;
+      document.getElementById('badge-chapter-title').innerText = chap.title;
+      document.getElementById('live-subtitle').innerText = `"${chap.narration}"`;
+
+      drawCanvasFrame();
+    }
+
+    function onChapterChange() {
+      renderChaptersList();
+      updateUIProgress();
+      if (isPlaying) {
+        const chap = chapters[currentChapterIndex];
+        speakNarration(chap.narration);
+      }
+    }
+
+    function jumpToChapter(index) {
+      if (nextChapterTimeout) {
+        clearTimeout(nextChapterTimeout);
+        nextChapterTimeout = null;
+      }
+      if (currentAudioObj) {
+        try { currentAudioObj.pause(); currentAudioObj = null; } catch {}
+      }
+      currentChapterIndex = index;
+      currentTime = chapters[index].timeStart;
+      onChapterChange();
+    }
+
+    function nextChapter() {
+      if (currentChapterIndex < chapters.length - 1) {
+        jumpToChapter(currentChapterIndex + 1);
+      }
+    }
+
+    function prevChapter() {
+      if (currentChapterIndex > 0) {
+        jumpToChapter(currentChapterIndex - 1);
+      }
+    }
+
+    function seekVideo(event) {
+      const rect = event.currentTarget.getBoundingClientRect();
+      const clickX = event.clientX - rect.left;
+      const width = rect.width;
+      const percent = Math.max(0, Math.min(1, clickX / width));
+      currentTime = Math.floor(percent * TOTAL_SECONDS);
+
+      const targetIndex = chapters.findIndex(c => currentTime >= c.timeStart && currentTime < c.timeEnd);
+      if (targetIndex !== -1) {
+        currentChapterIndex = targetIndex;
+      }
+      onChapterChange();
+    }
+
+    function toggleVoice() {
+      isVoiceEnabled = !isVoiceEnabled;
+      const label = document.getElementById('label-voice-status');
+      if (isVoiceEnabled) {
+        label.innerText = 'Ligada';
+        label.className = 'text-emerald-400';
+        if (isPlaying) {
+          speakNarration(chapters[currentChapterIndex].narration);
+        }
+      } else {
+        label.innerText = 'Desligada';
+        label.className = 'text-rose-400';
+        if (currentAudioObj) {
+          try { currentAudioObj.pause(); currentAudioObj = null; } catch {}
+        }
+        if (speechSynth) speechSynth.cancel();
+      }
+    }
+
+    function changeSpeed(speed) {
+      playbackSpeed = parseFloat(speed);
+      if (currentAudioObj) {
+        currentAudioObj.playbackRate = playbackSpeed;
+      }
+      if (isPlaying) {
+        pauseVideo();
+        playVideo();
+      }
+    }
+
+    // Video Recording via Canvas Stream MediaRecorder
+    let mediaRecorder = null;
+    let recordedChunks = [];
+    let isRecording = false;
+
+    function startVideoRecording() {
+      if (isRecording) {
+        stopVideoRecording();
+        return;
+      }
+
+      try {
+        const stream = canvas.captureStream(30); // 30 FPS
+        const options = { mimeType: 'video/webm;codecs=vp9' };
+        
+        let recorder;
+        try {
+          recorder = new MediaRecorder(stream, options);
+        } catch (e) {
+          recorder = new MediaRecorder(stream);
+        }
+
+        recordedChunks = [];
+        recorder.ondataavailable = (event) => {
+          if (event.data.size > 0) {
+            recordedChunks.push(event.data);
+          }
+        };
+
+        recorder.onstop = async () => {
+          const rawBlob = new Blob(recordedChunks, { type: recorder.mimeType || 'video/webm' });
+          const indicator = document.getElementById('recording-indicator');
+          if (indicator) {
+            indicator.innerText = 'Convertendo MP4...';
+            indicator.className = 'text-[10px] bg-amber-500 text-white px-2 py-0.5 rounded font-black animate-pulse';
+          }
+
+          function downloadBlob(b, filename) {
+            const url = URL.createObjectURL(b);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(() => URL.revokeObjectURL(url), 2000);
+          }
+
+          function resetIndicator() {
+            isRecording = false;
+            if (indicator) {
+              indicator.innerText = 'Gravar';
+              indicator.className = 'text-[10px] bg-white/20 px-2 py-0.5 rounded font-bold';
+            }
+          }
+
+          // If browser recorded directly to MP4
+          if (recorder.mimeType && recorder.mimeType.includes('mp4')) {
+            downloadBlob(rawBlob, 'video_tutorial_agenda_mais_facil_luna.mp4');
+            resetIndicator();
+            alert('🎬 Vídeo MP4 gravado com sucesso!');
+            return;
+          }
+
+          // Otherwise convert via backend ffmpeg to high-definition H.264 MP4
+          try {
+            const resp = await fetch('/api/convert-to-mp4', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/octet-stream' },
+              body: rawBlob
+            });
+
+            if (resp.ok) {
+              const mp4Blob = await resp.blob();
+              downloadBlob(mp4Blob, 'video_tutorial_agenda_mais_facil_luna.mp4');
+              alert('🎬 Vídeo convertido para MP4 com sucesso e download iniciado!');
+            } else {
+              // Fallback to the ready-made official tutorial MP4
+              window.location.href = '/api/download-tutorial-mp4';
+            }
+          } catch (e) {
+            console.warn('Fallback direct download MP4:', e);
+            window.location.href = '/api/download-tutorial-mp4';
+          } finally {
+            resetIndicator();
+          }
+        };
+
+        recorder.start();
+        mediaRecorder = recorder;
+        isRecording = true;
+
+        document.getElementById('recording-indicator').innerText = 'Gravando...';
+        document.getElementById('recording-indicator').className = 'text-[10px] bg-red-500 text-white animate-pulse px-2 py-0.5 rounded font-black';
+
+        // Play from start while recording
+        currentTime = 0;
+        currentChapterIndex = 0;
+        playVideo();
+
+      } catch (err) {
+        console.error(err);
+        alert('Erro ao iniciar gravação no navegador: ' + err.message);
+      }
+    }
+
+    function stopVideoRecording() {
+      if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.stop();
+      }
+    }
+
+    // Download Script as .txt with Luna's text
+    function downloadScriptText() {
+      let scriptContent = `🎬 ROTEIRO COMPLETO DO VÍDEO TUTORIAL • AGENDA MAIS FÁCIL SALÃO
+Apresentadora: Luna (Animação 3D Disney Pixar)
+Formato: Narração Dinâmica Contínua (Sem Pausas Mortas)
+Idioma: Português do Brasil (pt-BR)
+
+=======================================================
+PROPOSTA E FORMATO PARA REDES SOCIAIS:
+Instagram Reels • TikTok • YouTube Shorts • WhatsApp • Facebook
+Sugestão de Legenda:
+"Olá, todas e todos. Meu nome é Luna! Veja como o Agenda Mais Fácil Salão transforma sua barbearia ou salão com agendamento 24h, cálculo automático de comissão e 100% do lucro direto no seu bolso. Link na Bio!"
+Hashtags: #salaodebeleza #barbearia #gestaodesalao #agendamentoonline #salaoparceiro #agendamaisfacil
+=======================================================
+
+`;
+
+      chapters.forEach(chap => {
+        scriptContent += `-------------------------------------------------------
+[BLOCO ${chap.id}] ${chap.title}
+🎯 Botão de Foco: ${chap.buttonTarget}
+
+🎙️ FALA DA LUNA (VOZ):
+"${chap.narration}"
+
+📌 PONTOS-CHAVE EM TELA:
+${chap.keyPoints.map(p => `  • ${p}`).join('\n')}
+`;
+      });
+
+      scriptContent += `
+=======================================================
+FIM DO ROTEIRO • APRESENTADO POR LUNA (AGENDA FÁCIL SALÃO)
+`;
+
+      const blob = new Blob([scriptContent], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'roteiro_video_tutorial_luna_pixar.txt';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+
+    // Initialize on load
+    window.onload = () => {
+      renderChaptersList();
+      updateUIProgress();
+      drawCanvasFrame();
+    };
+  </script>
+</body>
+</html>

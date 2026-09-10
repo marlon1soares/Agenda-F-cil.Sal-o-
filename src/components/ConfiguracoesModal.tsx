@@ -14,6 +14,8 @@ import {
 interface ConfiguracoesModalProps {
   isOpen: boolean;
   config: SalonConfig;
+  salonId?: string;
+  salonName?: string;
   onClose: () => void;
   onSaveConfig: (cfg: SalonConfig) => void;
 }
@@ -21,6 +23,8 @@ interface ConfiguracoesModalProps {
 export const ConfiguracoesModal: React.FC<ConfiguracoesModalProps> = ({
   isOpen,
   config,
+  salonId,
+  salonName,
   onClose,
   onSaveConfig,
 }) => {
@@ -44,6 +48,7 @@ export const ConfiguracoesModal: React.FC<ConfiguracoesModalProps> = ({
   );
   const [scheduleSubTab, setScheduleSubTab] = useState<'quinzena' | 'semanal' | 'geral'>('quinzena');
   const [batchFeedback, setBatchFeedback] = useState<string | null>(null);
+  const [saveSuccess, setSaveSuccess] = useState(false);
 
   // Custom date picker for dates outside next 15 days
   const [customDateInput, setCustomDateInput] = useState('');
@@ -66,17 +71,23 @@ export const ConfiguracoesModal: React.FC<ConfiguracoesModalProps> = ({
 
   const logoFileRef = useRef<HTMLInputElement>(null);
   const bgFileRef = useRef<HTMLInputElement>(null);
+  const prevIsOpenRef = useRef(false);
 
-  // Re-sync when config changes or modal opens
+  // Re-sync when modal transitions from closed to open
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && !prevIsOpenRef.current) {
       setNomeSalao(config.nomeSalao || '');
       setLogoUrl(config.logoUrl || '');
       setBgHeaderUrl(config.bgHeaderUrl || '');
       setTemaKey(config.temaKey || 'azul');
       setCorCustom(config.corCustom || '#2563eb');
       
-      const sc = config.scheduleConfig || DEFAULT_SCHEDULE_CONFIG;
+      const sc: ScheduleConfig = {
+        ...DEFAULT_SCHEDULE_CONFIG,
+        ...(config.scheduleConfig || {}),
+        weeklySchedule: config.scheduleConfig?.weeklySchedule || DEFAULT_SCHEDULE_CONFIG.weeklySchedule,
+        specificDateSchedule: config.scheduleConfig?.specificDateSchedule || {}
+      };
       setDefaultStartTime(sc.defaultStartTime || '09:00');
       setDefaultEndTime(sc.defaultEndTime || '20:00');
       setDefaultIntervalMinutes(sc.defaultIntervalMinutes || 60);
@@ -96,8 +107,10 @@ export const ConfiguracoesModal: React.FC<ConfiguracoesModalProps> = ({
       setCpfCnpjCartao(config.cpfCnpjCartao || '');
       setLinkCartao(config.linkCartao || '');
       setInstrucoesPagamento(config.instrucoesPagamento || '');
+      setSaveSuccess(false);
     }
-  }, [isOpen, config]);
+    prevIsOpenRef.current = isOpen;
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -244,7 +257,11 @@ export const ConfiguracoesModal: React.FC<ConfiguracoesModalProps> = ({
     };
 
     onSaveConfig(updated);
-    onClose();
+    setSaveSuccess(true);
+    setTimeout(() => {
+      setSaveSuccess(false);
+      onClose();
+    }, 600);
   };
 
   // Upcoming 15 days calculation
@@ -263,15 +280,22 @@ export const ConfiguracoesModal: React.FC<ConfiguracoesModalProps> = ({
         {/* Header */}
         <div className="p-4 sm:p-5 border-b border-slate-800 flex items-center justify-between bg-slate-900">
           <div>
-            <h3 className="text-base font-extrabold text-white flex items-center gap-2">
-              <Settings className="w-5 h-5 text-blue-400" />
-              <span>Configurações do Estabelecimento</span>
-            </h3>
-            <p className="text-xs text-slate-400">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="text-base font-extrabold text-white flex items-center gap-2">
+                <Settings className="w-5 h-5 text-blue-400" />
+                <span>Configurações do Estabelecimento</span>
+              </h3>
+              {salonName && (
+                <span className="bg-sky-500/15 border border-sky-500/40 text-sky-300 text-[11px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                  💈 {salonName}
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-slate-400 mt-0.5">
               Personalize a identidade visual, horários da agenda e dados de recebimento (Pix e Cartão)
             </p>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors">
+          <button onClick={onClose} className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors cursor-pointer">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -1028,12 +1052,19 @@ export const ConfiguracoesModal: React.FC<ConfiguracoesModalProps> = ({
           )}
 
           {/* Action button */}
-          <div className="pt-2">
+          <div className="pt-2 space-y-2">
+            {saveSuccess && (
+              <div className="p-3 bg-emerald-950/90 border border-emerald-500/80 text-emerald-200 rounded-xl font-bold flex items-center justify-center gap-2 text-xs animate-in fade-in">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>Horários e configurações salvos com sucesso no seu salão!</span>
+              </div>
+            )}
             <button
               type="submit"
-              className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs py-3 rounded-2xl transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer active:scale-98"
+              disabled={saveSuccess}
+              className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs py-3 rounded-2xl transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer active:scale-98 disabled:opacity-75"
             >
-              <Save className="w-4 h-4" /> SALVAR TODAS AS ALTERAÇÕES
+              <Save className="w-4 h-4" /> {saveSuccess ? 'ALTERAÇÕES SALVAS!' : 'SALVAR TODAS AS ALTERAÇÕES'}
             </button>
           </div>
         </form>

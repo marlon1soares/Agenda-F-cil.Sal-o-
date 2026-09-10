@@ -4,6 +4,7 @@ import {
   ChatMessage, SystemBroadcastNotice, LivePresenceUser, EmployeeFechamentoRecord
 } from '../types';
 import { DEFAULT_CONFIG, DEFAULT_PROFESSIONALS, DEFAULT_SERVICES, DEFAULT_CLIENTS, INITIAL_TRANSACTIONS, INITIAL_APPOINTMENTS, INITIAL_CATALOG, DEFAULT_SALON_APPS } from '../data/mockData';
+import { DEFAULT_SCHEDULE_CONFIG } from './schedule';
 import { syncEngine } from './syncEngine';
 
 // IndexedDB for media storage (Photos & Videos without size limits)
@@ -99,15 +100,89 @@ function safeRemoveItem(key: string): void {
 
 // LocalStorage Persistence Wrappers
 export const Storage = {
-  getConfig(): SalonConfig {
+  getConfig(salonId?: string): SalonConfig {
+    const effectiveSalonId = salonId || safeGetItem('salao_active_id');
+    if (effectiveSalonId) {
+      // 1. Check specific salon config in localStorage
+      const specific = safeGetItem(`salaoConfig_${effectiveSalonId}`);
+      if (specific) {
+        try {
+          const parsed = JSON.parse(specific);
+          if (parsed && parsed.nomeSalao) {
+            if (!parsed.scheduleConfig) {
+              parsed.scheduleConfig = DEFAULT_SCHEDULE_CONFIG;
+            }
+            return parsed;
+          }
+        } catch {}
+      }
+      // 2. Check in salaoAppsList
+      const salon = this.getSalons().find(s => s.id === effectiveSalonId);
+      if (salon && salon.config) {
+        if (!salon.config.scheduleConfig) {
+          salon.config.scheduleConfig = DEFAULT_SCHEDULE_CONFIG;
+        }
+        return salon.config;
+      }
+    }
     const saved = safeGetItem('salaoConfig');
-    return saved ? JSON.parse(saved) : DEFAULT_CONFIG;
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (parsed && !parsed.scheduleConfig) {
+          parsed.scheduleConfig = DEFAULT_SCHEDULE_CONFIG;
+        }
+        return parsed;
+      } catch {}
+    }
+    return DEFAULT_CONFIG;
   },
-  saveConfig(config: SalonConfig) {
+  saveConfig(config: SalonConfig, salonId?: string) {
+    const effectiveSalonId = salonId || safeGetItem('salao_active_id') || 'salon-parcas';
+
+    // 1. Global config fallback
     safeSetItem('salaoConfig', JSON.stringify(config));
-    syncEngine.pushUpdate({ config });
+
+    // 2. Dedicated storage key for the individual salon
+    if (effectiveSalonId) {
+      safeSetItem(`salaoConfig_${effectiveSalonId}`, JSON.stringify(config));
+    }
+
+    // 3. Update the specific salon in salaoAppsList
+    const currentSalons = this.getSalons();
+    let updated = false;
+    const updatedSalons = currentSalons.map(s => {
+      if (s.id === effectiveSalonId) {
+        updated = true;
+        return {
+          ...s,
+          name: config.nomeSalao || s.name,
+          config: config
+        };
+      }
+      return s;
+    });
+
+    if (!updated && currentSalons.length > 0) {
+      updatedSalons[0] = {
+        ...updatedSalons[0],
+        name: config.nomeSalao || updatedSalons[0].name,
+        config: config
+      };
+    }
+
+    safeSetItem('salaoAppsList', JSON.stringify(updatedSalons));
+
+    // 4. Push updates to syncEngine with immediate persistence (Firestore + SSE)
+    syncEngine.pushUpdateImmediate({ 
+      config, 
+      salons: updatedSalons 
+    });
+
     if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('salao_sync_data', { detail: { key: 'salaoConfig' } }));
+      window.dispatchEvent(new CustomEvent('salao_sync_data', { 
+        detail: { key: 'salaoConfig', salonId: effectiveSalonId, config, salons: updatedSalons } 
+      }));
     }
   },
 
@@ -482,20 +557,44 @@ export const Storage = {
     const saved = safeGetItem('salaoAppsList');
     let list: SalonApp[] = saved ? JSON.parse(saved) : DEFAULT_SALON_APPS;
     
-    // Normalize any legacy SALAO-100X codes to SALAO-X (e.g. SALAO-1, SALAO-2, ...)
+    // Normalize any legacy SALAO-100X codes to SALAO-X and guarantee per-salon config integrity
     let changed = false;
     list = list.map((s, idx) => {
-      if (s.appCode) {
-        const legacyMatch = s.appCode.match(/^SALAO-100(\d+)$/i);
+      let currentConfig = s.config || DEFAULT_CONFIG;
+      const specific = safeGetItem(`salaoConfig_${s.id}`);
+      if (specific) {
+        try {
+          const parsed = JSON.parse(specific);
+          if (parsed && parsed.nomeSalao) {
+            currentConfig = parsed;
+          }
+        } catch {}
+      }
+
+      if (!currentConfig.scheduleConfig) {
+        currentConfig = {
+          ...currentConfig,
+          scheduleConfig: DEFAULT_SCHEDULE_CONFIG
+        };
+      }
+
+      let appCode = s.appCode;
+      if (appCode) {
+        const legacyMatch = appCode.match(/^SALAO-100(\d+)$/i);
         if (legacyMatch) {
           changed = true;
-          return { ...s, appCode: `SALAO-${legacyMatch[1]}` };
+          appCode = `SALAO-${legacyMatch[1]}`;
         }
       } else {
         changed = true;
-        return { ...s, appCode: `SALAO-${idx + 1}` };
+        appCode = `SALAO-${idx + 1}`;
       }
-      return s;
+
+      return {
+        ...s,
+        config: currentConfig,
+        appCode
+      };
     });
 
     if (changed && saved) {
@@ -505,7 +604,12 @@ export const Storage = {
   },
   saveSalons(salons: SalonApp[]) {
     safeSetItem('salaoAppsList', JSON.stringify(salons));
-    syncEngine.pushUpdate({ salons });
+    salons.forEach(s => {
+      if (s && s.id && s.config) {
+        safeSetItem(`salaoConfig_${s.id}`, JSON.stringify(s.config));
+      }
+    });
+    syncEngine.pushUpdateImmediate({ salons });
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('salao_sync_data', { detail: { key: 'salaoAppsList' } }));
     }

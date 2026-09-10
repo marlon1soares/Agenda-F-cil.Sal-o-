@@ -23,7 +23,6 @@ interface NavbarProps {
   onOpenSalonLink?: () => void;
   onOpenSalonAccessLink?: () => void;
   onOpenAdminChangePassword?: () => void;
-  onOpenVideoTutorial?: () => void;
   isExpanded: boolean;
   onToggleExpand: () => void;
   isMinimized: boolean;
@@ -48,7 +47,6 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenSalonLink,
   onOpenSalonAccessLink,
   onOpenAdminChangePassword,
-  onOpenVideoTutorial,
   isExpanded,
   onToggleExpand,
   isMinimized,

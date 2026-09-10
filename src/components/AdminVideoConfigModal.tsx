@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { VideoTutorialConfig, VideoTutorialChapterConfig } from '../types';
 import { Storage } from '../utils/storage';
 import { 
   Video, Sparkles, Youtube, Globe, Check, X, Play, RotateCcw, 
-  MessageSquare, Sliders, ShieldCheck, HelpCircle, Save, ExternalLink
+  MessageSquare, Sliders, ShieldCheck, HelpCircle, Save, ExternalLink,
+  Upload, FileVideo, Loader2, Trash2, FolderOpen
 } from 'lucide-react';
 
 interface AdminVideoConfigModalProps {
@@ -130,6 +131,71 @@ export const AdminVideoConfigModal: React.FC<AdminVideoConfigModalProps> = ({
   const [chapters, setChapters] = useState<VideoTutorialChapterConfig[]>(DEFAULT_CHAPTERS);
   const [selectedChapterIndex, setSelectedChapterIndex] = useState(0);
   const [successMsg, setSuccessMsg] = useState('');
+
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [isUploadingVideo, setIsUploadingVideo] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadError, setUploadError] = useState('');
+  const [uploadedVideoInfo, setUploadedVideoInfo] = useState<{ name: string; size: string } | null>(null);
+  const [showVideoPreview, setShowVideoPreview] = useState(false);
+
+  const handleUploadVideoFile = (file: File) => {
+    if (!file) return;
+    setUploadError('');
+    setIsUploadingVideo(true);
+    setUploadProgress(0);
+
+    const formatSize = (bytes: number) => {
+      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+      return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    };
+
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', '/api/upload-video', true);
+    xhr.setRequestHeader('x-filename', encodeURIComponent(file.name));
+    xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable) {
+        const percent = Math.round((event.loaded / event.total) * 100);
+        setUploadProgress(percent);
+      }
+    };
+
+    xhr.onload = () => {
+      setIsUploadingVideo(false);
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          const res = JSON.parse(xhr.responseText);
+          if (res.url) {
+            setCustomVideoUrl(res.url);
+            setUploadedVideoInfo({ name: file.name, size: formatSize(file.size) });
+            setSuccessMsg('Vídeo do seu computador anexado com sucesso!');
+            setTimeout(() => setSuccessMsg(''), 3000);
+          }
+        } catch {
+          setUploadError('Erro ao processar resposta do servidor.');
+        }
+      } else {
+        setUploadError(`Falha no upload (Erro ${xhr.status}).`);
+      }
+    };
+
+    xhr.onerror = () => {
+      setIsUploadingVideo(false);
+      setUploadError('Erro de conexão durante o upload.');
+    };
+
+    xhr.send(file);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      handleUploadVideoFile(file);
+    }
+    if (e.target) e.target.value = '';
+  };
 
   useEffect(() => {
     if (isOpen) {
@@ -413,18 +479,166 @@ export const AdminVideoConfigModal: React.FC<AdminVideoConfigModalProps> = ({
                     </p>
                   </div>
 
-                  <div className="space-y-1">
-                    <label className="block text-xs font-bold text-slate-300 flex items-center gap-1.5">
-                      <Globe className="w-3.5 h-3.5 text-sky-400" />
-                      <span>Link Direto de Vídeo MP4 / Embed (Opcional):</span>
-                    </label>
-                    <input
-                      type="url"
-                      value={customVideoUrl}
-                      onChange={(e) => setCustomVideoUrl(e.target.value)}
-                      placeholder="https://meuservidor.com/video-tutorial.mp4"
-                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono text-xs focus:outline-none focus:border-red-400"
-                    />
+                  {/* Hidden Native File Input */}
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="video/mp4,video/webm,video/ogg,video/quicktime,video/*,.mp4,.webm,.mov,.avi,.mkv"
+                    className="hidden"
+                    onChange={handleFileChange}
+                  />
+
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <label className="block text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                        <Globe className="w-3.5 h-3.5 text-sky-400" />
+                        <span>Link Direto de Vídeo MP4 / Embed (Opcional):</span>
+                      </label>
+
+                      {/* Explicit Button requested by the user to browse PC */}
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={isUploadingVideo}
+                        className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white text-xs font-black flex items-center gap-1.5 shadow-md shadow-red-950/40 transition-all active:scale-95 cursor-pointer disabled:opacity-50"
+                        title="Procurar e selecionar um vídeo MP4, WEBM ou MOV salvo no seu computador"
+                      >
+                        <FolderOpen className="w-3.5 h-3.5 text-white" />
+                        <span>Procurar Vídeo no Meu PC (.mp4)</span>
+                      </button>
+                    </div>
+
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={customVideoUrl}
+                        onChange={(e) => setCustomVideoUrl(e.target.value)}
+                        placeholder="https://meuservidor.com/video-tutorial.mp4 ou arquivo anexado do PC"
+                        className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono text-xs focus:outline-none focus:border-red-400"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={isUploadingVideo}
+                        className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
+                      >
+                        <Upload className="w-3.5 h-3.5 text-rose-400" />
+                        <span className="hidden sm:inline">Anexar do PC</span>
+                      </button>
+                    </div>
+
+                    {/* Uploading Progress */}
+                    {isUploadingVideo && (
+                      <div className="bg-slate-900 border border-rose-500/50 rounded-xl p-3 space-y-1.5 animate-in fade-in">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-rose-300 font-bold flex items-center gap-1.5">
+                            <Loader2 className="w-3.5 h-3.5 text-rose-400 animate-spin" />
+                            Enviando vídeo do seu computador...
+                          </span>
+                          <span className="font-mono text-white font-black">{uploadProgress}%</span>
+                        </div>
+                        <div className="w-full bg-slate-950 h-2 rounded-full overflow-hidden border border-slate-800">
+                          <div
+                            className="bg-gradient-to-r from-red-600 to-rose-400 h-full transition-all duration-150"
+                            style={{ width: `${uploadProgress}%` }}
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Upload Error */}
+                    {uploadError && (
+                      <div className="bg-rose-950/80 border border-rose-700 rounded-xl p-2.5 text-rose-200 text-xs flex items-center justify-between gap-2">
+                        <span>{uploadError}</span>
+                        <button
+                          type="button"
+                          onClick={() => setUploadError('')}
+                          className="text-slate-400 hover:text-white"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Uploaded Video File Status Card */}
+                    {customVideoUrl && !isUploadingVideo && (
+                      <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-2.5 flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <div className="p-1.5 bg-rose-500/20 text-rose-400 rounded-lg">
+                            <FileVideo className="w-4 h-4" />
+                          </div>
+                          <div className="text-xs">
+                            <div className="font-bold text-white flex items-center gap-1.5">
+                              <span>{uploadedVideoInfo?.name || (customVideoUrl.startsWith('/uploads') ? 'Vídeo Carregado do Computador' : 'Vídeo Configurado')}</span>
+                              <span className="text-[10px] bg-emerald-950 text-emerald-300 border border-emerald-800 px-1.5 py-0.2 rounded font-bold">
+                                Pronto
+                              </span>
+                            </div>
+                            <div className="text-[10px] text-slate-400 font-mono">
+                              {uploadedVideoInfo?.size ? `Tamanho: ${uploadedVideoInfo.size} • ` : ''}
+                              {customVideoUrl}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => setShowVideoPreview(!showVideoPreview)}
+                            className="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-bold flex items-center gap-1 transition-colors"
+                          >
+                            <Play className="w-3 h-3 text-emerald-400 fill-emerald-400" />
+                            <span>{showVideoPreview ? 'Fechar Prévia' : 'Ver Prévia'}</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCustomVideoUrl('');
+                              setUploadedVideoInfo(null);
+                              setShowVideoPreview(false);
+                            }}
+                            className="p-1 rounded-lg hover:bg-rose-950 text-slate-400 hover:text-rose-400 transition-colors"
+                            title="Remover vídeo"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Inline Mini Video Player Preview if toggled */}
+                    {showVideoPreview && customVideoUrl && (
+                      <div className="rounded-xl overflow-hidden border border-slate-700 bg-black aspect-video max-h-56 mx-auto flex items-center justify-center">
+                        <video
+                          src={customVideoUrl}
+                          controls
+                          autoPlay
+                          className="w-full h-full object-contain"
+                        />
+                      </div>
+                    )}
+
+                    {/* Drag & Drop Hint */}
+                    {!customVideoUrl && !isUploadingVideo && (
+                      <div
+                        onClick={() => fileInputRef.current?.click()}
+                        onDragOver={(e) => e.preventDefault()}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          const file = e.dataTransfer.files?.[0];
+                          if (file) handleUploadVideoFile(file);
+                        }}
+                        className="border-2 border-dashed border-slate-800 hover:border-red-500/60 bg-slate-950/60 hover:bg-slate-900/60 rounded-xl p-3 text-center cursor-pointer transition-all"
+                      >
+                        <Upload className="w-5 h-5 text-slate-400 mx-auto mb-1" />
+                        <span className="text-xs text-slate-300 font-bold block">
+                          Clique para procurar ou arraste o arquivo do seu computador aqui
+                        </span>
+                        <span className="text-[10px] text-slate-500 block mt-0.5">
+                          Formatos aceitos: MP4, WebM, MOV, MKV, AVI
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

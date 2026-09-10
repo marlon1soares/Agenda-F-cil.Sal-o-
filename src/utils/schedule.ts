@@ -141,18 +141,27 @@ export interface UpcomingDayInfo {
   isCustomized: boolean;
 }
 
+export function formatLocalDate(d: Date): string {
+  const y = d.getFullYear();
+  const m = (d.getMonth() + 1).toString().padStart(2, '0');
+  const day = d.getDate().toString().padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 export function getUpcomingDays(
   daysCount = 15,
   startDateStr?: string,
   scheduleConfig?: ScheduleConfig
 ): UpcomingDayInfo[] {
   const result: UpcomingDayInfo[] = [];
-  const base = startDateStr ? new Date(startDateStr + 'T12:00:00') : new Date();
-  
-  const todayStr = new Date().toISOString().split('T')[0];
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  const tomorrowStr = tomorrow.toISOString().split('T')[0];
+  const now = new Date();
+  const todayStr = formatLocalDate(now);
+  const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+  const tomorrowStr = formatLocalDate(tomorrow);
+
+  const base = startDateStr 
+    ? new Date(startDateStr + 'T12:00:00') 
+    : new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12, 0, 0);
 
   const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 

@@ -1,5 +1,8 @@
 import express from "express";
 import path from "path";
+import fs from "fs";
+import os from "os";
+import { exec } from "child_process";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
@@ -21,6 +24,125 @@ app.use((_req, res, next) => {
     return res.sendStatus(200);
   }
   next();
+});
+
+// Standalone Tutorial Video & Assets routes (Separated from the main application)
+const uploadsVideosDir = path.resolve(process.cwd(), "public/uploads/videos");
+if (!fs.existsSync(uploadsVideosDir)) {
+  fs.mkdirSync(uploadsVideosDir, { recursive: true });
+}
+app.use("/uploads/videos", express.static(uploadsVideosDir));
+app.use("/tutorial-assets", express.static(path.resolve(process.cwd(), "src/assets/images")));
+app.use("/tutorial_audio", express.static(path.resolve(process.cwd(), "public/tutorial_audio")));
+
+// Upload custom MP4/video from computer directly
+app.post("/api/upload-video", (req, res) => {
+  try {
+    const rawHeaderName = req.headers["x-filename"];
+    let rawFilename = "video.mp4";
+    if (typeof rawHeaderName === "string") {
+      try {
+        rawFilename = decodeURIComponent(rawHeaderName);
+      } catch {
+        rawFilename = rawHeaderName;
+      }
+    }
+    const ext = path.extname(rawFilename) || ".mp4";
+    const baseName = path.basename(rawFilename, ext).replace(/[^a-zA-Z0-9_-]/g, "_").substring(0, 40) || "video";
+    const uniqueSuffix = Date.now() + "_" + Math.random().toString(36).substring(2, 6);
+    const finalFilename = `${baseName}_${uniqueSuffix}${ext.toLowerCase()}`;
+    const targetFilePath = path.resolve(uploadsVideosDir, finalFilename);
+
+    const writeStream = fs.createWriteStream(targetFilePath);
+    req.pipe(writeStream);
+
+    writeStream.on("finish", () => {
+      const stats = fs.statSync(targetFilePath);
+      const fileUrl = `/uploads/videos/${finalFilename}`;
+      res.json({
+        success: true,
+        url: fileUrl,
+        filename: finalFilename,
+        originalName: rawFilename,
+        size: stats.size,
+      });
+    });
+
+    writeStream.on("error", (err) => {
+      console.error("Upload video error:", err);
+      res.status(500).json({ error: "Erro ao salvar vídeo." });
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || "Erro no upload." });
+  }
+});
+app.get(["/video", "/video.html", "/tutorial", "/tutorial.html"], (_req, res) => {
+  res.sendFile(path.resolve(process.cwd(), "video.html"));
+});
+
+// Direct MP4 Download endpoint (Ready official video)
+app.get(["/api/download-tutorial-mp4", "/api/video-mp4", "/download-mp4"], (_req, res) => {
+  const mp4Path = path.resolve(process.cwd(), "src/assets/images/video_tutorial_agende_mais_facil_luna.mp4");
+  if (fs.existsSync(mp4Path)) {
+    res.setHeader("Content-Type", "video/mp4");
+    res.setHeader("Content-Disposition", 'attachment; filename="video_tutorial_agenda_mais_facil_luna.mp4"');
+    fs.createReadStream(mp4Path).pipe(res);
+  } else {
+    res.status(404).send("Arquivo MP4 ainda não gerado.");
+  }
+});
+
+// Convert recorded WebM buffer/stream directly to universally compatible H.264 MP4 with synchronized voice audio via ffmpeg
+app.post("/api/convert-to-mp4", (req, res) => {
+  const tempId = Date.now() + "_" + Math.random().toString(36).substring(2, 7);
+  const inputPath = path.resolve(os.tmpdir(), `input_${tempId}.webm`);
+  const outputPath = path.resolve(os.tmpdir(), `output_${tempId}.mp4`);
+
+  const writeStream = fs.createWriteStream(inputPath);
+  req.pipe(writeStream);
+
+  writeStream.on("finish", () => {
+    // Check if recorded WebM already contains an audio stream
+    const probeCmd = `ffprobe -v error -select_streams a -show_entries stream=codec_type -of default=noprint_wrappers=1:nokey=1 "${inputPath}"`;
+    exec(probeCmd, (probeErr, probeStdout) => {
+      const hasAudio = probeStdout && probeStdout.trim().length > 0;
+      const masterAudioPath = path.resolve(process.cwd(), "public/tutorial_audio/master_narration.mp3");
+
+      let cmd = "";
+      if (hasAudio) {
+        // Encode both video and recorded natural voice audio track to high-quality MP4 + AAC
+        cmd = `ffmpeg -y -i "${inputPath}" -c:v libx264 -pix_fmt yuv420p -c:a aac -b:a 192k -ar 44100 -preset fast -movflags +faststart "${outputPath}"`;
+      } else if (fs.existsSync(masterAudioPath)) {
+        // Fallback: mux the master synchronized voice narration directly so audio is 100% guaranteed na íntegra!
+        cmd = `ffmpeg -y -i "${inputPath}" -i "${masterAudioPath}" -c:v libx264 -pix_fmt yuv420p -c:a aac -b:a 192k -ar 44100 -shortest -preset fast -movflags +faststart "${outputPath}"`;
+      } else {
+        cmd = `ffmpeg -y -i "${inputPath}" -c:v libx264 -pix_fmt yuv420p -preset fast -movflags +faststart "${outputPath}"`;
+      }
+
+      exec(cmd, { timeout: 180000 }, (err, _stdout, stderr) => {
+        if (err || !fs.existsSync(outputPath)) {
+          console.error("FFmpeg conversion error:", stderr || err?.message);
+          try { if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath); } catch {}
+          try { if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath); } catch {}
+          return res.status(500).json({ error: "Falha na conversão para MP4 pelo servidor." });
+        }
+
+        res.setHeader("Content-Type", "video/mp4");
+        res.setHeader("Content-Disposition", 'attachment; filename="video_tutorial_agenda_mais_facil_luna.mp4"');
+        const readStream = fs.createReadStream(outputPath);
+        readStream.pipe(res);
+        readStream.on("close", () => {
+          try { if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath); } catch {}
+          try { if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath); } catch {}
+        });
+      });
+    });
+  });
+
+  writeStream.on("error", (err) => {
+    console.error("Write stream error:", err);
+    res.status(500).json({ error: "Erro ao receber vídeo para conversão." });
+  });
 });
 
 const PORT = 3000;

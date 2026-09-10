@@ -21,8 +21,6 @@ import { SalonAccessLinkModal } from './components/SalonAccessLinkModal';
 import { SalonAuthModal } from './components/SalonAuthModal';
 import { EmployeeLinkModal } from './components/EmployeeLinkModal';
 import { LiveConnectionHubModal } from './components/LiveConnectionHubModal';
-import { VideoTutorialModal } from './components/VideoTutorialModal';
-import { AdminVideoConfigModal } from './components/AdminVideoConfigModal';
 
 import { Transaction, Appointment, SalonConfig, UserRole, Professional, ServiceItem, ClientRecord, SalonApp } from './types';
 import { Storage } from './utils/storage';
@@ -145,13 +143,27 @@ export function App() {
         const found = Storage.getSalonBySlugOrCode(salonParam);
         if (found) return found.id;
       }
+      const savedAuth = typeof sessionStorage !== 'undefined' && sessionStorage.getItem('salao_authenticated_id');
+      if (savedAuth) {
+        const found = Storage.getSalons().find(s => s.id === savedAuth);
+        if (found) return found.id;
+      }
+      const savedActive = typeof localStorage !== 'undefined' && localStorage.getItem('salao_active_id');
+      if (savedActive) {
+        const found = Storage.getSalons().find(s => s.id === savedActive);
+        if (found) return found.id;
+      }
     } catch {}
     const list = Storage.getSalons();
     return list && list.length > 0 ? list[0].id : DEFAULT_SALON_APPS[0].id;
   });
 
   // Salon Data States
-  const [config, setConfig] = useState<SalonConfig>(() => Storage.getConfig() || DEFAULT_CONFIG);
+  const [config, setConfig] = useState<SalonConfig>(() => {
+    const list = Storage.getSalons();
+    const active = list.find(s => s.id === activeSalonId);
+    return Storage.getConfig(activeSalonId) || active?.config || DEFAULT_CONFIG;
+  });
   const [transactions, setTransactions] = useState<Transaction[]>(() => Storage.getTransactions());
   const [appointments, setAppointments] = useState<Record<string, Record<string, Appointment>>>(() => Storage.getAppointments());
   const [timeAdjustments, setTimeAdjustments] = useState<Record<string, number>>(() => Storage.getTimeAdjustments());
@@ -219,13 +231,6 @@ export function App() {
   const [isSalonLinkOpen, setIsSalonLinkOpen] = useState(false);
   const [isSalonAccessLinkOpen, setIsSalonAccessLinkOpen] = useState(false);
   const [isLiveHubOpen, setIsLiveHubOpen] = useState(false);
-  const [isVideoTutorialOpen, setIsVideoTutorialOpen] = useState<boolean>(() => {
-    try {
-      return hasUrlAction('video', 'tutorial', 'video-tutorial', 'video_tutorial');
-    } catch {}
-    return false;
-  });
-  const [isVideoConfigOpen, setIsVideoConfigOpen] = useState(false);
   const [initialPaymentOrderId, setInitialPaymentOrderId] = useState<string | null>(() => {
     try {
       return getUrlParam('confirmar-pedido') || 
@@ -408,19 +413,18 @@ export function App() {
     const handleSync = () => {
       const currentSalons = Storage.getSalons();
       setSalons(currentSalons);
-      setConfig(Storage.getConfig());
+      const active = currentSalons.find(s => s.id === activeSalonId);
+      if (active && active.config) {
+        setConfig(active.config);
+      } else {
+        setConfig(Storage.getConfig(activeSalonId));
+      }
       setTransactions(Storage.getTransactions());
       setAppointments(Storage.getAppointments());
       setTimeAdjustments(Storage.getTimeAdjustments());
       setProfessionals(Storage.getProfessionals());
       setServices(Storage.getServices());
       setClients(Storage.getClients());
-
-      // If active salon changed, re-sync its config
-      const active = currentSalons.find(s => s.id === activeSalonId);
-      if (active) {
-        setConfig(active.config);
-      }
     };
 
     window.addEventListener('salao_sync_data', handleSync);
@@ -434,8 +438,13 @@ export function App() {
   // Multi-salon handlers
   const handleSelectSalon = (salon: SalonApp) => {
     setActiveSalonId(salon.id);
-    setConfig(salon.config);
-    Storage.saveConfig(salon.config);
+    try {
+      localStorage.setItem('salao_active_id', salon.id);
+      sessionStorage.setItem('salao_authenticated_id', salon.id);
+    } catch {}
+    const salonConfig = Storage.getConfig(salon.id) || salon.config;
+    setConfig(salonConfig);
+    Storage.saveConfig(salonConfig, salon.id);
   };
 
   const handleCreateSalon = (newSalon: SalonApp) => {
@@ -453,7 +462,7 @@ export function App() {
 
     if (updatedSalon.id === activeSalonId) {
       setConfig(updatedSalon.config);
-      Storage.saveConfig(updatedSalon.config);
+      Storage.saveConfig(updatedSalon.config, updatedSalon.id);
     }
   };
 
@@ -536,11 +545,8 @@ export function App() {
   };
 
   const handleResetDaySchedule = (date: string) => {
-    const updatedAgenda = { ...appointments };
-    delete updatedAgenda[date];
-    setAppointments(updatedAgenda);
-    Storage.saveAppointments(updatedAgenda);
-
+    // Only reset time shifts (+/- minutes adjustment)
+    // NEVER delete existing booked appointments
     const updatedShifts = { ...timeAdjustments };
     delete updatedShifts[date];
     setTimeAdjustments(updatedShifts);
@@ -584,7 +590,22 @@ export function App() {
   // Handlers for Master Config
   const handleSaveConfig = (newConfig: SalonConfig) => {
     setConfig(newConfig);
-    Storage.saveConfig(newConfig);
+
+    setSalons(prevSalons => {
+      const updated = prevSalons.map(s => {
+        if (s.id === activeSalonId) {
+          return {
+            ...s,
+            name: newConfig.nomeSalao || s.name,
+            config: newConfig
+          };
+        }
+        return s;
+      });
+      return updated;
+    });
+
+    Storage.saveConfig(newConfig, activeSalonId);
   };
 
   // Active Salon & License Status
@@ -781,7 +802,6 @@ export function App() {
           onOpenSalonLink={() => setIsSalonLinkOpen(true)}
           onOpenSalonAccessLink={() => setIsSalonAccessLinkOpen(true)}
           onOpenAdminChangePassword={() => setIsAdminChangePasswordOpen(true)}
-          onOpenVideoTutorial={() => setIsVideoTutorialOpen(true)}
           onOpenLiveHub={() => setIsLiveHubOpen(true)}
           isExpanded={isExpanded}
           onToggleExpand={() => setIsExpanded(!isExpanded)}
@@ -822,26 +842,6 @@ export function App() {
                     >
                       <Key className="w-3.5 h-3.5 text-emerald-300" />
                       <span>Alterar Senha Admin</span>
-                    </button>
-
-                    <button
-                      id="btn-admin-video-tutorial"
-                      onClick={() => setIsVideoTutorialOpen(true)}
-                      className="bg-rose-600 hover:bg-rose-500 text-white font-extrabold text-xs px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 shadow-xs border border-rose-400/30 active:scale-95 cursor-pointer"
-                      title="Assistir Demonstração & Vídeo Tutorial"
-                    >
-                      <Play className="w-3.5 h-3.5 fill-white" />
-                      <span>Vídeo Tutorial</span>
-                    </button>
-
-                    <button
-                      id="btn-admin-video-config"
-                      onClick={() => setIsVideoConfigOpen(true)}
-                      className="bg-slate-800 hover:bg-slate-700 text-rose-300 font-extrabold text-xs px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 shadow-xs border border-rose-500/30 active:scale-95 cursor-pointer"
-                      title="Configurar Link do Vídeo (YouTube/MP4) e Narrações por Voz"
-                    >
-                      <Settings className="w-3.5 h-3.5 text-rose-400" />
-                      <span>Config Vídeo/Voz</span>
                     </button>
 
                     <button
@@ -1261,6 +1261,7 @@ export function App() {
                     onResetDaySchedule={handleResetDaySchedule}
                     onConvertToPOS={handleConvertAppointmentToPOS}
                     onOpenLiveHub={() => setIsLiveHubOpen(true)}
+                    onOpenConfig={() => setIsConfigOpen(true)}
                   />
                 )}
 
@@ -1328,6 +1329,8 @@ export function App() {
       <ConfiguracoesModal
         isOpen={isConfigOpen}
         config={config}
+        salonId={activeSalonId}
+        salonName={activeSalon.name || config.nomeSalao}
         onClose={() => setIsConfigOpen(false)}
         onSaveConfig={handleSaveConfig}
       />
@@ -1367,8 +1370,6 @@ export function App() {
         }}
         onOpenAdminChangePassword={() => setIsAdminChangePasswordOpen(true)}
         onOpenLiveHub={() => setIsLiveHubOpen(true)}
-        onOpenVideoTutorial={() => setIsVideoTutorialOpen(true)}
-        onOpenVideoConfig={() => setIsVideoConfigOpen(true)}
       />
 
       {/* Admin Change Password & User Management Modal */}
@@ -1381,13 +1382,6 @@ export function App() {
       <AdminPaymentAccountModal
         isOpen={isAdminPaymentOpen}
         onClose={() => setIsAdminPaymentOpen(false)}
-      />
-
-      {/* Admin Video Tutorial and Narration Config Modal */}
-      <AdminVideoConfigModal
-        isOpen={isVideoConfigOpen}
-        onClose={() => setIsVideoConfigOpen(false)}
-        onOpenVideoTutorial={() => setIsVideoTutorialOpen(true)}
       />
 
       {/* Buy App & Generate Token Checkout Modal */}
@@ -1518,17 +1512,6 @@ export function App() {
         activeSalon={activeSalon}
         onSelectRole={handleSelectRole}
       />
-
-      {/* Interactive Video Tutorial & Demonstration Modal */}
-      <VideoTutorialModal
-        isOpen={isVideoTutorialOpen}
-        onClose={() => setIsVideoTutorialOpen(false)}
-        salonName={activeSalon?.name || config.nomeSalao || 'Salão dos Parças'}
-        ownerName={activeSalon?.ownerName || 'Proprietário'}
-        onOpenAdminVideoConfig={userRole === 'admin' ? () => setIsVideoConfigOpen(true) : undefined}
-        isAdmin={userRole === 'admin'}
-      />
-
 
     </div>
   );

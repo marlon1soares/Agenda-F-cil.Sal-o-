@@ -1,0 +1,8 @@
+file '/app/applet/public/tutorial_audio/chapter_1.mp3'
+file '/app/applet/public/tutorial_audio/chapter_2.mp3'
+file '/app/applet/public/tutorial_audio/chapter_3.mp3'
+file '/app/applet/public/tutorial_audio/chapter_4.mp3'
+file '/app/applet/public/tutorial_audio/chapter_5.mp3'
+file '/app/applet/public/tutorial_audio/chapter_6.mp3'
+file '/app/applet/public/tutorial_audio/chapter_7.mp3'
+file '/app/applet/public/tutorial_audio/chapter_8.mp3'

@@ -1,0 +1,46 @@
+{
+  "totalDuration": 154.68,
+  "voice": "pt-BR-FranciscaNeural",
+  "chapters": [
+    {
+      "id": 1,
+      "file": "/app/applet/public/tutorial_audio/chapter_1.mp3",
+      "duration": 21.432
+    },
+    {
+      "id": 2,
+      "file": "/app/applet/public/tutorial_audio/chapter_2.mp3",
+      "duration": 17.28
+    },
+    {
+      "id": 3,
+      "file": "/app/applet/public/tutorial_audio/chapter_3.mp3",
+      "duration": 19.368
+    },
+    {
+      "id": 4,
+      "file": "/app/applet/public/tutorial_audio/chapter_4.mp3",
+      "duration": 17.568
+    },
+    {
+      "id": 5,
+      "file": "/app/applet/public/tutorial_audio/chapter_5.mp3",
+      "duration": 20.04
+    },
+    {
+      "id": 6,
+      "file": "/app/applet/public/tutorial_audio/chapter_6.mp3",
+      "duration": 19.272
+    },
+    {
+      "id": 7,
+      "file": "/app/applet/public/tutorial_audio/chapter_7.mp3",
+      "duration": 19.08
+    },
+    {
+      "id": 8,
+      "file": "/app/applet/public/tutorial_audio/chapter_8.mp3",
+      "duration": 20.64
+    }
+  ]
+}

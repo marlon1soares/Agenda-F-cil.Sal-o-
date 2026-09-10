@@ -1,0 +1,17 @@
+file '/app/applet/scripts/tmp_slides/slide_1.png'
+duration 21.432
+file '/app/applet/scripts/tmp_slides/slide_2.png'
+duration 17.280
+file '/app/applet/scripts/tmp_slides/slide_3.png'
+duration 19.368
+file '/app/applet/scripts/tmp_slides/slide_4.png'
+duration 17.568
+file '/app/applet/scripts/tmp_slides/slide_5.png'
+duration 20.040
+file '/app/applet/scripts/tmp_slides/slide_6.png'
+duration 19.272
+file '/app/applet/scripts/tmp_slides/slide_7.png'
+duration 19.080
+file '/app/applet/scripts/tmp_slides/slide_8.png'
+duration 20.640
+file '/app/applet/scripts/tmp_slides/slide_8.png'

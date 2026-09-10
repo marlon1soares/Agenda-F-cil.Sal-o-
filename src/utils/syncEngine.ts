@@ -316,7 +316,14 @@ class SyncEngine {
       let messagesChanged = false;
 
       if (state.salons && Array.isArray(state.salons) && state.salons.length > 0) {
-        try { localStorage.setItem('salaoAppsList', JSON.stringify(state.salons)); } catch {}
+        try { 
+          localStorage.setItem('salaoAppsList', JSON.stringify(state.salons));
+          state.salons.forEach((s: any) => {
+            if (s && s.id && s.config) {
+              localStorage.setItem(`salaoConfig_${s.id}`, JSON.stringify(s.config));
+            }
+          });
+        } catch {}
       }
       if (state.config && state.config.nomeSalao) {
         try { localStorage.setItem('salaoConfig', JSON.stringify(state.config)); } catch {}

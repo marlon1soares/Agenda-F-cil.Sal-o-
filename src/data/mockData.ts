@@ -68,6 +68,7 @@ export const DEFAULT_SALON_APPS: SalonApp[] = [
       bgHeaderUrl: "",
       temaKey: "azul",
       corCustom: "#2563eb",
+      scheduleConfig: DEFAULT_SCHEDULE_CONFIG,
       profs: [
         { id: "prof-1", nome: "Michael", porc: 70 },
         { id: "prof-2", nome: "Marlon", porc: 30 }
@@ -114,6 +115,7 @@ export const DEFAULT_SALON_APPS: SalonApp[] = [
       bgHeaderUrl: "",
       temaKey: "rosa",
       corCustom: "#db2777",
+      scheduleConfig: DEFAULT_SCHEDULE_CONFIG,
       profs: [
         { id: "prof-p1", nome: "Patricia", porc: 60 },
         { id: "prof-p2", nome: "Renata", porc: 40 }
@@ -148,6 +150,7 @@ export const DEFAULT_SALON_APPS: SalonApp[] = [
       bgHeaderUrl: "",
       temaKey: "darkGold",
       corCustom: "#18181b",
+      scheduleConfig: DEFAULT_SCHEDULE_CONFIG,
       profs: [
         { id: "prof-k1", nome: "Kadu", porc: 60 },
         { id: "prof-k2", nome: "Rodrigo", porc: 40 }
