@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Transaction, SalonConfig, UserRole } from '../types';
 import { parsePOSCommand } from '../utils/storage';
 import { exportToExcel, exportToWord } from '../utils/exporters';
-import { CreditCard, Trash2, FileSpreadsheet, FileText, Send, Sparkles, Filter, X, FolderOpen, Settings } from 'lucide-react';
+import { CreditCard, Trash2, FileSpreadsheet, FileText, Send, Sparkles, Filter, X, FolderOpen, Settings, CheckCircle2, Lock } from 'lucide-react';
 
 interface CaixaViewProps {
   transactions: Transaction[];
@@ -72,6 +72,56 @@ export const CaixaView: React.FC<CaixaViewProps> = ({
   });
 
   const canExportReports = userRole === 'admin' || userRole === 'salao';
+
+  const [fechamentoNotice, setFechamentoNotice] = useState<string | null>(null);
+  const [isClosingCaixa, setIsClosingCaixa] = useState(false);
+  const [lastFechamento, setLastFechamento] = useState<{
+    date: string;
+    totalGross: number;
+    count: number;
+  } | null>(() => {
+    try {
+      const saved = localStorage.getItem(`fechamento_caixa_${config.id || 'default'}`);
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  const handleFechamentoCaixa = () => {
+    if (activeTransactions.length === 0 && cancelledTransactionsCount === 0) {
+      alert("Não há lançamentos ou procedimentos registrados no período atual para fechamento de caixa.");
+      return;
+    }
+
+    setIsClosingCaixa(true);
+
+    const now = new Date();
+    const formattedDate = `${now.toLocaleDateString('pt-BR')} às ${now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
+    const info = {
+      date: formattedDate,
+      totalGross: Number(totalGross) || 0,
+      count: activeTransactions.length,
+    };
+
+    try {
+      localStorage.setItem(`fechamento_caixa_${config.id || 'default'}`, JSON.stringify(info));
+      setLastFechamento(info);
+    } catch (e) {
+      console.warn("Aviso ao salvar registro local do fechamento:", e);
+    }
+
+    // 1. Gera e baixa o relatório em Word (.doc)
+    exportToWord(filteredTransactions, config);
+
+    // 2. Gera e baixa o relatório em Excel (.xls) com pequeno intervalo para o navegador permitir ambos os downloads
+    setTimeout(() => {
+      exportToExcel(filteredTransactions, config);
+      setIsClosingCaixa(false);
+      setFechamentoNotice(`Fechamento de Caixa realizado com sucesso! Total contabilizado: R$ ${info.totalGross.toFixed(2)} (${info.count} procedimentos). Os relatórios em Word (.doc) e Excel (.xls) foram baixados.`);
+      setTimeout(() => setFechamentoNotice(null), 9000);
+    }, 450);
+  };
 
   return (
     <div className="space-y-6">
@@ -339,22 +389,73 @@ export const CaixaView: React.FC<CaixaViewProps> = ({
 
       {/* Export Reports Action Buttons - Restricted to Owner & Admin */}
       {canExportReports ? (
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3">
-          <button
-            onClick={() => exportToExcel(filteredTransactions, config)}
-            className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs py-3 px-4 rounded-xl shadow-xs transition-colors flex items-center justify-center gap-2 cursor-pointer"
-          >
-            <FileSpreadsheet className="w-4 h-4" />
-            <span>BAIXAR EXCEL (.XLS)</span>
-          </button>
+        <div className="space-y-2">
+          {/* Mensagem de Feedback de Fechamento Concluído */}
+          {fechamentoNotice && (
+            <div className="bg-emerald-50 border border-emerald-300 text-emerald-900 px-4 py-3 rounded-xl text-xs font-bold flex items-center justify-between gap-2 shadow-xs animate-in fade-in duration-200">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>{fechamentoNotice}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setFechamentoNotice(null)}
+                className="text-emerald-700 hover:text-emerald-900 p-1 cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
 
-          <button
-            onClick={() => exportToWord(filteredTransactions, config)}
-            className="flex-1 bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs py-3 px-4 rounded-xl shadow-xs transition-colors flex items-center justify-center gap-2 cursor-pointer"
-          >
-            <FileText className="w-4 h-4" />
-            <span>BAIXAR WORD (.DOC)</span>
-          </button>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-end gap-2.5 sm:gap-3">
+            {/* Coluna Esquerda: Baixar Excel (.XLS) */}
+            <div className="flex-1 flex flex-col justify-end">
+              <button
+                type="button"
+                id="btn-caixa-baixar-excel"
+                onClick={() => exportToExcel(filteredTransactions, config)}
+                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs py-3 px-4 rounded-xl shadow-xs transition-colors flex items-center justify-center gap-2 cursor-pointer active:scale-98"
+              >
+                <FileSpreadsheet className="w-4 h-4" />
+                <span>BAIXAR EXCEL (.XLS)</span>
+              </button>
+            </div>
+
+            {/* Coluna Direita: Botão pequeno Fechamento de Caixa EM CIMA do Baixar Word */}
+            <div className="flex-1 flex flex-col gap-1.5">
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  id="btn-fechamento-caixa"
+                  onClick={handleFechamentoCaixa}
+                  disabled={isClosingCaixa}
+                  className="bg-amber-400 hover:bg-amber-500 text-slate-950 font-black text-[11px] py-1 px-3 rounded-lg shadow-xs flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer border border-amber-300 disabled:opacity-50"
+                  title="Fazer Fechamento de Caixa: Consolida os valores contabilizados no período e baixa automaticamente os relatórios em Word e Excel"
+                >
+                  <Lock className="w-3.5 h-3.5 text-slate-950" />
+                  <span>Fechamento de Caixa</span>
+                </button>
+              </div>
+
+              <button
+                type="button"
+                id="btn-caixa-baixar-word"
+                onClick={() => exportToWord(filteredTransactions, config)}
+                className="w-full bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs py-3 px-4 rounded-xl shadow-xs transition-colors flex items-center justify-center gap-2 cursor-pointer active:scale-98"
+              >
+                <FileText className="w-4 h-4" />
+                <span>BAIXAR WORD (.DOC)</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Registro do último fechamento efetuado */}
+          {lastFechamento && (
+            <div className="text-[11px] text-slate-500 text-right pr-1 flex items-center justify-end gap-1.5 font-medium">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block"></span>
+              <span>Último fechamento: {lastFechamento.date} • Total: R$ {lastFechamento.totalGross.toFixed(2)} ({lastFechamento.count} procedimentos)</span>
+            </div>
+          )}
         </div>
       ) : (
         <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-center text-xs text-slate-500 font-medium">
