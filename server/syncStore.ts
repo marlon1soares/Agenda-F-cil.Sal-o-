@@ -324,9 +324,72 @@ class SyncStore {
   }
 
   public updateState(updates: Partial<SyncDatabaseState>, senderId?: string): SyncDatabaseState {
+    let mergedSalons = this.state.salons;
+    if (updates.salons && Array.isArray(updates.salons)) {
+      const salonMap = new Map<string, any>();
+      (this.state.salons || []).forEach((s: any) => { if (s && s.id) salonMap.set(s.id, s); });
+      updates.salons.forEach((s: any) => {
+        if (s && s.id) {
+          const existing = salonMap.get(s.id);
+          if (existing) {
+            salonMap.set(s.id, {
+              ...existing,
+              ...s,
+              name: s.name || existing.name,
+              ownerName: s.ownerName || existing.ownerName,
+              ownerPhone: s.ownerPhone || existing.ownerPhone,
+              ownerEmail: s.ownerEmail || existing.ownerEmail,
+              ownerCpf: s.ownerCpf || existing.ownerCpf,
+              ownerRg: s.ownerRg || existing.ownerRg,
+              cep: s.cep || existing.cep,
+              logradouro: s.logradouro || existing.logradouro,
+              numero: s.numero || existing.numero,
+              bairro: s.bairro || existing.bairro,
+              cidade: s.cidade || existing.cidade,
+              uf: s.uf || existing.uf,
+              config: {
+                ...(existing.config || {}),
+                ...(s.config || {})
+              }
+            });
+          } else {
+            salonMap.set(s.id, s);
+          }
+        }
+      });
+      mergedSalons = Array.from(salonMap.values());
+    }
+
+    let mergedAppointments = this.state.appointments;
+    if (updates.appointments && typeof updates.appointments === 'object') {
+      mergedAppointments = { ...(this.state.appointments || {}) };
+      Object.keys(updates.appointments).forEach((dateKey) => {
+        mergedAppointments[dateKey] = {
+          ...(mergedAppointments[dateKey] || {}),
+          ...updates.appointments![dateKey]
+        };
+      });
+    }
+
+    let mergedTransactions = this.state.transactions;
+    if (updates.transactions && Array.isArray(updates.transactions)) {
+      const txMap = new Map<string, any>();
+      (this.state.transactions || []).forEach((t: any) => { if (t && t.id) txMap.set(t.id, t); });
+      updates.transactions.forEach((t: any) => {
+        if (t && t.id) {
+          const existing = txMap.get(t.id);
+          txMap.set(t.id, existing ? { ...existing, ...t } : t);
+        }
+      });
+      mergedTransactions = Array.from(txMap.values());
+    }
+
     this.state = {
       ...this.state,
       ...updates,
+      salons: updates.salons ? mergedSalons : this.state.salons,
+      appointments: updates.appointments ? mergedAppointments : this.state.appointments,
+      transactions: updates.transactions ? mergedTransactions : this.state.transactions,
       lastUpdated: Date.now()
     };
 

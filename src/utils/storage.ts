@@ -296,11 +296,22 @@ export const Storage = {
   },
 
   async getCatalog(): Promise<Record<CatalogFolder, CatalogMedia[]>> {
-    const data = await getMediaFromIDB('salaoCatalogo', INITIAL_CATALOG);
-    return data;
+    let data = await getMediaFromIDB('salaoCatalogo', null);
+    if (!data) {
+      const backup = safeGetItem('salaoCatalogo_backup');
+      if (backup) {
+        try {
+          data = JSON.parse(backup);
+        } catch {}
+      }
+    }
+    return data || INITIAL_CATALOG;
   },
   async saveCatalog(catalog: Record<CatalogFolder, CatalogMedia[]>): Promise<boolean> {
     const ok = await saveMediaToIDB('salaoCatalogo', catalog);
+    try {
+      safeSetItem('salaoCatalogo_backup', JSON.stringify(catalog));
+    } catch {}
     window.dispatchEvent(new CustomEvent('salao_sync_data', { detail: { key: 'salaoCatalogo' } }));
     return ok;
   },

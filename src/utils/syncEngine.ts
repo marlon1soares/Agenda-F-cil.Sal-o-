@@ -326,7 +326,31 @@ class SyncEngine {
           state.salons.forEach((s: any) => {
             if (s && s.id) {
               const existing = salonMap.get(s.id);
-              salonMap.set(s.id, existing ? { ...existing, ...s } : s);
+              if (existing) {
+                // Strictly preserve local owner details and registration information
+                salonMap.set(s.id, {
+                  ...s,
+                  ...existing,
+                  name: existing.name || s.name,
+                  ownerName: existing.ownerName || s.ownerName,
+                  ownerPhone: existing.ownerPhone || s.ownerPhone,
+                  ownerEmail: existing.ownerEmail || s.ownerEmail,
+                  ownerCpf: existing.ownerCpf || s.ownerCpf,
+                  ownerRg: existing.ownerRg || s.ownerRg,
+                  cep: existing.cep || s.cep,
+                  logradouro: existing.logradouro || s.logradouro,
+                  numero: existing.numero || s.numero,
+                  bairro: existing.bairro || s.bairro,
+                  cidade: existing.cidade || s.cidade,
+                  uf: existing.uf || s.uf,
+                  config: {
+                    ...(s.config || {}),
+                    ...(existing.config || {})
+                  }
+                });
+              } else {
+                salonMap.set(s.id, s);
+              }
             }
           });
           const mergedSalons = Array.from(salonMap.values());
@@ -339,7 +363,19 @@ class SyncEngine {
         } catch {}
       }
       if (state.config && state.config.nomeSalao) {
-        try { localStorage.setItem('salaoConfig', JSON.stringify(state.config)); } catch {}
+        try {
+          const currentConfigRaw = localStorage.getItem('salaoConfig');
+          if (currentConfigRaw) {
+            const currentConfig = JSON.parse(currentConfigRaw);
+            localStorage.setItem('salaoConfig', JSON.stringify({
+              ...state.config,
+              ...currentConfig,
+              nomeSalao: currentConfig.nomeSalao || state.config.nomeSalao
+            }));
+          } else {
+            localStorage.setItem('salaoConfig', JSON.stringify(state.config));
+          }
+        } catch {}
       }
       if (state.appointments && typeof state.appointments === 'object') {
         appointmentsChanged = true;
@@ -348,10 +384,27 @@ class SyncEngine {
           const localAgenda = localAgendaRaw ? JSON.parse(localAgendaRaw) : {};
           const mergedAgenda = { ...localAgenda };
           Object.keys(state.appointments).forEach((dateKey) => {
-            mergedAgenda[dateKey] = {
-              ...(mergedAgenda[dateKey] || {}),
-              ...state.appointments![dateKey]
-            };
+            const localDateSlots = mergedAgenda[dateKey] || {};
+            const remoteDateSlots = state.appointments![dateKey] || {};
+            const mergedDateSlots = { ...localDateSlots };
+
+            Object.keys(remoteDateSlots).forEach((slotKey) => {
+              const localSlot = localDateSlots[slotKey];
+              const remoteSlot = remoteDateSlots[slotKey];
+
+              // If local slot is booked (has clientName or booked status), NEVER overwrite with empty/livre
+              if (localSlot && (localSlot.clientName || localSlot.status === 'agendado' || localSlot.status === 'em_atendimento' || localSlot.status === 'concluido')) {
+                if (remoteSlot && remoteSlot.clientName) {
+                  mergedDateSlots[slotKey] = { ...localSlot, ...remoteSlot };
+                } else {
+                  mergedDateSlots[slotKey] = localSlot;
+                }
+              } else {
+                mergedDateSlots[slotKey] = remoteSlot || localSlot;
+              }
+            });
+
+            mergedAgenda[dateKey] = mergedDateSlots;
           });
           localStorage.setItem('salaoAgenda', JSON.stringify(mergedAgenda));
         } catch {}
@@ -367,7 +420,7 @@ class SyncEngine {
           state.transactions.forEach((t: any) => {
             if (t && t.id) {
               const existing = txMap.get(t.id);
-              txMap.set(t.id, existing ? { ...existing, ...t } : t);
+              txMap.set(t.id, existing ? { ...t, ...existing } : t);
             }
           });
           localStorage.setItem('salaoLancamentos', JSON.stringify(Array.from(txMap.values())));

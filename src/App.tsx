@@ -387,16 +387,20 @@ export function App() {
     // Re-resolve after fetching authoritative server state
     syncEngine.fetchServerState().then((serverState) => {
       if (serverState) {
-        if (serverState.salons && serverState.salons.length > 0) {
-          setSalons(serverState.salons);
+        const mergedSalons = Storage.getSalons();
+        setSalons(mergedSalons);
+        const active = mergedSalons.find(s => s.id === activeSalonId);
+        if (active && active.config) {
+          setConfig(active.config);
+        } else {
+          setConfig(Storage.getConfig(activeSalonId));
         }
-        if (serverState.config) setConfig(serverState.config);
-        if (serverState.appointments) setAppointments(serverState.appointments);
-        if (serverState.transactions) setTransactions(serverState.transactions);
-        if (serverState.timeAdjustments) setTimeAdjustments(serverState.timeAdjustments);
-        if (serverState.professionals) setProfessionals(serverState.professionals);
-        if (serverState.services) setServices(serverState.services);
-        if (serverState.clients) setClients(serverState.clients);
+        setAppointments(Storage.getAppointments());
+        setTransactions(Storage.getTransactions());
+        setTimeAdjustments(Storage.getTimeAdjustments());
+        setProfessionals(Storage.getProfessionals());
+        setServices(Storage.getServices());
+        setClients(Storage.getClients());
 
         resolveUrlParams();
       }
