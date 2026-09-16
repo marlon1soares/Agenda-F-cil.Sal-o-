@@ -869,16 +869,6 @@ export function App() {
 
                   <div className="flex items-center gap-2 flex-wrap w-full md:w-auto justify-start md:justify-end">
                     <button
-                      id="btn-admin-auth-settings"
-                      onClick={() => setIsAdminChangePasswordOpen(true)}
-                      className="bg-slate-800 hover:bg-slate-700 text-emerald-300 font-extrabold text-xs px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 shadow-xs border border-emerald-500/30 active:scale-95 cursor-pointer"
-                      title="Alterar Senha do Administrador e Gerenciar Acessos"
-                    >
-                      <Key className="w-3.5 h-3.5 text-emerald-300" />
-                      <span>Alterar Senha Admin</span>
-                    </button>
-
-                    <button
                       id="btn-admin-payment-config"
                       onClick={() => setIsAdminPaymentOpen(true)}
                       className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 shadow-xs active:scale-95 cursor-pointer"
@@ -886,26 +876,6 @@ export function App() {
                     >
                       <Settings className="w-3.5 h-3.5" />
                       <span>Configurar Recebimento (Pix)</span>
-                    </button>
-
-                    <button
-                      id="btn-admin-video-config"
-                      onClick={() => setIsAdminVideoConfigOpen(true)}
-                      className="bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-extrabold text-xs px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 shadow-xs border border-red-400/40 active:scale-95 cursor-pointer"
-                      title="Configurar e Anexar Vídeo Tutorial em MP4 pesquisando no computador"
-                    >
-                      <Video className="w-3.5 h-3.5 text-yellow-300" />
-                      <span>Anexar Vídeo Tutorial (MP4)</span>
-                    </button>
-
-                    <button
-                      id="btn-admin-broadcast"
-                      onClick={() => setIsAdminBroadcastOpen(true)}
-                      className="bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white font-extrabold text-xs px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 shadow-xs border border-amber-400/40 active:scale-95 cursor-pointer"
-                      title="Disparar comunicados ou vídeo tutorial para todos os salões cadastrados"
-                    >
-                      <Sparkles className="w-3.5 h-3.5 text-amber-200" />
-                      <span>Disparar p/ Todos os Salões</span>
                     </button>
 
                     <button
