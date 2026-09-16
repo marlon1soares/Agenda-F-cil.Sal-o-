@@ -1346,6 +1346,8 @@ app.post("/api/send-purchase-email", async (req, res) => {
       expiresAt,
       purchaseDate,
       appUrl: clientAppUrl,
+      videoUrl: customVideoUrl,
+      videoTitle: customVideoTitle,
     } = req.body;
 
     if (!ownerEmail || !purchaseToken) {
@@ -1359,6 +1361,8 @@ app.post("/api/send-purchase-email", async (req, res) => {
     const formattedDate = purchaseDate || new Date().toLocaleDateString("pt-BR");
     const formattedExpiry = expiresAt || "Indefinida";
     const displayCpf = ownerCpf ? ownerCpf : "Cadastrado no Pedido";
+    const effectiveVideoUrl = customVideoUrl || "https://www.youtube.com/watch?v=tutorial-agenda-facil-salao";
+    const effectiveVideoTitle = customVideoTitle || "Assistir ao Vídeo Explicativo";
 
     const isTrialActivation = planDays <= 7 || String(priceStr || '').toLowerCase().includes('grátis') || String(priceStr || '').toLowerCase().includes('teste');
     const emailSubject = isTrialActivation
@@ -1429,8 +1433,8 @@ app.post("/api/send-purchase-email", async (req, res) => {
         Assista ao vídeo tutorial completo e aprenda em menos de 3 minutos como cadastrar serviços, gerenciar sua equipe, controlar o caixa e receber agendamentos online:
       </p>
       <div style="text-align: center;">
-        <a href="https://www.youtube.com/watch?v=tutorial-agenda-facil-salao" target="_blank" style="display: inline-block; background-color: #dc2626; color: #ffffff; text-decoration: none; font-weight: bold; font-size: 13px; padding: 10px 22px; border-radius: 10px; box-shadow: 0 4px 12px rgba(220, 38, 38, 0.4);">
-          ▶ Assistir ao Vídeo Explicativo no YouTube
+        <a href="${effectiveVideoUrl}" target="_blank" style="display: inline-block; background-color: #dc2626; color: #ffffff; text-decoration: none; font-weight: bold; font-size: 13px; padding: 10px 22px; border-radius: 10px; box-shadow: 0 4px 12px rgba(220, 38, 38, 0.4);">
+          ▶ ${effectiveVideoTitle}
         </a>
       </div>
     </div>
@@ -1562,6 +1566,105 @@ app.post("/api/send-purchase-email", async (req, res) => {
       success: false,
       error: err.message || "Falha ao enviar e-mail de confirmação.",
     });
+  }
+});
+
+// Admin Broadcast to All Registered Salons (Mass Email & Video Announcement Dispatch)
+app.post("/api/broadcast-salons", async (req, res) => {
+  try {
+    const { recipients, subject, message, videoUrl, videoTitle } = req.body;
+    if (!recipients || !Array.isArray(recipients) || recipients.length === 0) {
+      return res.status(400).json({ error: "Lista de destinatários 'recipients' é obrigatória." });
+    }
+
+    const transporter = getTransporter();
+    const effectiveSubject = subject || "📢 Comunicado Oficial - Agenda Fácil Salão & Barbearia";
+    const effectiveVideoUrl = videoUrl || "https://www.youtube.com/watch?v=tutorial-agenda-facil-salao";
+    const effectiveVideoTitle = videoTitle || "Assistir ao Vídeo Tutorial";
+
+    const results = [];
+    const fromAddr = process.env.SMTP_FROM || `"Agenda Fácil Admin" <${process.env.SMTP_USER || 'marlon1soares28@gmail.com'}>`;
+
+    for (const recipient of recipients) {
+      const { email, salonName, ownerName, token, cpf, directLoginUrl } = recipient;
+      if (!email) continue;
+
+      let emailHtml = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #0b1120; color: #e2e8f0; margin: 0; padding: 20px; }
+    .container { max-width: 600px; margin: 0 auto; background-color: #0f172a; border-radius: 16px; border: 1px solid #1e293b; padding: 24px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5); }
+    .header { text-align: center; border-bottom: 1px solid #1e293b; padding-bottom: 16px; margin-bottom: 20px; }
+    .btn { display: inline-block; background-color: #dc2626; color: #ffffff; text-decoration: none; font-weight: bold; font-size: 13px; padding: 12px 24px; border-radius: 10px; margin-top: 12px; }
+    .btn-login { display: inline-block; background-color: #2563eb; color: #ffffff; text-decoration: none; font-weight: bold; font-size: 13px; padding: 12px 24px; border-radius: 10px; margin-top: 8px; }
+    .card { background-color: #1e293b; border-radius: 12px; padding: 16px; margin: 16px 0; border: 1px solid #334155; }
+    .msg-body { white-space: pre-wrap; font-size: 14px; line-height: 1.6; color: #cbd5e1; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h2 style="color: #f59e0b; margin: 0 0 4px 0;">📢 COMUNICADO DO ADMINISTRADOR</h2>
+      <p style="color: #94a3b8; font-size: 12px; margin: 0;">Agenda Fácil Salões & Barbearias</p>
+    </div>
+
+    <p style="font-size: 15px; color: #f8fafc;">Olá <strong>${ownerName || 'Proprietário'}</strong> (${salonName || 'Salão'}),</p>
+
+    <div class="msg-body">${message || 'Segue comunicado importante e vídeo tutorial atualizado do seu sistema.'}</div>
+
+    ${videoUrl ? `
+    <div class="card" style="text-align: center; border-color: #ef4444;">
+      <h4 style="color: #fca5a5; margin: 0 0 8px 0;">🎥 VÍDEO TUTORIAL OFICIAL:</h4>
+      <p style="font-size: 12px; color: #cbd5e1; margin: 0 0 10px 0;">Clique abaixo para assistir ao passo a passo:</p>
+      <a href="${effectiveVideoUrl}" target="_blank" class="btn">▶ ${effectiveVideoTitle}</a>
+    </div>` : ''}
+
+    ${token ? `
+    <div class="card">
+      <h4 style="color: #38bdf8; margin: 0 0 8px 0;">🔑 SUAS CREDENCIAIS DE ACESSO:</h4>
+      <p style="font-size: 13px; margin: 4px 0;"><strong>Salão:</strong> ${salonName || 'Seu Salão'}</p>
+      <p style="font-size: 13px; margin: 4px 0;"><strong>Login (CPF):</strong> ${cpf || 'Cadastrado'}</p>
+      <p style="font-size: 13px; margin: 4px 0;"><strong>Token:</strong> <span style="font-family: monospace; color: #fbbf24; font-weight: bold;">${token}</span></p>
+      ${directLoginUrl ? `<div style="text-align: center; margin-top: 12px;"><a href="${directLoginUrl}" target="_blank" class="btn-login">🚀 Acessar Painel do Salão</a></div>` : ''}
+    </div>` : ''}
+
+    <div style="text-align: center; border-top: 1px solid #1e293b; padding-top: 14px; font-size: 11px; color: #64748b; margin-top: 24px;">
+      <p style="margin: 0;">Mensagem enviada diretamente pelo Administrador do Agenda Fácil.</p>
+    </div>
+  </div>
+</body>
+</html>`;
+
+      if (transporter) {
+        try {
+          const info = await transporter.sendMail({
+            from: fromAddr,
+            to: email,
+            subject: effectiveSubject,
+            html: emailHtml,
+          });
+          results.push({ email, success: true, messageId: info.messageId });
+        } catch (mailErr: any) {
+          results.push({ email, success: false, error: mailErr.message });
+        }
+      } else {
+        console.log(`[SMTP SIMULATOR BROADCAST] Para ${email} (${salonName}): ${effectiveSubject}`);
+        results.push({ email, success: true, simulated: true });
+      }
+    }
+
+    return res.json({
+      success: true,
+      processed: results.length,
+      results,
+      message: `Disparo processado para ${results.length} destinatários!`
+    });
+  } catch (err: any) {
+    console.error("Erro no broadcast para salões:", err);
+    return res.status(500).json({ success: false, error: err.message || "Erro no envio em lote." });
   }
 });
 

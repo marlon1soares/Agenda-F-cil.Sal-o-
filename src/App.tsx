@@ -21,6 +21,8 @@ import { SalonAccessLinkModal } from './components/SalonAccessLinkModal';
 import { SalonAuthModal } from './components/SalonAuthModal';
 import { EmployeeLinkModal } from './components/EmployeeLinkModal';
 import { LiveConnectionHubModal } from './components/LiveConnectionHubModal';
+import { AdminVideoConfigModal } from './components/AdminVideoConfigModal';
+import { AdminBroadcastModal } from './components/AdminBroadcastModal';
 
 import { Transaction, Appointment, SalonConfig, UserRole, Professional, ServiceItem, ClientRecord, SalonApp } from './types';
 import { Storage } from './utils/storage';
@@ -220,6 +222,8 @@ export function App() {
   });
   const [isAdminSalonsOpen, setIsAdminSalonsOpen] = useState(false);
   const [isAdminPaymentOpen, setIsAdminPaymentOpen] = useState(false);
+  const [isAdminVideoConfigOpen, setIsAdminVideoConfigOpen] = useState(false);
+  const [isAdminBroadcastOpen, setIsAdminBroadcastOpen] = useState(false);
   const [isBuyAppOpen, setIsBuyAppOpen] = useState<boolean>(() => {
     try {
       return hasUrlAction('comprar-licenca', 'comprar', 'comprar_licenca', 'licenca', 'buy', 'compra');
@@ -825,6 +829,8 @@ export function App() {
           }}
           onOpenBuyApp={() => setIsBuyAppOpen(true)}
           onOpenAdminPaymentConfig={() => setIsAdminPaymentOpen(true)}
+          onOpenAdminVideoConfig={() => setIsAdminVideoConfigOpen(true)}
+          onOpenAdminBroadcast={() => setIsAdminBroadcastOpen(true)}
           onOpenClientLink={() => setIsClientLinkOpen(true)}
           onOpenEmployeeLink={() => setIsEmployeeLinkOpen(true)}
           onOpenSalonLink={() => setIsSalonLinkOpen(true)}
@@ -880,6 +886,26 @@ export function App() {
                     >
                       <Settings className="w-3.5 h-3.5" />
                       <span>Configurar Recebimento (Pix)</span>
+                    </button>
+
+                    <button
+                      id="btn-admin-video-config"
+                      onClick={() => setIsAdminVideoConfigOpen(true)}
+                      className="bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-extrabold text-xs px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 shadow-xs border border-red-400/40 active:scale-95 cursor-pointer"
+                      title="Configurar e Anexar Vídeo Tutorial em MP4 pesquisando no computador"
+                    >
+                      <Video className="w-3.5 h-3.5 text-yellow-300" />
+                      <span>Anexar Vídeo Tutorial (MP4)</span>
+                    </button>
+
+                    <button
+                      id="btn-admin-broadcast"
+                      onClick={() => setIsAdminBroadcastOpen(true)}
+                      className="bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white font-extrabold text-xs px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 shadow-xs border border-amber-400/40 active:scale-95 cursor-pointer"
+                      title="Disparar comunicados ou vídeo tutorial para todos os salões cadastrados"
+                    >
+                      <Sparkles className="w-3.5 h-3.5 text-amber-200" />
+                      <span>Disparar p/ Todos os Salões</span>
                     </button>
 
                     <button
@@ -1539,6 +1565,27 @@ export function App() {
         userRole={userRole}
         activeSalon={activeSalon}
         onSelectRole={handleSelectRole}
+      />
+
+      {/* Admin Video Tutorial Configuration & MP4 Attachment Modal */}
+      <AdminVideoConfigModal
+        isOpen={isAdminVideoConfigOpen}
+        onClose={() => setIsAdminVideoConfigOpen(false)}
+        activeSalon={activeSalon}
+        onOpenVideoTutorial={() => {
+          // Can test video player if needed
+        }}
+      />
+
+      {/* Admin Mass Broadcast to All Registered Salons Modal */}
+      <AdminBroadcastModal
+        isOpen={isAdminBroadcastOpen}
+        onClose={() => setIsAdminBroadcastOpen(false)}
+        salons={salons}
+        onOpenVideoConfig={() => {
+          setIsAdminBroadcastOpen(false);
+          setIsAdminVideoConfigOpen(true);
+        }}
       />
 
     </div>

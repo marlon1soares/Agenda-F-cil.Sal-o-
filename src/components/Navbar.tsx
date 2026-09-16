@@ -3,7 +3,7 @@ import { SalonConfig, UserRole, ThemeConfig, Professional } from '../types';
 import { THEMES } from '../data/mockData';
 import { Storage } from '../utils/storage';
 import { formatBRL } from '../utils/pricing';
-import { Crown, Scissors, User, Users, Minimize2, Maximize2, Settings, Image as ImageIcon, Sparkles, FolderOpen, ChevronDown, Building2, ShoppingCart, Link2, Key, Radio, Wifi, MessageSquare, Play, Video } from 'lucide-react';
+import { Crown, Scissors, User, Users, Minimize2, Maximize2, Settings, Image as ImageIcon, Sparkles, FolderOpen, ChevronDown, Building2, ShoppingCart, Link2, Key, Radio, Wifi, MessageSquare, Play, Video, Send } from 'lucide-react';
 
 interface NavbarProps {
   config: SalonConfig;
@@ -18,6 +18,8 @@ interface NavbarProps {
   onOpenAdminSalons?: () => void;
   onOpenBuyApp?: () => void;
   onOpenAdminPaymentConfig?: () => void;
+  onOpenAdminVideoConfig?: () => void;
+  onOpenAdminBroadcast?: () => void;
   onOpenClientLink?: () => void;
   onOpenEmployeeLink?: () => void;
   onOpenSalonLink?: () => void;
@@ -42,6 +44,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenAdminSalons,
   onOpenBuyApp,
   onOpenAdminPaymentConfig,
+  onOpenAdminVideoConfig,
+  onOpenAdminBroadcast,
   onOpenClientLink,
   onOpenEmployeeLink,
   onOpenSalonLink,
@@ -515,6 +519,32 @@ export const Navbar: React.FC<NavbarProps> = ({
                 >
                   <Key className="w-3.5 h-3.5 text-emerald-400" />
                   <span>Alterar Senha Admin</span>
+                </button>
+              )}
+
+              {userRole === 'admin' && onOpenAdminVideoConfig && (
+                <button
+                  id="btn-action-admin-video-config"
+                  type="button"
+                  onClick={onOpenAdminVideoConfig}
+                  title="Configurar e Anexar Vídeo Tutorial em MP4 pesquisando no computador"
+                  className="bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-extrabold text-xs px-3 py-1.5 rounded-xl shadow-sm flex items-center gap-1.5 transition-all active:scale-95 border border-red-400/40 shrink-0 cursor-pointer"
+                >
+                  <Video className="w-3.5 h-3.5 text-yellow-300" />
+                  <span>Anexar Vídeo Tutorial (MP4)</span>
+                </button>
+              )}
+
+              {userRole === 'admin' && onOpenAdminBroadcast && (
+                <button
+                  id="btn-action-admin-broadcast"
+                  type="button"
+                  onClick={onOpenAdminBroadcast}
+                  title="Disparar qualquer informação, comunicado ou vídeo tutorial para todos os salões cadastrados de uma vez só"
+                  className="bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white font-extrabold text-xs px-3 py-1.5 rounded-xl shadow-sm flex items-center gap-1.5 transition-all active:scale-95 border border-amber-400/40 shrink-0 cursor-pointer"
+                >
+                  <Send className="w-3.5 h-3.5 text-amber-200" />
+                  <span>Disparar p/ Todos os Salões</span>
                 </button>
               )}
 

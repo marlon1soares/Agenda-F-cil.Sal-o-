@@ -272,6 +272,18 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
     try {
       setIsSendingEmail(true);
       setEmailStatusMsg('Enviando e-mail de confirmação com login e token de acesso...');
+      const vCfg = adminPaymentConfig.videoTutorialConfig;
+      let activeVideoUrl = 'https://www.youtube.com/watch?v=tutorial-agenda-facil-salao';
+      if (vCfg?.customVideoUrl) {
+        activeVideoUrl = vCfg.customVideoUrl.startsWith('http')
+          ? vCfg.customVideoUrl
+          : `${getPublicAppUrl()}${vCfg.customVideoUrl.startsWith('/') ? '' : '/'}${vCfg.customVideoUrl}`;
+      } else if (vCfg?.youtubeUrl) {
+        activeVideoUrl = vCfg.youtubeUrl;
+      } else {
+        activeVideoUrl = `${getPublicAppUrl()}/video`;
+      }
+
       const response = await fetch('/api/send-purchase-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -287,6 +299,8 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
           expiresAt: salon.expiresAt,
           purchaseDate: salon.purchaseDate,
           appUrl: getPublicAppUrl(),
+          videoUrl: activeVideoUrl,
+          videoTitle: vCfg?.videoTitle
         })
       });
       const data = await response.json();
@@ -1180,6 +1194,18 @@ Guarde este e-mail para consultas futuras.`);
 
   const handleShareWhatsappCredentials = () => {
     if (!createdSalon) return;
+    const vCfg = adminPaymentConfig.videoTutorialConfig;
+    let activeVideoUrl = 'https://www.youtube.com/watch?v=tutorial-agenda-facil-salao';
+    if (vCfg?.customVideoUrl) {
+      activeVideoUrl = vCfg.customVideoUrl.startsWith('http')
+        ? vCfg.customVideoUrl
+        : `${getPublicAppUrl()}${vCfg.customVideoUrl.startsWith('/') ? '' : '/'}${vCfg.customVideoUrl}`;
+    } else if (vCfg?.youtubeUrl) {
+      activeVideoUrl = vCfg.youtubeUrl;
+    } else {
+      activeVideoUrl = `${getPublicAppUrl()}/video`;
+    }
+
     const msg = `🎉 *PAGAMENTO CONFIRMADO - SEU SALÃO ESTÁ LIBERADO!*
 
 Olá *${createdSalon.ownerName}*, seu acesso ao aplicativo *${createdSalon.name}* está pronto!
@@ -1193,7 +1219,7 @@ Olá *${createdSalon.ownerName}*, seu acesso ao aplicativo *${createdSalon.name}
 👉 ${salonAccessUrl}
 
 🎥 *Vídeo Tutorial (Como usar o sistema):*
-👉 https://www.youtube.com/watch?v=tutorial-agenda-facil-salao
+👉 ${activeVideoUrl}
 
 📲 *Como instalar no celular:*
 1. Abra o link acima no Chrome ou Safari.

@@ -481,6 +481,19 @@ export const AdminSalonsModal: React.FC<AdminSalonsModalProps> = ({
       const directSalonUrl = `${cleanBase}/?acesso-salao=1&cpf=${encodeURIComponent(newSalon.ownerCpf || '')}&token=${encodeURIComponent(newToken)}`;
       const clientBookingUrl = `${cleanBase}/?role=cliente&salon=${encodeURIComponent(newSalon.name)}`;
 
+      const adminPaymentCfg = Storage.getAdminPaymentConfig();
+      const videoCfg = adminPaymentCfg.videoTutorialConfig;
+      let activeVideoUrl = 'https://www.youtube.com/watch?v=tutorial-agenda-facil-salao';
+      if (videoCfg?.customVideoUrl) {
+        activeVideoUrl = videoCfg.customVideoUrl.startsWith('http')
+          ? videoCfg.customVideoUrl
+          : `${cleanBase}${videoCfg.customVideoUrl.startsWith('/') ? '' : '/'}${videoCfg.customVideoUrl}`;
+      } else if (videoCfg?.youtubeUrl) {
+        activeVideoUrl = videoCfg.youtubeUrl;
+      } else {
+        activeVideoUrl = `${cleanBase}/video`;
+      }
+
       const stepByStepMsg = 
 `🎉 *BEM-VINDO AO AGENDA FÁCIL - SEU APLICATIVO ESTÁ PRONTO!* 💈
 
@@ -506,7 +519,7 @@ ${clientBookingUrl}
 4️⃣ Pronto! Você terá acesso completo ao Dashboard, Caixa, Agenda e Equipe.
 5️⃣ Envie o *Link de Agendamento* para seus clientes agendarem no WhatsApp e Instagram 24h por dia!
 
-🎥 *Vídeo Tutorial de Ajuda:* https://www.youtube.com/watch?v=tutorial-agenda-facil-salao
+🎥 *Vídeo Tutorial de Ajuda:* ${activeVideoUrl}
 
 _🤖 Mensagem automática enviada pelo Robô de Despacho Agenda Fácil._`;
 
@@ -554,7 +567,9 @@ _🤖 Mensagem automática enviada pelo Robô de Despacho Agenda Fácil._`;
           planDays: newSalon.planDays,
           priceStr: newSalon.planDays <= 7 ? 'Teste Gratuito 7 Dias' : `Plano ${newSalon.planDays} Dias`,
           expiresAt: newSalon.expiresAt,
-          appUrl: publicAppUrl
+          appUrl: publicAppUrl,
+          videoUrl: activeVideoUrl,
+          videoTitle: videoCfg?.videoTitle
         })
       })
       .then(res => res.json())
