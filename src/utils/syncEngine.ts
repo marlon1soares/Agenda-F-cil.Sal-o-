@@ -317,8 +317,21 @@ class SyncEngine {
 
       if (state.salons && Array.isArray(state.salons) && state.salons.length > 0) {
         try { 
-          localStorage.setItem('salaoAppsList', JSON.stringify(state.salons));
+          const localSalonsRaw = localStorage.getItem('salaoAppsList');
+          const localSalons = localSalonsRaw ? JSON.parse(localSalonsRaw) : [];
+          const salonMap = new Map<string, any>();
+          if (Array.isArray(localSalons)) {
+            localSalons.forEach((s: any) => { if (s && s.id) salonMap.set(s.id, s); });
+          }
           state.salons.forEach((s: any) => {
+            if (s && s.id) {
+              const existing = salonMap.get(s.id);
+              salonMap.set(s.id, existing ? { ...existing, ...s } : s);
+            }
+          });
+          const mergedSalons = Array.from(salonMap.values());
+          localStorage.setItem('salaoAppsList', JSON.stringify(mergedSalons));
+          mergedSalons.forEach((s: any) => {
             if (s && s.id && s.config) {
               localStorage.setItem(`salaoConfig_${s.id}`, JSON.stringify(s.config));
             }
@@ -328,12 +341,37 @@ class SyncEngine {
       if (state.config && state.config.nomeSalao) {
         try { localStorage.setItem('salaoConfig', JSON.stringify(state.config)); } catch {}
       }
-      if (state.appointments) {
+      if (state.appointments && typeof state.appointments === 'object') {
         appointmentsChanged = true;
-        try { localStorage.setItem('salaoAgenda', JSON.stringify(state.appointments)); } catch {}
+        try {
+          const localAgendaRaw = localStorage.getItem('salaoAgenda');
+          const localAgenda = localAgendaRaw ? JSON.parse(localAgendaRaw) : {};
+          const mergedAgenda = { ...localAgenda };
+          Object.keys(state.appointments).forEach((dateKey) => {
+            mergedAgenda[dateKey] = {
+              ...(mergedAgenda[dateKey] || {}),
+              ...state.appointments![dateKey]
+            };
+          });
+          localStorage.setItem('salaoAgenda', JSON.stringify(mergedAgenda));
+        } catch {}
       }
       if (state.transactions && Array.isArray(state.transactions)) {
-        try { localStorage.setItem('salaoLancamentos', JSON.stringify(state.transactions)); } catch {}
+        try {
+          const localTxRaw = localStorage.getItem('salaoLancamentos');
+          const localTx = localTxRaw ? JSON.parse(localTxRaw) : [];
+          const txMap = new Map<string, any>();
+          if (Array.isArray(localTx)) {
+            localTx.forEach((t: any) => { if (t && t.id) txMap.set(t.id, t); });
+          }
+          state.transactions.forEach((t: any) => {
+            if (t && t.id) {
+              const existing = txMap.get(t.id);
+              txMap.set(t.id, existing ? { ...existing, ...t } : t);
+            }
+          });
+          localStorage.setItem('salaoLancamentos', JSON.stringify(Array.from(txMap.values())));
+        } catch {}
       }
       if (state.timeAdjustments) {
         try { localStorage.setItem('salaoAjustesHorarios', JSON.stringify(state.timeAdjustments)); } catch {}

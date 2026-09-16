@@ -133,8 +133,9 @@ export const MeusFuncionariosView: React.FC<MeusFuncionariosViewProps> = ({
       };
     });
 
-    // 1. Scan transactions (POS Completed)
+    // 1. Scan transactions (POS Completed) - ignore cancelled/deleted
     (transactions || []).forEach(t => {
+      if (!t || t.deleted || t.status === 'cancelado') return;
       if (t && t.commissions && Array.isArray(t.commissions)) {
         t.commissions.forEach(c => {
           if (!c || !c.professionalName) return;
@@ -405,6 +406,7 @@ export const MeusFuncionariosView: React.FC<MeusFuncionariosViewProps> = ({
     const daysWorkedSet = new Set<string>();
 
     (transactions || []).forEach(t => {
+      if (!t || t.deleted || t.status === 'cancelado') return;
       if (t && t.date && t.date >= startDate && t.date <= endDate) {
         if (t.commissions && Array.isArray(t.commissions)) {
           const matchComm = t.commissions.find(c => c && (c.professionalName === profName || c.professionalId === prof.id));

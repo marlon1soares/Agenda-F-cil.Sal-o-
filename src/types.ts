@@ -11,6 +11,7 @@ export interface StaffCommission {
 
 export interface Transaction {
   id: string;
+  salonId?: string;
   date: string; // YYYY-MM-DD
   time: string; // HH:mm
   description: string;
@@ -23,6 +24,10 @@ export interface Transaction {
   commissions: StaffCommission[];
   createdBy: UserRole;
   notes?: string;
+  status?: 'ativo' | 'cancelado';
+  deleted?: boolean;
+  deletedAt?: string;
+  deletedBy?: UserRole;
 }
 
 export type AppointmentStatus = 'livre' | 'agendado' | 'em_atendimento' | 'concluido' | 'bloqueado' | 'cancelado';

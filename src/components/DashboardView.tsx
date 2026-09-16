@@ -31,15 +31,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   const todayISO = new Date().toISOString().split('T')[0];
 
+  // Active transactions (excluding soft-deleted / cancelled items)
+  const activeTransactions = transactions.filter(t => !t.deleted && t.status !== 'cancelado');
+
   // Calculate Today KPIs
-  const todayTransactions = transactions.filter(t => t.date === todayISO);
-  const totalRevenueToday = todayTransactions.reduce((acc, t) => acc + t.grossAmount, 0);
-  const totalNetToday = todayTransactions.reduce((acc, t) => acc + t.netAmount, 0);
+  const todayTransactions = activeTransactions.filter(t => t.date === todayISO);
+  const totalRevenueToday = todayTransactions.reduce((acc, t) => acc + (Number(t.grossAmount) || 0), 0);
+  const totalNetToday = todayTransactions.reduce((acc, t) => acc + (Number(t.netAmount) || 0), 0);
   const totalServicesToday = todayTransactions.length;
 
   // Calculate Commissions Today
   const totalCommissionsToday = todayTransactions.reduce((acc, t) => {
-    const commTotal = t.commissions.reduce((cAcc, c) => cAcc + c.amount, 0);
+    const commTotal = t.commissions.reduce((cAcc, c) => cAcc + (Number(c.amount) || 0), 0);
     return acc + commTotal;
   }, 0);
 
@@ -50,9 +53,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   // Revenue By Payment Method for Chart
   const paymentMethodData = ['pix', 'cartao_credito', 'cartao_debito', 'dinheiro', 'outro'].map(pm => {
-    const sum = transactions
+    const sum = activeTransactions
       .filter(t => t.paymentMethod === pm)
-      .reduce((acc, t) => acc + t.grossAmount, 0);
+      .reduce((acc, t) => acc + (Number(t.grossAmount) || 0), 0);
     return {
       name: pm === 'cartao_credito' ? 'Crédito' : pm === 'cartao_debito' ? 'Débito' : pm.toUpperCase(),
       value: sum
@@ -61,9 +64,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   // Performance per professional
   const professionalPerformance = config.profs.map(p => {
-    const earnings = transactions.reduce((acc, t) => {
+    const earnings = activeTransactions.reduce((acc, t) => {
       const comm = t.commissions.find(c => c.professionalName === p.nome);
-      return acc + (comm ? comm.amount : 0);
+      return acc + (comm ? (Number(comm.amount) || 0) : 0);
     }, 0);
     return {
       name: p.nome,

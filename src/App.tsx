@@ -499,23 +499,47 @@ export function App() {
     }
   };
 
-  // Handlers for Transactions
+  // Handlers for Transactions (with Soft-Delete for audit reports in Word/Excel)
   const handleAddTransaction = (tx: Transaction) => {
-    const updated = [tx, ...transactions];
+    const newTx: Transaction = {
+      ...tx,
+      salonId: activeSalonId,
+      status: 'ativo',
+      deleted: false,
+    };
+    const updated = [newTx, ...transactions];
     setTransactions(updated);
     Storage.saveTransactions(updated);
   };
 
   const handleDeleteTransaction = (id: string) => {
-    const updated = transactions.filter(t => t.id !== id);
+    const updated = transactions.map(t => {
+      if (t.id === id) {
+        return {
+          ...t,
+          status: 'cancelado' as const,
+          deleted: true,
+          deletedAt: new Date().toISOString(),
+          deletedBy: userRole,
+        };
+      }
+      return t;
+    });
     setTransactions(updated);
     Storage.saveTransactions(updated);
   };
 
   const handleClearAllTransactions = () => {
-    if (confirm("Tem certeza que deseja apagar todos os lançamentos do caixa?")) {
-      setTransactions([]);
-      Storage.saveTransactions([]);
+    if (confirm("Tem certeza que deseja apagar os lançamentos do caixa? Eles permanecerão cancelados e destacados em vermelho nos relatórios Word/Excel para auditoria.")) {
+      const updated = transactions.map(t => ({
+        ...t,
+        status: 'cancelado' as const,
+        deleted: true,
+        deletedAt: new Date().toISOString(),
+        deletedBy: userRole,
+      }));
+      setTransactions(updated);
+      Storage.saveTransactions(updated);
     }
   };
 

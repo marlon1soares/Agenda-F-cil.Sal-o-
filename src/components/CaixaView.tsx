@@ -42,7 +42,7 @@ export const CaixaView: React.FC<CaixaViewProps> = ({
     setCommandInput('');
   };
 
-  // Filtered transactions
+  // Filtered transactions (including both active and cancelled for export)
   const filteredTransactions = transactions.filter(tx => {
     if (!filterQuery) return true;
     const query = filterQuery.toLowerCase();
@@ -54,18 +54,24 @@ export const CaixaView: React.FC<CaixaViewProps> = ({
     );
   });
 
-  // Calculate Totals
-  const totalGross = filteredTransactions.reduce((acc, t) => acc + t.grossAmount, 0);
-  const totalNet = filteredTransactions.reduce((acc, t) => acc + t.netAmount, 0);
+  // Active transactions for on-screen daily caixa view
+  const activeTransactions = filteredTransactions.filter(tx => !tx.deleted && tx.status !== 'cancelado');
+  const cancelledTransactionsCount = filteredTransactions.filter(tx => tx.deleted || tx.status === 'cancelado').length;
 
-  // Professional Commission Totals
+  // Calculate Totals for active procedures (omitting cancelled items)
+  const totalGross = activeTransactions.reduce((acc, t) => acc + (Number(t.grossAmount) || 0), 0);
+  const totalNet = activeTransactions.reduce((acc, t) => acc + (Number(t.netAmount) || 0), 0);
+
+  // Professional Commission Totals (from active procedures only)
   const profCommissionTotals = config.profs.map(p => {
-    const totalAmount = filteredTransactions.reduce((acc, t) => {
-      const comm = t.commissions.find(c => c.professionalName === p.nome);
+    const totalAmount = activeTransactions.reduce((acc, t) => {
+      const comm = t.commissions?.find(c => c.professionalName === p.nome);
       return acc + (comm ? comm.amount : 0);
     }, 0);
     return { name: p.nome, percentage: p.porc, totalAmount };
   });
+
+  const canExportReports = userRole === 'admin' || userRole === 'salao';
 
   return (
     <div className="space-y-6">
@@ -108,10 +114,18 @@ export const CaixaView: React.FC<CaixaViewProps> = ({
           <h3 className="text-sm sm:text-base font-extrabold text-slate-900">
             Lançamentos Globais de Hoje
           </h3>
-          <span className="bg-sky-600 text-white font-extrabold text-xs px-2.5 py-1 rounded-full shadow-xs whitespace-nowrap inline-flex items-center gap-1">
-            <span>Procedimentos:</span>
-            <span className="bg-white/20 px-1.5 py-0.5 rounded-full font-black text-white">{filteredTransactions.length}</span>
-          </span>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="bg-sky-600 text-white font-extrabold text-xs px-2.5 py-1 rounded-full shadow-xs whitespace-nowrap inline-flex items-center gap-1">
+              <span>Ativos:</span>
+              <span className="bg-white/20 px-1.5 py-0.5 rounded-full font-black text-white">{activeTransactions.length}</span>
+            </span>
+            {cancelledTransactionsCount > 0 && (
+              <span className="bg-rose-50 text-rose-700 border border-rose-200 font-extrabold text-xs px-2 py-0.5 rounded-full whitespace-nowrap inline-flex items-center gap-1" title="Procedimentos cancelados mantidos para o relatório Word/Excel">
+                <span>Apagados:</span>
+                <span className="bg-rose-200 text-rose-900 px-1.5 py-0.2 rounded-full font-black text-[11px]">{cancelledTransactionsCount}</span>
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Filter Search Input & Action Buttons */}
@@ -157,12 +171,12 @@ export const CaixaView: React.FC<CaixaViewProps> = ({
 
       {/* MOBILE ADAPTIVE VIEW (CARD-BASED - PERFECT ON SMARTPHONES) */}
       <div className="block sm:hidden space-y-2.5">
-        {filteredTransactions.length === 0 ? (
+        {activeTransactions.length === 0 ? (
           <div className="bg-white p-6 rounded-2xl border border-slate-200 text-center text-xs text-slate-400">
-            Nenhum lançamento registrado no caixa. Use o campo acima para lançar!
+            Nenhum lançamento ativo no caixa de hoje. Use o campo acima para lançar!
           </div>
         ) : (
-          filteredTransactions.map((tx) => (
+          activeTransactions.map((tx) => (
             <div key={`mob-tx-${tx.id}`} className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs space-y-2.5">
               <div className="flex items-start justify-between gap-2">
                 <div>
@@ -245,14 +259,14 @@ export const CaixaView: React.FC<CaixaViewProps> = ({
             </thead>
 
             <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
-              {filteredTransactions.length === 0 ? (
+              {activeTransactions.length === 0 ? (
                 <tr>
                   <td colSpan={7 + config.profs.length} className="p-8 text-center text-slate-400">
-                    Nenhum lançamento registrado no caixa. Use o campo acima para lançar!
+                    Nenhum lançamento ativo no caixa de hoje. Use o campo acima para lançar!
                   </td>
                 </tr>
               ) : (
-                filteredTransactions.map((tx, idx) => (
+                activeTransactions.map((tx, idx) => (
                   <tr key={tx.id} className={idx % 2 === 1 ? 'bg-slate-50/60' : 'bg-white'}>
                     <td className="p-3 text-center text-slate-500 font-mono">{tx.date}</td>
                     <td className="p-3 text-center text-slate-500 font-mono">{tx.time}</td>
@@ -303,7 +317,7 @@ export const CaixaView: React.FC<CaixaViewProps> = ({
       {/* Totals Summary Bar */}
       <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs text-xs font-bold text-slate-900 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
         <div>
-          TOTAL DO DIA ({filteredTransactions.length} procedimentos):{' '}
+          TOTAL DO DIA ({activeTransactions.length} procedimento{activeTransactions.length === 1 ? '' : 's'}):{' '}
           <span className="text-orange-600 font-extrabold text-sm sm:text-base ml-1">
             R$ {(Number(totalGross) || 0).toFixed(2)}
           </span>
@@ -323,24 +337,30 @@ export const CaixaView: React.FC<CaixaViewProps> = ({
         </div>
       </div>
 
-      {/* Export Reports Action Buttons */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3">
-        <button
-          onClick={() => exportToExcel(filteredTransactions, config)}
-          className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs py-3 px-4 rounded-xl shadow-xs transition-colors flex items-center justify-center gap-2 cursor-pointer"
-        >
-          <FileSpreadsheet className="w-4 h-4" />
-          <span>BAIXAR EXCEL (.XLS)</span>
-        </button>
+      {/* Export Reports Action Buttons - Restricted to Owner & Admin */}
+      {canExportReports ? (
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3">
+          <button
+            onClick={() => exportToExcel(filteredTransactions, config)}
+            className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs py-3 px-4 rounded-xl shadow-xs transition-colors flex items-center justify-center gap-2 cursor-pointer"
+          >
+            <FileSpreadsheet className="w-4 h-4" />
+            <span>BAIXAR EXCEL (.XLS)</span>
+          </button>
 
-        <button
-          onClick={() => exportToWord(filteredTransactions, config)}
-          className="flex-1 bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs py-3 px-4 rounded-xl shadow-xs transition-colors flex items-center justify-center gap-2 cursor-pointer"
-        >
-          <FileText className="w-4 h-4" />
-          <span>BAIXAR WORD (.DOC)</span>
-        </button>
-      </div>
+          <button
+            onClick={() => exportToWord(filteredTransactions, config)}
+            className="flex-1 bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs py-3 px-4 rounded-xl shadow-xs transition-colors flex items-center justify-center gap-2 cursor-pointer"
+          >
+            <FileText className="w-4 h-4" />
+            <span>BAIXAR WORD (.DOC)</span>
+          </button>
+        </div>
+      ) : (
+        <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-center text-xs text-slate-500 font-medium">
+          🔒 Relatórios de fechamento em Excel e Word são reservados exclusivamente para o Dono do Salão e Administrador.
+        </div>
+      )}
 
     </div>
   );
