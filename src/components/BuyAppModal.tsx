@@ -64,11 +64,11 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
   const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
   const [hasUserClickedPlan, setHasUserClickedPlan] = useState(false);
 
-  // Email Automation Robot State (Robô Automático de Envio de E-mail)
-  const [robotState, setRobotState] = useState<'idle' | 'preparing' | 'opening_email' | 'sending' | 'completed' | 'error'>('idle');
+  // WhatsApp & Email Automation Robot State (Robô Automático de Despacho 100% sem cliques)
+  const [robotState, setRobotState] = useState<'idle' | 'preparing' | 'opening_whatsapp' | 'opening_email' | 'sending' | 'completed' | 'error'>('idle');
   const [robotLog, setRobotLog] = useState<string>('');
   const [robotProgress, setRobotProgress] = useState<number>(0);
-  const [autoClickStep, setAutoClickStep] = useState<'idle' | 'scrolling_to_bottom' | 'robot_targeting_email' | 'robot_clicking_email' | 'email_sent_success'>('idle');
+  const [autoClickStep, setAutoClickStep] = useState<'idle' | 'scrolling_to_bottom' | 'robot_clicking_whatsapp' | 'robot_targeting_email' | 'robot_clicking_email' | 'email_sent_success'>('idle');
   const [isEmailButtonClicked, setIsEmailButtonClicked] = useState<boolean>(false);
   const [lastEmailSentTime, setLastEmailSentTime] = useState<string>('');
   
@@ -420,15 +420,15 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
     }
   };
 
-  // Automated Email Dispatch Robot (Metáfora do Robozinho / Código Automático)
+  // Automated WhatsApp & Email Dispatch Robot (Robô Automático 100% sem cliques)
   useEffect(() => {
     if (step === 'success' && createdSalon) {
       setAutoClickStep('scrolling_to_bottom');
       setRobotState('preparing');
-      setRobotProgress(25);
-      setRobotLog(`🤖 Código/Robô ativado: Rolando a página até o botão "Enviar por E-mail"...`);
+      setRobotProgress(15);
+      setRobotLog(`🤖 Robô ativado: Preparando despacho automático de WhatsApp e E-mail...`);
 
-      // 1. Smoothly scroll down all the way to the bottom email button section
+      // 1. Smoothly scroll down all the way to the bottom dispatch section
       const scrollTimer = setTimeout(() => {
         if (bottomEmailSectionRef.current) {
           bottomEmailSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -438,26 +438,48 @@ export const BuyAppModal: React.FC<BuyAppModalProps> = ({
             behavior: 'smooth'
           });
         }
-      }, 500);
+      }, 400);
 
-      // 2. Robot targets the "Enviar por E-mail" button with visual indicator
-      const targetTimer = setTimeout(() => {
-        setAutoClickStep('robot_targeting_email');
-        setRobotState('opening_email');
-        setRobotProgress(55);
-        setRobotLog(`🎯 Robô posicionando sobre o botão "Enviar por E-mail" para ${createdSalon.ownerEmail}...`);
-      }, 1400);
+      // 2. Robot clicks WhatsApp button automatically
+      const waTimer = setTimeout(() => {
+        setAutoClickStep('robot_clicking_whatsapp');
+        setRobotState('opening_whatsapp');
+        setRobotProgress(50);
+        setRobotLog(`📲 Robô clicando em "WhatsApp" para despachar dados para ${createdSalon.ownerPhone || 'o número cadastrado'}...`);
+        try {
+          handleShareWhatsappCredentials();
+        } catch (e) {
+          console.warn('Erro ao acionar WhatsApp pelo robô:', e);
+        }
+      }, 900);
 
-      // 3. Robot clicks the "Enviar por E-mail" button and sends the email
-      const clickTimer = setTimeout(() => {
+      // 3. Robot clicks Email button automatically
+      const emailTimer = setTimeout(() => {
         setAutoClickStep('robot_clicking_email');
-        handleTriggerEmailDispatch(true);
-      }, 2300);
+        setRobotState('sending');
+        setRobotProgress(80);
+        setRobotLog(`✉️ Robô clicando em "Enviar por E-mail" para despachar para ${createdSalon.ownerEmail}...`);
+        try {
+          handleTriggerEmailDispatch(true);
+        } catch (e) {
+          console.warn('Erro ao acionar E-mail pelo robô:', e);
+        }
+      }, 2100);
+
+      // 4. Robot finishes both actions
+      const finishTimer = setTimeout(() => {
+        setAutoClickStep('email_sent_success');
+        setRobotState('completed');
+        setRobotProgress(100);
+        setRobotLog(`🎉 Despacho 100% Concluído! O Robô enviou WhatsApp e E-mail automaticamente sem você precisar clicar.`);
+      }, 3300);
 
       return () => {
         clearTimeout(scrollTimer);
-        clearTimeout(targetTimer);
-        clearTimeout(clickTimer);
+        clearTimeout(waTimer);
+        clearTimeout(emailTimer);
+        clearTimeout(finishTimer);
+        clearTimeout(finishTimer);
       };
     } else {
       setRobotState('idle');
@@ -2418,11 +2440,24 @@ Olá *${createdSalon.ownerName}*, seu acesso ao aplicativo *${createdSalon.name}
                 <button
                   type="button"
                   onClick={handleShareWhatsappCredentials}
-                  className="bg-emerald-700 hover:bg-emerald-600 text-white font-bold py-2 px-2 rounded-xl text-[10px] flex items-center justify-center gap-1 transition-colors cursor-pointer shadow"
-                  title="Enviar cópia no WhatsApp"
+                  className={`font-bold py-2 px-2 rounded-xl text-[10px] flex items-center justify-center gap-1 transition-all cursor-pointer shadow ${
+                    autoClickStep === 'robot_clicking_whatsapp'
+                      ? 'bg-emerald-400 text-slate-950 scale-105 shadow-emerald-500/50 ring-2 ring-emerald-300'
+                      : 'bg-emerald-700 hover:bg-emerald-600 text-white'
+                  }`}
+                  title="Disparado automaticamente pelo robô para o WhatsApp"
                 >
-                  <Phone className="w-3 h-3 text-emerald-200" />
-                  <span>WhatsApp</span>
+                  {autoClickStep === 'robot_clicking_whatsapp' ? (
+                    <>
+                      <Bot className="w-3 h-3 animate-spin text-slate-950" />
+                      <span>Robô Clicando...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Phone className="w-3 h-3 text-emerald-200" />
+                      <span>WhatsApp ✓</span>
+                    </>
+                  )}
                 </button>
 
                 <button

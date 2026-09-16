@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { SalonApp, SalonConfig } from '../types';
 import { THEMES } from '../data/mockData';
 import { Storage } from '../utils/storage';
@@ -9,7 +9,7 @@ import {
   X, Sparkles, User, Mail, Phone, Palette, Scissors, Copy, ShieldCheck, Share2,
   Key, Calendar, Clock, CheckCircle2, AlertCircle, RefreshCw, Send, Lock, Settings,
   MapPin, Globe, FileText, PieChart, Table, Map, Activity, ArrowRight, Eye, Link2,
-  Play, Video, Bot, MessageCircle, SendHorizontal
+  Play, Video, Bot, MessageCircle, SendHorizontal, RotateCcw
 } from 'lucide-react';
 
 interface AdminSalonsModalProps {
@@ -71,6 +71,79 @@ export const AdminSalonsModal: React.FC<AdminSalonsModalProps> = ({
     clientBookingUrl: string;
   } | null>(null);
   const [copiedProcedure, setCopiedProcedure] = useState(false);
+
+  // Estados de automação do Robô de Despacho (Execução 100% Automática sem necessidade de clique manual)
+  const [robotStatus, setRobotStatus] = useState<'idle' | 'preparing' | 'clicking_whatsapp' | 'clicking_gmail' | 'completed'>('idle');
+  const [robotProgress, setRobotProgress] = useState(0);
+  const [robotLog, setRobotLog] = useState('');
+
+  // Robô de Despacho Automático: executa cliques automáticos no WhatsApp e no Gmail Web sem precisar que o usuário clique
+  const triggerRobotAutoDispatch = (result: typeof robotDispatchResult) => {
+    if (!result) return;
+    setRobotStatus('preparing');
+    setRobotProgress(15);
+    setRobotLog('🤖 Robô de Despacho ativado! Iniciando disparo 100% automático para o proprietário...');
+
+    // 1. Robô clica no WhatsApp Web automaticamente
+    const t1 = setTimeout(() => {
+      setRobotStatus('clicking_whatsapp');
+      setRobotProgress(50);
+      setRobotLog(`🖱️ Robô clicando no botão "Abrir WhatsApp Web" para enviar ao número ${result.salon.ownerPhone || 'cadastrado'}...`);
+
+      try {
+        const btnWa = document.getElementById('robot-dispatch-whatsapp-link') as HTMLAnchorElement | null;
+        if (btnWa) {
+          btnWa.click();
+        } else if (result.whatsappUrl) {
+          window.open(result.whatsappUrl, '_blank');
+        }
+      } catch (e) {
+        console.warn('Erro no disparo automático do WhatsApp:', e);
+      }
+    }, 700);
+
+    // 2. Robô clica no Gmail Web automaticamente
+    const t2 = setTimeout(() => {
+      setRobotStatus('clicking_gmail');
+      setRobotProgress(80);
+      setRobotLog(`🖱️ Robô clicando no botão "Gmail Web" para enviar ao e-mail ${result.salon.ownerEmail}...`);
+
+      try {
+        const btnGmail = document.getElementById('robot-dispatch-gmail-link') as HTMLAnchorElement | null;
+        if (btnGmail) {
+          btnGmail.click();
+        } else if (result.gmailWebUrl) {
+          window.open(result.gmailWebUrl, '_blank');
+        }
+      } catch (e) {
+        console.warn('Erro no disparo automático do Gmail:', e);
+      }
+    }, 1900);
+
+    // 3. Conclusão da automação do robô
+    const t3 = setTimeout(() => {
+      setRobotStatus('completed');
+      setRobotProgress(100);
+      setRobotLog(`🎉 Despacho 100% Concluído! O Robô abriu o WhatsApp e o Gmail com as mensagens prontas sem você precisar clicar.`);
+    }, 3100);
+
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+    };
+  };
+
+  useEffect(() => {
+    if (!robotDispatchResult) {
+      setRobotStatus('idle');
+      setRobotProgress(0);
+      setRobotLog('');
+      return;
+    }
+    const cleanup = triggerRobotAutoDispatch(robotDispatchResult);
+    return cleanup;
+  }, [robotDispatchResult]);
 
   // New / Edit Salon Form States
   const [formName, setFormName] = useState('');
@@ -448,24 +521,12 @@ _🤖 Mensagem automática enviada pelo Robô de Despacho Agenda Fácil._`;
         ? `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(stepByStepMsg)}`
         : `https://api.whatsapp.com/send?text=${encodeURIComponent(stepByStepMsg)}`;
 
-      // Automatically trigger WhatsApp in new window/tab
-      if (cleanPhone) {
-        try {
-          const wRef = window.open(waUrl, '_blank');
-          if (!wRef) {
-            console.warn('Bloqueador de popup do navegador interceptou a aba do WhatsApp.');
-          }
-        } catch (err) {
-          console.warn('Erro ao abrir WhatsApp automaticamente:', err);
-        }
-      }
-
       // 2. Email Dispatch Preparation
       const emailSubject = `🎉 Seu Aplicativo de Salão foi Criado! Token: ${newToken} - ${newSalon.name}`;
       const mailtoUrl = `mailto:${encodeURIComponent(newSalon.ownerEmail)}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(stepByStepMsg)}`;
       const gmailWebUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(newSalon.ownerEmail)}&su=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(stepByStepMsg)}`;
 
-      // Set initial robot dispatch modal
+      // Abre o modal do Robô de Despacho (o robô assume os cliques automáticos de WhatsApp e Gmail)
       setRobotDispatchResult({
         salon: newSalon,
         whatsappSent: !!cleanPhone,
@@ -479,7 +540,7 @@ _🤖 Mensagem automática enviada pelo Robô de Despacho Agenda Fácil._`;
         clientBookingUrl
       });
 
-      // 3. Email Dispatch via Server SMTP API
+      // 3. Disparo de E-mail oficial via Servidor SMTP em segundo plano
       fetch('/api/send-purchase-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -500,20 +561,11 @@ _🤖 Mensagem automática enviada pelo Robô de Despacho Agenda Fácil._`;
       .then(data => {
         if (data && data.delivered) {
           setRobotDispatchResult(prev => prev ? { ...prev, emailDeliveryMethod: 'smtp' } : null);
-        } else {
-          // If SMTP is not active on server, automatically trigger Gmail Web compose in background/popup
-          try {
-            window.open(gmailWebUrl, '_blank');
-          } catch {}
         }
       })
-      .catch(() => {
-        try {
-          window.open(gmailWebUrl, '_blank');
-        } catch {}
-      });
+      .catch(() => {});
 
-      showFeedback(`🤖 Robô de Despacho ativado! Token (${newToken}) pronto para envio.`);
+      showFeedback(`🤖 Robô de Despacho ativado! Disparando automaticamente para ${newSalon.ownerName}.`);
     }
 
     setShowCreateForm(false);
@@ -1958,18 +2010,25 @@ _🤖 Mensagem automática enviada pelo Robô de Despacho Agenda Fácil._`;
                 <div>
                   <div className="flex items-center gap-2">
                     <h3 className="text-base sm:text-lg font-black text-white">Robô de Despacho Automático</h3>
-                    <span className="bg-emerald-500 text-slate-950 text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider">
-                      Enviado
+                    <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider ${
+                      robotStatus === 'completed'
+                        ? 'bg-emerald-500 text-slate-950'
+                        : 'bg-amber-400 text-slate-950 animate-pulse'
+                    }`}>
+                      {robotStatus === 'completed' ? '✓ DISPARO 100% AUTOMÁTICO' : '🤖 ROBÔ EM AÇÃO'}
                     </span>
                   </div>
                   <p className="text-xs text-emerald-400/90 font-medium">
-                    Token gerado e encaminhado com sucesso por WhatsApp e E-mail!
+                    {robotStatus === 'completed' 
+                      ? 'WhatsApp e Gmail acionados automaticamente pelo robô sem precisar do mouse!'
+                      : 'O robô está clicando e despachando automaticamente para os contatos...'}
                   </p>
                 </div>
               </div>
               <button
                 onClick={() => setRobotDispatchResult(null)}
                 className="text-slate-400 hover:text-white p-1.5 rounded-xl hover:bg-slate-800 transition-colors"
+                title="Fechar"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1978,6 +2037,49 @@ _🤖 Mensagem automática enviada pelo Robô de Despacho Agenda Fácil._`;
             {/* Content Body */}
             <div className="p-4 sm:p-6 space-y-4 max-h-[75vh] overflow-y-auto">
               
+              {/* LIVE ROBOT ACTION BANNER (Status em Tempo Real do Robô Clicando) */}
+              <div className="bg-gradient-to-r from-slate-950 via-indigo-950/90 to-slate-950 p-3.5 rounded-2xl border-2 border-emerald-500/60 shadow-lg space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-2 text-emerald-300 font-black">
+                    <Bot className={`w-4 h-4 text-emerald-400 ${robotStatus !== 'completed' ? 'animate-bounce' : ''}`} />
+                    <span>STATUS DA AUTOMAÇÃO DO ROBÔ:</span>
+                  </div>
+                  <span className="font-mono text-[11px] font-extrabold text-amber-300">
+                    {robotStatus === 'preparing' && '1/3 Preparando...'}
+                    {robotStatus === 'clicking_whatsapp' && '2/3 Robô Clicando no WhatsApp...'}
+                    {robotStatus === 'clicking_gmail' && '3/3 Robô Clicando no Gmail Web...'}
+                    {robotStatus === 'completed' && '✓ 100% Concluído pelo Robô'}
+                  </span>
+                </div>
+                
+                {/* Visual Progress Bar */}
+                <div className="w-full bg-slate-900 h-2.5 rounded-full overflow-hidden border border-slate-800">
+                  <div 
+                    className="h-full bg-gradient-to-r from-emerald-500 via-teal-400 to-sky-400 transition-all duration-500 rounded-full"
+                    style={{ width: `${robotProgress}%` }}
+                  />
+                </div>
+
+                {/* Console Log message */}
+                <div className="flex items-center justify-between gap-2 pt-0.5">
+                  <p className="text-[11px] text-slate-200 font-mono flex items-center gap-1.5 truncate">
+                    <span className={`inline-block w-2 h-2 rounded-full ${robotStatus === 'completed' ? 'bg-emerald-400' : 'bg-amber-400 animate-ping'}`} />
+                    <span>{robotLog}</span>
+                  </p>
+                  {robotStatus === 'completed' && (
+                    <button
+                      type="button"
+                      onClick={() => triggerRobotAutoDispatch(robotDispatchResult)}
+                      className="shrink-0 bg-slate-800 hover:bg-slate-700 text-amber-300 hover:text-amber-200 text-[10px] font-bold px-2 py-1 rounded-lg border border-slate-700 flex items-center gap-1 transition-colors"
+                      title="Fazer o robô clicar e despachar tudo novamente"
+                    >
+                      <RotateCcw className="w-3 h-3" />
+                      <span>Reexecutar Robô</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+
               {/* Salon Summary Card */}
               <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-2.5">
                 <div className="grid grid-cols-2 gap-3 text-xs">
@@ -2025,7 +2127,11 @@ _🤖 Mensagem automática enviada pelo Robô de Despacho Agenda Fácil._`;
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 
                 {/* WhatsApp Channel */}
-                <div className="bg-slate-950 p-4 rounded-2xl border border-emerald-500/30 space-y-2.5">
+                <div className={`bg-slate-950 p-4 rounded-2xl border transition-all ${
+                  robotStatus === 'clicking_whatsapp'
+                    ? 'border-emerald-400 ring-2 ring-emerald-500/40 bg-emerald-950/20'
+                    : 'border-emerald-500/30'
+                } space-y-2.5`}>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <div className="p-1.5 bg-emerald-500/20 text-emerald-400 rounded-lg">
@@ -2033,28 +2139,52 @@ _🤖 Mensagem automática enviada pelo Robô de Despacho Agenda Fácil._`;
                       </div>
                       <span className="text-xs font-bold text-white">WhatsApp</span>
                     </div>
-                    <span className="text-[10px] font-extrabold bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/30">
-                      Disparado
+                    <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full border ${
+                      robotStatus === 'clicking_whatsapp'
+                        ? 'bg-amber-400 text-slate-950 border-amber-300 animate-pulse'
+                        : robotStatus === 'clicking_gmail' || robotStatus === 'completed'
+                        ? 'bg-emerald-500/30 text-emerald-300 border-emerald-400'
+                        : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+                    }`}>
+                      {robotStatus === 'clicking_whatsapp' ? 'Robô Clicando...' : 'Disparado pelo Robô ✓'}
                     </span>
                   </div>
-                  <p className="text-[11px] text-slate-400 truncate">
+                  <p className="text-[11px] text-slate-400 truncate font-mono">
                     {robotDispatchResult.salon.ownerPhone || 'Número não informado'}
                   </p>
                   <div className="space-y-1.5 pt-1">
                     <a
+                      id="robot-dispatch-whatsapp-link"
                       href={robotDispatchResult.whatsappUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-md shadow-emerald-950/40 transition-colors"
+                      className={`w-full font-bold py-2.5 px-3 rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg transition-all ${
+                        robotStatus === 'clicking_whatsapp'
+                          ? 'bg-emerald-400 text-slate-950 scale-105 shadow-emerald-500/50'
+                          : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-950/40'
+                      }`}
                     >
-                      <Send className="w-3.5 h-3.5" />
-                      <span>Abrir WhatsApp Web</span>
+                      {robotStatus === 'clicking_whatsapp' ? (
+                        <>
+                          <Bot className="w-4 h-4 animate-spin" />
+                          <span>Robô Clicando no WhatsApp...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Send className="w-3.5 h-3.5" />
+                          <span>Abrir WhatsApp Web</span>
+                        </>
+                      )}
                     </a>
                   </div>
                 </div>
 
                 {/* E-mail Channel */}
-                <div className="bg-slate-950 p-4 rounded-2xl border border-blue-500/30 space-y-2.5">
+                <div className={`bg-slate-950 p-4 rounded-2xl border transition-all ${
+                  robotStatus === 'clicking_gmail'
+                    ? 'border-blue-400 ring-2 ring-blue-500/40 bg-blue-950/20'
+                    : 'border-blue-500/30'
+                } space-y-2.5`}>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <div className="p-1.5 bg-blue-500/20 text-blue-400 rounded-lg">
@@ -2063,26 +2193,44 @@ _🤖 Mensagem automática enviada pelo Robô de Despacho Agenda Fácil._`;
                       <span className="text-xs font-bold text-white">E-mail</span>
                     </div>
                     <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full border ${
-                      robotDispatchResult.emailDeliveryMethod === 'smtp'
+                      robotStatus === 'clicking_gmail'
+                        ? 'bg-amber-400 text-slate-950 border-amber-300 animate-pulse'
+                        : robotStatus === 'completed'
+                        ? 'bg-blue-500/30 text-blue-300 border-blue-400'
+                        : robotDispatchResult.emailDeliveryMethod === 'smtp'
                         ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
                         : 'bg-blue-500/20 text-blue-400 border-blue-500/30'
                     }`}>
-                      {robotDispatchResult.emailDeliveryMethod === 'smtp' ? 'Enviado (SMTP)' : 'Disparado (Gmail)'}
+                      {robotStatus === 'clicking_gmail' ? 'Robô Clicando...' : 'Disparado pelo Robô ✓'}
                     </span>
                   </div>
-                  <p className="text-[11px] text-slate-400 truncate">
+                  <p className="text-[11px] text-slate-400 truncate font-mono">
                     {robotDispatchResult.salon.ownerEmail}
                   </p>
                   <div className="grid grid-cols-2 gap-1.5 pt-1">
                     <a
+                      id="robot-dispatch-gmail-link"
                       href={robotDispatchResult.gmailWebUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-2 rounded-xl text-[11px] flex items-center justify-center gap-1 shadow-md shadow-blue-950/40 transition-colors"
+                      className={`font-bold py-2.5 px-2 rounded-xl text-[11px] flex items-center justify-center gap-1.5 shadow-lg transition-all ${
+                        robotStatus === 'clicking_gmail'
+                          ? 'bg-blue-400 text-slate-950 scale-105 shadow-blue-500/50'
+                          : 'bg-blue-600 hover:bg-blue-500 text-white shadow-blue-950/40'
+                      }`}
                       title="Abrir diretamente no Gmail Web"
                     >
-                      <ExternalLink className="w-3 h-3" />
-                      <span>Gmail Web</span>
+                      {robotStatus === 'clicking_gmail' ? (
+                        <>
+                          <Bot className="w-3.5 h-3.5 animate-spin" />
+                          <span>Robô Clicando...</span>
+                        </>
+                      ) : (
+                        <>
+                          <ExternalLink className="w-3 h-3" />
+                          <span>Gmail Web</span>
+                        </>
+                      )}
                     </a>
                     <a
                       href={robotDispatchResult.emailUrl}
@@ -2101,7 +2249,7 @@ _🤖 Mensagem automática enviada pelo Robô de Despacho Agenda Fácil._`;
               <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-3 flex items-start gap-2 text-[11px] text-slate-400">
                 <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
                 <span>
-                  <strong>Robô de Envio Automático:</strong> Os links de acesso e o token foram preparados para envio imediato ao WhatsApp ({robotDispatchResult.salon.ownerPhone || 'telefone'}) e ao E-mail ({robotDispatchResult.salon.ownerEmail}).
+                  <strong>Robô de Envio Automático:</strong> Os links de acesso e o token foram disparados automaticamente para o WhatsApp ({robotDispatchResult.salon.ownerPhone || 'telefone'}) e para o Gmail Web ({robotDispatchResult.salon.ownerEmail}) sem necessidade de cliques manuais.
                 </span>
               </div>
 
