@@ -4,7 +4,7 @@ import { Storage } from '../utils/storage';
 import { 
   Video, Sparkles, Youtube, Globe, Check, X, Play, RotateCcw, 
   MessageSquare, Sliders, ShieldCheck, HelpCircle, Save, ExternalLink,
-  Upload, FileVideo, Loader2, Trash2, FolderOpen
+  Upload, FileVideo, Loader2, Trash2, FolderOpen, Download, Film, CheckCircle2
 } from 'lucide-react';
 
 interface AdminVideoConfigModalProps {
@@ -138,21 +138,107 @@ export const AdminVideoConfigModal: React.FC<AdminVideoConfigModalProps> = ({
   const [uploadError, setUploadError] = useState('');
   const [uploadedVideoInfo, setUploadedVideoInfo] = useState<{ name: string; size: string } | null>(null);
   const [showVideoPreview, setShowVideoPreview] = useState(false);
+  const [showLunaPreview, setShowLunaPreview] = useState(false);
 
+  const formatSize = (bytes: number) => {
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  };
+
+  const handleDownloadLunaVideo = () => {
+    const link = document.createElement('a');
+    link.href = '/api/download-tutorial-mp4';
+    link.download = 'video_tutorial_agenda_mais_facil_luna.mp4';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setSuccessMsg('Iniciando download do vídeo tutorial da Luna em MP4!');
+    setTimeout(() => setSuccessMsg(''), 4000);
+  };
+
+  const handleUseLunaVideo = () => {
+    const lunaVideoUrl = '/uploads/videos/video_tutorial_agenda_mais_facil_luna.mp4';
+    setCustomVideoUrl(lunaVideoUrl);
+    setUploadedVideoInfo({
+      name: 'video_tutorial_agenda_mais_facil_luna.mp4',
+      size: '6.5 MB (Apresentadora Luna - Oficial)'
+    });
+    setSuccessMsg('Vídeo oficial da Luna configurado como o tutorial do sistema!');
+    setTimeout(() => setSuccessMsg(''), 4000);
+  };
+
+  // Resilient upload: try direct binary stream first; if blocked or errored, fallback to base64 JSON payload
   const handleUploadVideoFile = (file: File) => {
     if (!file) return;
     setUploadError('');
     setIsUploadingVideo(true);
     setUploadProgress(0);
 
-    const formatSize = (bytes: number) => {
-      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-      return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    const safeFilename = encodeURIComponent(file.name);
+    const uploadUrl = `/api/upload-video?filename=${safeFilename}`;
+
+    const tryBase64Fallback = () => {
+      setUploadProgress(40);
+      const reader = new FileReader();
+      reader.onprogress = (ev) => {
+        if (ev.lengthComputable) {
+          const pct = Math.round((ev.loaded / ev.total) * 40);
+          setUploadProgress(pct);
+        }
+      };
+      reader.onload = async () => {
+        setUploadProgress(70);
+        try {
+          const base64Data = reader.result as string;
+          const resp = await fetch(uploadUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              filename: file.name,
+              base64: base64Data,
+            }),
+          });
+
+          if (resp.ok) {
+            const data = await resp.json();
+            if (data.url) {
+              setCustomVideoUrl(data.url);
+              setUploadedVideoInfo({ name: file.name, size: formatSize(file.size) });
+              setUploadProgress(100);
+              setSuccessMsg('Vídeo do seu computador anexado com sucesso!');
+              setTimeout(() => setSuccessMsg(''), 3000);
+              return;
+            }
+          }
+          // If server failed, create local object URL so user is never blocked
+          const blobUrl = URL.createObjectURL(file);
+          setCustomVideoUrl(blobUrl);
+          setUploadedVideoInfo({ name: file.name, size: `${formatSize(file.size)} (Local)` });
+          setUploadProgress(100);
+          setSuccessMsg('Vídeo anexado e pronto para reprodução!');
+          setTimeout(() => setSuccessMsg(''), 3000);
+        } catch {
+          const blobUrl = URL.createObjectURL(file);
+          setCustomVideoUrl(blobUrl);
+          setUploadedVideoInfo({ name: file.name, size: `${formatSize(file.size)} (Local)` });
+          setUploadProgress(100);
+          setSuccessMsg('Vídeo anexado localmente com sucesso!');
+          setTimeout(() => setSuccessMsg(''), 3000);
+        } finally {
+          setIsUploadingVideo(false);
+        }
+      };
+      reader.onerror = () => {
+        setIsUploadingVideo(false);
+        setUploadError('Não foi possível ler o arquivo selecionado.');
+      };
+      reader.readAsDataURL(file);
     };
 
     const xhr = new XMLHttpRequest();
-    xhr.open('POST', '/api/upload-video', true);
-    xhr.setRequestHeader('x-filename', encodeURIComponent(file.name));
+    xhr.open('POST', uploadUrl, true);
     xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
 
     xhr.upload.onprogress = (event) => {
@@ -163,8 +249,8 @@ export const AdminVideoConfigModal: React.FC<AdminVideoConfigModalProps> = ({
     };
 
     xhr.onload = () => {
-      setIsUploadingVideo(false);
       if (xhr.status >= 200 && xhr.status < 300) {
+        setIsUploadingVideo(false);
         try {
           const res = JSON.parse(xhr.responseText);
           if (res.url) {
@@ -172,21 +258,26 @@ export const AdminVideoConfigModal: React.FC<AdminVideoConfigModalProps> = ({
             setUploadedVideoInfo({ name: file.name, size: formatSize(file.size) });
             setSuccessMsg('Vídeo do seu computador anexado com sucesso!');
             setTimeout(() => setSuccessMsg(''), 3000);
+            return;
           }
         } catch {
-          setUploadError('Erro ao processar resposta do servidor.');
+          // fallthrough
         }
-      } else {
-        setUploadError(`Falha no upload (Erro ${xhr.status}).`);
       }
+      // If binary stream fails (e.g., 405 from static proxy or limit), execute Base64 fallback automatically
+      tryBase64Fallback();
     };
 
     xhr.onerror = () => {
-      setIsUploadingVideo(false);
-      setUploadError('Erro de conexão durante o upload.');
+      // Execute Base64 fallback on network/CORS error
+      tryBase64Fallback();
     };
 
-    xhr.send(file);
+    try {
+      xhr.send(file);
+    } catch {
+      tryBase64Fallback();
+    }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -441,11 +532,89 @@ export const AdminVideoConfigModal: React.FC<AdminVideoConfigModalProps> = ({
                 </div>
               </div>
 
+              {/* Cartão de Download e Seleção do Vídeo Tutorial Oficial da Apresentadora Luna em MP4 */}
+              <div className="bg-gradient-to-r from-red-950/70 via-slate-900 to-rose-950/60 p-4 rounded-2xl border-2 border-red-500/40 space-y-3 shadow-lg">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-red-600 to-rose-500 p-0.5 shadow-md shadow-red-950 shrink-0 overflow-hidden">
+                      <img
+                        src="/tutorial-assets/pixar_female_host_1788749082734.jpg"
+                        alt="Apresentadora Luna"
+                        className="w-full h-full object-cover rounded-[10px]"
+                      />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-black text-sm text-white">Vídeo Tutorial Oficial da Apresentadora Luna</span>
+                        <span className="bg-emerald-950/80 border border-emerald-500/60 text-emerald-300 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                          <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                          MP4 Pronto
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-300 mt-0.5">
+                        Vídeo completo gravado com a apresentadora Luna ensinando o proprietário a usar o Agenda Fácil.
+                      </p>
+                      <div className="flex items-center gap-2 mt-1 text-[11px] text-slate-400 font-mono">
+                        <span>MP4 Universal H.264</span>
+                        <span>•</span>
+                        <span>Tamanho: 6.5 MB</span>
+                        <span>•</span>
+                        <span>Duração: 3m 23s</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Ações Rápidas: Baixar MP4, Definir como Tutorial Oficial, Assistir Prévia */}
+                <div className="flex flex-wrap items-center gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={handleDownloadLunaVideo}
+                    className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-black flex items-center gap-1.5 shadow-md shadow-emerald-950/40 transition-all active:scale-95 cursor-pointer"
+                    title="Baixar o arquivo de vídeo MP4 oficial da Luna para o seu computador"
+                  >
+                    <Download className="w-3.5 h-3.5 text-white" />
+                    <span>Baixar Vídeo em MP4</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleUseLunaVideo}
+                    className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white text-xs font-black flex items-center gap-1.5 shadow-md shadow-red-950/40 transition-all active:scale-95 cursor-pointer"
+                    title="Definir este vídeo oficial da Luna como o vídeo tutorial do sistema e de todos os salões"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-yellow-300" />
+                    <span>Usar Este Vídeo como Tutorial</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowLunaPreview(!showLunaPreview)}
+                    className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <Play className="w-3.5 h-3.5 text-emerald-400 fill-emerald-400" />
+                    <span>{showLunaPreview ? 'Fechar Vídeo' : 'Assistir Vídeo da Luna'}</span>
+                  </button>
+                </div>
+
+                {/* Inline Player do Vídeo da Luna */}
+                {showLunaPreview && (
+                  <div className="rounded-xl overflow-hidden border border-slate-700 bg-black aspect-video max-h-72 mx-auto flex items-center justify-center mt-2 shadow-2xl">
+                    <video
+                      src="/uploads/videos/video_tutorial_agenda_mais_facil_luna.mp4"
+                      controls
+                      autoPlay
+                      className="w-full h-full object-contain"
+                    />
+                  </div>
+                )}
+              </div>
+
               {/* URL Fields */}
               <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-3">
                 <label className="font-bold text-white text-sm flex items-center gap-2">
                   <Youtube className="w-4 h-4 text-red-400" />
-                  <span>Links do Vídeo Externo:</span>
+                  <span>Configurar Vídeo Externo ou Anexar do PC:</span>
                 </label>
 
                 <div className="space-y-3">

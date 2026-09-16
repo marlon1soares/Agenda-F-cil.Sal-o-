@@ -13,59 +13,107 @@ import { WebhookSecurity } from "./server/webhookSecurity";
 dotenv.config();
 
 const app = express();
-app.use(express.json({ limit: "50mb" }));
 
-// Enable CORS for all origins (mobile phone, external links, desktop)
+// Enable CORS for all origins, methods and headers BEFORE any other middleware
 app.use((_req, res, next) => {
   res.header("Access-Control-Allow-Origin", "*");
-  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, X-Signature, X-Request-Id, asaas-access-token, x-webhook-token");
+  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH, HEAD");
+  res.header("Access-Control-Allow-Headers", "*");
+  res.header("Access-Control-Expose-Headers", "Content-Length, Content-Range, Content-Disposition");
   if (_req.method === "OPTIONS") {
     return res.sendStatus(200);
   }
   next();
 });
 
+// JSON body parser with generous limit
+app.use(express.json({ limit: "150mb" }));
+app.use(express.urlencoded({ limit: "150mb", extended: true }));
+
 // Standalone Tutorial Video & Assets routes (Separated from the main application)
 const uploadsVideosDir = path.resolve(process.cwd(), "public/uploads/videos");
 if (!fs.existsSync(uploadsVideosDir)) {
   fs.mkdirSync(uploadsVideosDir, { recursive: true });
 }
-app.use("/uploads/videos", express.static(uploadsVideosDir));
+app.use("/uploads/videos", express.static(uploadsVideosDir, {
+  setHeaders: (res) => {
+    res.setHeader("Accept-Ranges", "bytes");
+    res.setHeader("Access-Control-Allow-Origin", "*");
+  }
+}));
 app.use("/tutorial-assets", express.static(path.resolve(process.cwd(), "src/assets/images")));
 app.use("/tutorial_audio", express.static(path.resolve(process.cwd(), "public/tutorial_audio")));
 
-// Upload custom MP4/video from computer directly
-app.post("/api/upload-video", (req, res) => {
+// Helper function to resolve Luna video file
+function getLunaVideoPath(): string | null {
+  const candidates = [
+    path.resolve(uploadsVideosDir, "video_tutorial_agenda_mais_facil_luna.mp4"),
+    path.resolve(process.cwd(), "src/assets/images/video_tutorial_agende_mais_facil_luna.mp4"),
+    path.resolve(process.cwd(), "public/video_tutorial_agenda_mais_facil_luna.mp4")
+  ];
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) return candidate;
+  }
+  return null;
+}
+
+// Upload custom MP4/video from computer directly (Supports Stream, JSON Base64 and Raw Binary)
+app.all(["/api/upload-video", "/api/upload-video-mp4", "/api/video-upload"], (req, res, next) => {
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(200);
+  }
+  if (req.method !== "POST" && req.method !== "PUT") {
+    return res.status(405).json({ error: "Método não permitido. Utilize POST ou PUT." });
+  }
+
   try {
+    const rawQueryName = req.query.filename as string;
     const rawHeaderName = req.headers["x-filename"];
-    let rawFilename = "video.mp4";
-    if (typeof rawHeaderName === "string") {
-      try {
-        rawFilename = decodeURIComponent(rawHeaderName);
-      } catch {
-        rawFilename = rawHeaderName;
-      }
+    let rawFilename = rawQueryName || (typeof rawHeaderName === "string" ? rawHeaderName : "video_tutorial.mp4");
+    try {
+      rawFilename = decodeURIComponent(rawFilename);
+    } catch {
+      // keep as is
     }
+
     const ext = path.extname(rawFilename) || ".mp4";
     const baseName = path.basename(rawFilename, ext).replace(/[^a-zA-Z0-9_-]/g, "_").substring(0, 40) || "video";
     const uniqueSuffix = Date.now() + "_" + Math.random().toString(36).substring(2, 6);
     const finalFilename = `${baseName}_${uniqueSuffix}${ext.toLowerCase()}`;
     const targetFilePath = path.resolve(uploadsVideosDir, finalFilename);
 
+    // Case 1: Client sent JSON payload with base64 data
+    if (req.body && (req.body.base64 || req.body.videoBase64)) {
+      const b64 = (req.body.base64 || req.body.videoBase64).replace(/^data:video\/[a-zA-Z0-9]+;base64,/, "");
+      const buffer = Buffer.from(b64, "base64");
+      fs.writeFileSync(targetFilePath, buffer);
+      return res.json({
+        success: true,
+        url: `/uploads/videos/${finalFilename}`,
+        filename: finalFilename,
+        originalName: rawFilename,
+        size: buffer.length,
+      });
+    }
+
+    // Case 2: Client streamed binary data
     const writeStream = fs.createWriteStream(targetFilePath);
     req.pipe(writeStream);
 
     writeStream.on("finish", () => {
-      const stats = fs.statSync(targetFilePath);
-      const fileUrl = `/uploads/videos/${finalFilename}`;
-      res.json({
-        success: true,
-        url: fileUrl,
-        filename: finalFilename,
-        originalName: rawFilename,
-        size: stats.size,
-      });
+      try {
+        const stats = fs.statSync(targetFilePath);
+        const fileUrl = `/uploads/videos/${finalFilename}`;
+        res.json({
+          success: true,
+          url: fileUrl,
+          filename: finalFilename,
+          originalName: rawFilename,
+          size: stats.size,
+        });
+      } catch (e: any) {
+        res.status(500).json({ error: "Erro ao verificar arquivo gravado." });
+      }
     });
 
     writeStream.on("error", (err) => {
@@ -73,19 +121,24 @@ app.post("/api/upload-video", (req, res) => {
       res.status(500).json({ error: "Erro ao salvar vídeo." });
     });
   } catch (err: any) {
+    console.error("Upload catch error:", err);
     res.status(500).json({ error: err?.message || "Erro no upload." });
   }
 });
+
 app.get(["/video", "/video.html", "/tutorial", "/tutorial.html"], (_req, res) => {
   res.sendFile(path.resolve(process.cwd(), "video.html"));
 });
 
-// Direct MP4 Download endpoint (Ready official video)
-app.get(["/api/download-tutorial-mp4", "/api/video-mp4", "/download-mp4"], (_req, res) => {
-  const mp4Path = path.resolve(process.cwd(), "src/assets/images/video_tutorial_agende_mais_facil_luna.mp4");
-  if (fs.existsSync(mp4Path)) {
+// Direct MP4 Download endpoint (Ready official video from Luna)
+app.get(["/api/download-tutorial-mp4", "/api/video-mp4", "/download-mp4", "/api/download-luna-mp4"], (_req, res) => {
+  const mp4Path = getLunaVideoPath();
+  if (mp4Path) {
     res.setHeader("Content-Type", "video/mp4");
     res.setHeader("Content-Disposition", 'attachment; filename="video_tutorial_agenda_mais_facil_luna.mp4"');
+    res.setHeader("Accept-Ranges", "bytes");
+    const stat = fs.statSync(mp4Path);
+    res.setHeader("Content-Length", stat.size);
     fs.createReadStream(mp4Path).pipe(res);
   } else {
     res.status(404).send("Arquivo MP4 ainda não gerado.");
