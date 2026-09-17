@@ -3,13 +3,14 @@ import {
   X, Database, Calendar as CalendarIcon, Download, FileText, 
   FileSpreadsheet, Search, ChevronLeft, ChevronRight, CheckCircle2, 
   Clock, ShieldCheck, Eye, Sparkles, Filter, ChevronDown, 
-  ChevronUp, AlertCircle, RefreshCw, Layers, DollarSign, UserCheck
+  ChevronUp, AlertCircle, RefreshCw, Layers, DollarSign, UserCheck,
+  ArrowRight, RotateCcw
 } from 'lucide-react';
 import { CaixaFechamentoCiclo, SalonConfig, UserRole, Transaction } from '../types';
 import { Storage } from '../utils/storage';
 import { exportToExcel, exportToWord } from '../utils/exporters';
 import { db } from '../lib/firebase';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, getDocs } from 'firebase/firestore';
 
 interface BancoDadosCaixaModalProps {
   isOpen: boolean;
@@ -18,6 +19,7 @@ interface BancoDadosCaixaModalProps {
   salonName: string;
   config: SalonConfig;
   userRole: UserRole;
+  currentTransactions?: Transaction[];
 }
 
 export const BancoDadosCaixaModal: React.FC<BancoDadosCaixaModalProps> = ({
@@ -26,23 +28,107 @@ export const BancoDadosCaixaModal: React.FC<BancoDadosCaixaModalProps> = ({
   salonId,
   salonName,
   config,
-  userRole
+  userRole,
+  currentTransactions = []
 }) => {
   const [ciclos, setCiclos] = useState<CaixaFechamentoCiclo[]>([]);
   const [selectedCycleId, setSelectedCycleId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedPeriodFilter, setSelectedPeriodFilter] = useState<'todos' | 'hoje' | '7dias' | '30dias' | '6meses' | '1ano'>('todos');
-  const [selectedDate, setSelectedDate] = useState<string>(''); // YYYY-MM-DD
+  
+  // Date Helpers
+  const getTodayStr = () => {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const getFirstDayOfMonthStr = (date?: Date) => {
+    const d = date || new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    return `${year}-${month}-01`;
+  };
+
+  const getDaysAgoStr = (days: number) => {
+    const d = new Date();
+    d.setDate(d.getDate() - days);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const getMonthsAgoStr = (months: number) => {
+    const d = new Date();
+    d.setMonth(d.getMonth() - months);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  // State for Date Range
+  // By default, as requested: "quando eu clicar hoje ou a data, tem que puxar do mês inteiro.
+  // Por exemplo, dia 16 que eu fechei hoje, tem que aparecer todos os lançamentos do dia 16 que eu fechei hoje até o dia 1º de setembro"
+  const [startDate, setStartDate] = useState<string>(() => getFirstDayOfMonthStr());
+  const [endDate, setEndDate] = useState<string>(() => getTodayStr());
+  const [activeFilterPreset, setActiveFilterPreset] = useState<'hoje' | '7dias' | '30dias' | '6meses' | '1ano' | 'todos' | 'personalizado'>('hoje');
+
   const [calendarMonth, setCalendarMonth] = useState<Date>(new Date());
   const [isLoading, setIsLoading] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
-  // Load from local storage and firestore
+  // Load data from local storage and firestore
   const loadData = async () => {
     setIsLoading(true);
     try {
       // 1. Local storage first
-      const localData = Storage.getCaixaFechamentos(salonId);
+      let localData = Storage.getCaixaFechamentos(salonId);
+
+      // Verify if there was a saved fechamento in localStorage that hasn't been archived as a cycle yet
+      const savedFechamentoStr = localStorage.getItem(`fechamento_caixa_${salonId || 'default'}`);
+      const liveTxs = (currentTransactions && currentTransactions.length > 0)
+        ? currentTransactions
+        : Storage.getTransactions();
+
+      if (localData.length === 0 && (savedFechamentoStr || liveTxs.length > 0)) {
+        let savedFechamento: any = null;
+        try {
+          if (savedFechamentoStr) savedFechamento = JSON.parse(savedFechamentoStr);
+        } catch { /* ignore */ }
+
+        const now = new Date();
+        const formattedDate = savedFechamento?.date || `${now.toLocaleDateString('pt-BR')} às ${now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
+        const yyyymmdd = now.toISOString().split('T')[0];
+
+        const activeTxs = liveTxs.filter(t => !t.deleted && t.status !== 'cancelado');
+        const gross = savedFechamento?.totalGross ?? activeTxs.reduce((acc, t) => acc + (Number(t.grossAmount) || 0), 0);
+        const net = activeTxs.reduce((acc, t) => acc + (Number(t.netAmount) || 0), 0);
+
+        const syntheticCycle: CaixaFechamentoCiclo = {
+          id: `fechamento_recuperado_${Date.now()}`,
+          salonId: salonId || 'default',
+          salonName: config.nomeSalao || salonName,
+          closedAt: now.toISOString(),
+          closedAtFormatted: formattedDate,
+          date: yyyymmdd,
+          totalGross: gross,
+          totalNet: net,
+          totalCommissions: 0,
+          activeCount: savedFechamento?.count ?? activeTxs.length,
+          cancelledCount: liveTxs.length - activeTxs.length,
+          commissionsByProf: [],
+          paymentMethodsSummary: [],
+          transactions: [...liveTxs],
+          clearedBy: userRole
+        };
+
+        Storage.saveCaixaFechamento(syntheticCycle);
+        localData = [syntheticCycle];
+      }
+
       setCiclos(localData);
 
       // 2. Query Firestore if available to sync any cycles made on other devices
@@ -82,6 +168,10 @@ export const BancoDadosCaixaModal: React.FC<BancoDadosCaixaModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       loadData();
+      // Ensure it defaults to month-to-date
+      setStartDate(getFirstDayOfMonthStr());
+      setEndDate(getTodayStr());
+      setActiveFilterPreset('hoje');
     }
   }, [isOpen, salonId]);
 
@@ -97,6 +187,60 @@ export const BancoDadosCaixaModal: React.FC<BancoDadosCaixaModalProps> = ({
     return () => window.removeEventListener('salao_sync_data', handleSync);
   }, [salonId]);
 
+  // Pool all transactions from archived cycles and live transactions (deduplicating by ID)
+  const allTransactionsMap = useMemo<Map<string, Transaction>>(() => {
+    const map = new Map<string, Transaction>();
+    
+    // 1. From archived cycles
+    ciclos.forEach(c => {
+      (c.transactions || []).forEach(tx => {
+        if (tx && tx.id) {
+          map.set(tx.id, tx);
+        }
+      });
+    });
+
+    // 2. From current live transactions (or storage)
+    const liveTxs: Transaction[] = (currentTransactions && currentTransactions.length > 0)
+      ? currentTransactions
+      : Storage.getTransactions();
+    
+    liveTxs.forEach(tx => {
+      if (tx && tx.id && !map.has(tx.id)) {
+        map.set(tx.id, tx);
+      }
+    });
+
+    return map;
+  }, [ciclos, currentTransactions]);
+
+  // Filter individual transactions for the selected date range and search term
+  const periodTransactions = useMemo<Transaction[]>(() => {
+    const txList: Transaction[] = Array.from(allTransactionsMap.values());
+    return txList.filter((tx: Transaction) => {
+      const txDate = tx.date || (tx.deletedAt ? tx.deletedAt.split('T')[0] : '');
+      if (startDate && txDate && txDate < startDate) return false;
+      if (endDate && txDate && txDate > endDate) return false;
+
+      if (searchTerm.trim()) {
+        const q = searchTerm.toLowerCase();
+        const desc = (tx.description || '').toLowerCase();
+        const client = (tx.clientName || '').toLowerCase();
+        const method = (tx.paymentMethod || '').toLowerCase();
+        const dateStr = (tx.date || '').toLowerCase();
+        const commMatch = (tx.commissions || []).some(c => (c.professionalName || '').toLowerCase().includes(q));
+        if (!desc.includes(q) && !client.includes(q) && !method.includes(q) && !dateStr.includes(q) && !commMatch) {
+          return false;
+        }
+      }
+      return true;
+    }).sort((a: Transaction, b: Transaction) => {
+      const dateComp = (b.date || '').localeCompare(a.date || '');
+      if (dateComp !== 0) return dateComp;
+      return (b.time || '').localeCompare(a.time || '');
+    });
+  }, [allTransactionsMap, startDate, endDate, searchTerm]);
+
   // Group cycles by date for calendar highlighting
   const cyclesByDate = useMemo(() => {
     const map: Record<string, CaixaFechamentoCiclo[]> = {};
@@ -110,30 +254,13 @@ export const BancoDadosCaixaModal: React.FC<BancoDadosCaixaModalProps> = ({
     return map;
   }, [ciclos]);
 
-  // Filter cycles based on search, period filter, and calendar date selection
+  // Filter cycles based on date range and search term
   const filteredCiclos = useMemo(() => {
-    const now = new Date();
-    const todayStr = now.toISOString().split('T')[0];
-
     return ciclos.filter(c => {
       const cycleDate = c.date || (c.closedAt ? c.closedAt.split('T')[0] : '');
 
-      // Specific calendar date filter
-      if (selectedDate && cycleDate !== selectedDate) {
-        return false;
-      }
-
-      // Period filter
-      if (!selectedDate && selectedPeriodFilter !== 'todos') {
-        const cDate = new Date(cycleDate + 'T12:00:00');
-        const diffDays = Math.floor((now.getTime() - cDate.getTime()) / (1000 * 60 * 60 * 24));
-
-        if (selectedPeriodFilter === 'hoje' && cycleDate !== todayStr) return false;
-        if (selectedPeriodFilter === '7dias' && diffDays > 7) return false;
-        if (selectedPeriodFilter === '30dias' && diffDays > 30) return false;
-        if (selectedPeriodFilter === '6meses' && diffDays > 183) return false;
-        if (selectedPeriodFilter === '1ano' && diffDays > 365) return false;
-      }
+      if (startDate && cycleDate && cycleDate < startDate) return false;
+      if (endDate && cycleDate && cycleDate > endDate) return false;
 
       // Text search
       if (searchTerm.trim()) {
@@ -151,9 +278,9 @@ export const BancoDadosCaixaModal: React.FC<BancoDadosCaixaModalProps> = ({
 
       return true;
     });
-  }, [ciclos, selectedDate, selectedPeriodFilter, searchTerm]);
+  }, [ciclos, startDate, endDate, searchTerm]);
 
-  // Aggregate stats of currently filtered cycles
+  // Aggregate stats of periodTransactions
   const stats = useMemo(() => {
     let gross = 0;
     let net = 0;
@@ -161,18 +288,49 @@ export const BancoDadosCaixaModal: React.FC<BancoDadosCaixaModalProps> = ({
     let cancelled = 0;
     const profMap: Record<string, number> = {};
 
-    filteredCiclos.forEach(c => {
-      gross += Number(c.totalGross) || 0;
-      net += Number(c.totalNet) || 0;
-      procedures += Number(c.activeCount) || 0;
-      cancelled += Number(c.cancelledCount) || 0;
-      (c.commissionsByProf || []).forEach(p => {
-        profMap[p.professionalName] = (profMap[p.professionalName] || 0) + (p.amount || 0);
-      });
+    periodTransactions.forEach(tx => {
+      const isCancelled = Boolean(tx.deleted || tx.status === 'cancelado');
+      if (!isCancelled) {
+        gross += Number(tx.grossAmount) || 0;
+        net += Number(tx.netAmount) || 0;
+        procedures++;
+        (tx.commissions || []).forEach(c => {
+          profMap[c.professionalName] = (profMap[c.professionalName] || 0) + (Number(c.amount) || 0);
+        });
+      } else {
+        cancelled++;
+      }
     });
 
     return { gross, net, procedures, cancelled, profMap };
-  }, [filteredCiclos]);
+  }, [periodTransactions]);
+
+  // Preset Handlers
+  const handlePresetSelect = (preset: 'hoje' | '7dias' | '30dias' | '6meses' | '1ano' | 'todos') => {
+    setActiveFilterPreset(preset);
+    const today = getTodayStr();
+
+    if (preset === 'hoje') {
+      // Puxa do dia 1º do mês atual até hoje
+      setStartDate(getFirstDayOfMonthStr());
+      setEndDate(today);
+    } else if (preset === '7dias') {
+      setStartDate(getDaysAgoStr(7));
+      setEndDate(today);
+    } else if (preset === '30dias') {
+      setStartDate(getDaysAgoStr(30));
+      setEndDate(today);
+    } else if (preset === '6meses') {
+      setStartDate(getMonthsAgoStr(6));
+      setEndDate(today);
+    } else if (preset === '1ano') {
+      setStartDate(getMonthsAgoStr(12));
+      setEndDate(today);
+    } else if (preset === 'todos') {
+      setStartDate('');
+      setEndDate('');
+    }
+  };
 
   // Calendar generation helpers
   const currentYear = calendarMonth.getFullYear();
@@ -194,6 +352,35 @@ export const BancoDadosCaixaModal: React.FC<BancoDadosCaixaModalProps> = ({
     'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
   ];
 
+  // Calendar day click handler
+  const handleCalendarDayClick = (dayStr: string) => {
+    setActiveFilterPreset('personalizado');
+    // If no start date or both already set, start fresh
+    if (!startDate || (startDate && endDate && startDate !== endDate)) {
+      setStartDate(dayStr);
+      setEndDate(dayStr);
+    } else if (startDate && (!endDate || startDate === endDate)) {
+      if (dayStr < startDate) {
+        setEndDate(startDate);
+        setStartDate(dayStr);
+      } else {
+        setEndDate(dayStr);
+      }
+    }
+  };
+
+  // Quick action: Pull from 1st of month to selected day
+  const handlePullFromFirstToDate = (targetDate?: string) => {
+    const target = targetDate || endDate || getTodayStr();
+    const parts = target.split('-');
+    const firstDay = `${parts[0]}-${parts[1]}-01`;
+    setStartDate(firstDay);
+    setEndDate(target);
+    setActiveFilterPreset('personalizado');
+    setNotice(`Filtro atualizado: De ${firstDay.split('-').reverse().join('/')} até ${target.split('-').reverse().join('/')}`);
+    setTimeout(() => setNotice(null), 4000);
+  };
+
   // Downloads for an individual cycle
   const handleDownloadCycleExcel = (ciclo: CaixaFechamentoCiclo) => {
     const formattedDate = ciclo.date ? ciclo.date.replace(/-/g, '_') : 'periodo';
@@ -213,45 +400,37 @@ export const BancoDadosCaixaModal: React.FC<BancoDadosCaixaModalProps> = ({
     setTimeout(() => setNotice(null), 5000);
   };
 
-  // Consolidated download for the entire filtered period
+  // Consolidated download for the entire filtered period (WORD & EXCEL)
   const handleDownloadConsolidatedExcel = () => {
-    if (filteredCiclos.length === 0) {
-      alert("Nenhum ciclo encontrado no período para gerar relatório consolidado.");
+    if (periodTransactions.length === 0) {
+      alert(`Nenhum lançamento encontrado no período selecionado (${startDate ? startDate.split('-').reverse().join('/') : 'Início'} até ${endDate ? endDate.split('-').reverse().join('/') : 'Fim'}). Selecione outro período no calendário ou clique em 'Todos'.`);
       return;
     }
-    const allTx: Transaction[] = [];
-    filteredCiclos.forEach(c => {
-      (c.transactions || []).forEach(tx => allTx.push(tx));
-    });
 
-    const periodTag = selectedDate 
-      ? `Data_${selectedDate}` 
-      : (selectedPeriodFilter === 'todos' ? 'Historico_Completo' : selectedPeriodFilter);
-    const filename = `Relatorio_Consolidado_Caixa_${config.nomeSalao.replace(/\s+/g, '_')}_${periodTag}.xls`;
-    const title = `Relatório Consolidado do Banco de Dados (${filteredCiclos.length} ciclo(s) - ${allTx.length} procedimentos) - ${config.nomeSalao}`;
-    exportToExcel(allTx, config, title, filename);
-    setNotice(`Planilha consolidada de ${filteredCiclos.length} ciclo(s) baixada com sucesso!`);
-    setTimeout(() => setNotice(null), 5000);
+    const startLabel = startDate ? startDate.split('-').reverse().join('/') : 'Inicio';
+    const endLabel = endDate ? endDate.split('-').reverse().join('/') : 'Hoje';
+    const filename = `Relatorio_Lancamentos_${config.nomeSalao.replace(/\s+/g, '_')}_${startLabel.replace(/\//g, '-')}_a_${endLabel.replace(/\//g, '-')}.xls`;
+    const title = `Relatório Consolidado de Lançamentos (${startLabel} até ${endLabel}) - ${periodTransactions.length} procedimentos - ${config.nomeSalao}`;
+
+    exportToExcel(periodTransactions, config, title, filename);
+    setNotice(`Planilha Excel baixada com sucesso! Total de ${periodTransactions.length} procedimentos entre ${startLabel} e ${endLabel}.`);
+    setTimeout(() => setNotice(null), 6000);
   };
 
   const handleDownloadConsolidatedWord = () => {
-    if (filteredCiclos.length === 0) {
-      alert("Nenhum ciclo encontrado no período para gerar relatório consolidado.");
+    if (periodTransactions.length === 0) {
+      alert(`Nenhum lançamento encontrado no período selecionado (${startDate ? startDate.split('-').reverse().join('/') : 'Início'} até ${endDate ? endDate.split('-').reverse().join('/') : 'Fim'}). Selecione outro período no calendário ou clique em 'Todos'.`);
       return;
     }
-    const allTx: Transaction[] = [];
-    filteredCiclos.forEach(c => {
-      (c.transactions || []).forEach(tx => allTx.push(tx));
-    });
 
-    const periodTag = selectedDate 
-      ? `Data_${selectedDate}` 
-      : (selectedPeriodFilter === 'todos' ? 'Historico_Completo' : selectedPeriodFilter);
-    const filename = `Relatorio_Consolidado_Caixa_${config.nomeSalao.replace(/\s+/g, '_')}_${periodTag}.doc`;
-    const title = `Relatório Consolidado do Banco de Dados (${filteredCiclos.length} ciclo(s) - ${allTx.length} procedimentos) - ${config.nomeSalao}`;
-    exportToWord(allTx, config, title, filename);
-    setNotice(`Documento Word consolidado de ${filteredCiclos.length} ciclo(s) baixado com sucesso!`);
-    setTimeout(() => setNotice(null), 5000);
+    const startLabel = startDate ? startDate.split('-').reverse().join('/') : 'Inicio';
+    const endLabel = endDate ? endDate.split('-').reverse().join('/') : 'Hoje';
+    const filename = `Relatorio_Lancamentos_${config.nomeSalao.replace(/\s+/g, '_')}_${startLabel.replace(/\//g, '-')}_a_${endLabel.replace(/\//g, '-')}.doc`;
+    const title = `Relatório Consolidado de Lançamentos (${startLabel} até ${endLabel}) - ${periodTransactions.length} procedimentos - ${config.nomeSalao}`;
+
+    exportToWord(periodTransactions, config, title, filename);
+    setNotice(`Relatório Word baixado com sucesso! Total de ${periodTransactions.length} procedimentos entre ${startLabel} e ${endLabel}.`);
+    setTimeout(() => setNotice(null), 6000);
   };
 
   if (!isOpen) return null;
@@ -280,7 +459,7 @@ export const BancoDadosCaixaModal: React.FC<BancoDadosCaixaModalProps> = ({
                 </span>
               </div>
               <p className="text-xs text-white/80 mt-0.5">
-                Histórico seguro de todos os ciclos fechados e limpos pelo proprietário. Consulte por dia ou período e baixe em Word e Excel.
+                Consulte e baixe relatórios em Word e Excel com filtro por Data Inicial e Data Final ou períodos rápidos.
               </p>
             </div>
           </div>
@@ -301,7 +480,7 @@ export const BancoDadosCaixaModal: React.FC<BancoDadosCaixaModalProps> = ({
               <CheckCircle2 className="w-4 h-4 text-emerald-200 shrink-0" />
               <span>{notice}</span>
             </div>
-            <button onClick={() => setNotice(null)} className="text-emerald-100 hover:text-white">
+            <button onClick={() => setNotice(null)} className="text-emerald-100 hover:text-white cursor-pointer">
               <X className="w-3.5 h-3.5" />
             </button>
           </div>
@@ -310,76 +489,153 @@ export const BancoDadosCaixaModal: React.FC<BancoDadosCaixaModalProps> = ({
         {/* MAIN BODY */}
         <div className="p-3 sm:p-5 overflow-y-auto space-y-4 flex-1">
 
-          {/* TOP CONTROLS: PERIOD FILTER, SEARCH & CONSOLIDATED DOWNLOADS */}
+          {/* TOP CONTROLS: PERIOD PRESETS, DATE RANGE INPUTS, SEARCH & CONSOLIDATED DOWNLOADS */}
           <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200 shadow-xs space-y-3">
             
-            <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+            {/* ROW 1: PRESETS AND DOWNLOAD BUTTONS */}
+            <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
               
-              {/* Quick Period Filters */}
+              {/* Quick Period Preset Buttons */}
               <div className="flex items-center gap-1.5 flex-wrap">
-                <span className="text-xs font-bold text-slate-500 flex items-center gap-1 mr-1">
+                <span className="text-xs font-black text-slate-600 flex items-center gap-1 mr-1">
                   <Filter className="w-3.5 h-3.5 text-blue-600" /> Período:
                 </span>
                 
                 {[
-                  { key: 'todos', label: 'Todos' },
-                  { key: 'hoje', label: 'Hoje' },
+                  { key: 'hoje', label: 'Hoje (01 a 16/09)' },
                   { key: '7dias', label: 'Últimos 7 dias' },
                   { key: '30dias', label: '30 dias' },
                   { key: '6meses', label: '6 meses' },
                   { key: '1ano', label: '1 ano' },
-                ].map((item) => (
-                  <button
-                    key={item.key}
-                    onClick={() => {
-                      setSelectedPeriodFilter(item.key as any);
-                      setSelectedDate('');
-                    }}
-                    className={`text-xs font-bold px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
-                      selectedPeriodFilter === item.key && !selectedDate
-                        ? 'bg-blue-600 text-white shadow-xs'
-                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                    }`}
-                  >
-                    {item.label}
-                  </button>
-                ))}
+                  { key: 'todos', label: 'Todos' },
+                ].map((item) => {
+                  const isActive = activeFilterPreset === item.key;
+                  return (
+                    <button
+                      key={item.key}
+                      onClick={() => handlePresetSelect(item.key as any)}
+                      className={`text-xs font-bold px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
+                        isActive
+                          ? 'bg-blue-600 text-white shadow-xs scale-[1.02]'
+                          : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                      }`}
+                    >
+                      {item.label}
+                    </button>
+                  );
+                })}
+              </div>
 
-                {selectedDate && (
+              {/* Word and Excel Action Buttons (ALWAYS FUNCTIONAL) */}
+              <div className="flex items-center gap-2 self-start lg:self-auto shrink-0 flex-wrap">
+                <button
+                  type="button"
+                  id="btn-banco-baixar-word"
+                  onClick={handleDownloadConsolidatedWord}
+                  className="bg-sky-600 hover:bg-sky-700 text-white text-xs font-extrabold px-3.5 py-2 rounded-xl transition-all shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-95 shrink-0"
+                  title="Baixar em Word (.doc) todos os lançamentos do período selecionado"
+                >
+                  <FileText className="w-4 h-4 text-white" />
+                  <span>Baixar Período Word</span>
+                  <span className="bg-sky-800/80 text-white text-[10px] px-2 py-0.5 rounded-full font-mono font-bold">
+                    {periodTransactions.length}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  id="btn-banco-baixar-excel"
+                  onClick={handleDownloadConsolidatedExcel}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold px-3.5 py-2 rounded-xl transition-all shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-95 shrink-0"
+                  title="Baixar em Excel (.xls) todos os lançamentos do período selecionado"
+                >
+                  <FileSpreadsheet className="w-4 h-4 text-white" />
+                  <span>Baixar Período Excel</span>
+                  <span className="bg-emerald-800/80 text-white text-[10px] px-2 py-0.5 rounded-full font-mono font-bold">
+                    {periodTransactions.length}
+                  </span>
+                </button>
+              </div>
+
+            </div>
+
+            {/* ROW 2: EXPLICIT DATA INICIAL AND DATA FINAL CONTROLS */}
+            <div className="bg-slate-100/90 p-3 rounded-xl border border-slate-200 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-3">
+                
+                {/* Data Inicial Input */}
+                <div className="flex items-center gap-2">
+                  <label className="text-xs font-black text-slate-700 flex items-center gap-1 shrink-0">
+                    <CalendarIcon className="w-3.5 h-3.5 text-blue-600" />
+                    <span>Data Inicial:</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => {
+                      setStartDate(e.target.value);
+                      setActiveFilterPreset('personalizado');
+                    }}
+                    className="bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-blue-500 shadow-2xs cursor-pointer"
+                  />
+                </div>
+
+                <div className="hidden sm:block text-slate-400">
+                  <ArrowRight className="w-4 h-4" />
+                </div>
+
+                {/* Data Final Input */}
+                <div className="flex items-center gap-2">
+                  <label className="text-xs font-black text-slate-700 flex items-center gap-1 shrink-0">
+                    <CalendarIcon className="w-3.5 h-3.5 text-blue-600" />
+                    <span>Data Final:</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => {
+                      setEndDate(e.target.value);
+                      setActiveFilterPreset('personalizado');
+                    }}
+                    className="bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-blue-500 shadow-2xs cursor-pointer"
+                  />
+                </div>
+
+                {/* Quick Helper Button */}
+                <button
+                  type="button"
+                  onClick={() => handlePullFromFirstToDate()}
+                  className="bg-white hover:bg-slate-200 text-blue-700 border border-blue-200 hover:border-blue-300 text-[11px] font-bold px-2.5 py-1.5 rounded-lg transition-all shadow-2xs flex items-center gap-1 cursor-pointer"
+                  title="Puxar lançamentos desde o dia 1º até a data final"
+                >
+                  <Sparkles className="w-3 h-3 text-blue-600" />
+                  <span>Puxar do dia 1º até hoje</span>
+                </button>
+
+                {(startDate || endDate) && (
                   <button
-                    onClick={() => setSelectedDate('')}
-                    className="text-xs font-bold px-3 py-1.5 rounded-xl bg-amber-500 text-white flex items-center gap-1 shadow-xs cursor-pointer"
-                    title="Remover filtro de dia específico"
+                    type="button"
+                    onClick={() => {
+                      setStartDate('');
+                      setEndDate('');
+                      setActiveFilterPreset('todos');
+                    }}
+                    className="text-[11px] text-slate-500 hover:text-rose-600 font-bold flex items-center gap-1 px-2 py-1 rounded cursor-pointer"
+                    title="Limpar filtro de datas e ver todos"
                   >
-                    <span>Dia: {selectedDate.split('-').reverse().join('/')}</span>
-                    <X className="w-3 h-3" />
+                    <RotateCcw className="w-3 h-3" />
+                    <span>Limpar Datas</span>
                   </button>
                 )}
               </div>
 
-              {/* Consolidated Export Buttons */}
-              <div className="flex items-center gap-2 self-start md:self-auto shrink-0">
-                <button
-                  onClick={handleDownloadConsolidatedWord}
-                  disabled={filteredCiclos.length === 0}
-                  className="bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-xs font-bold px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                  title="Baixar todos os lançamentos do período em Word (.doc)"
-                >
-                  <FileText className="w-3.5 h-3.5 text-blue-600" />
-                  <span>Baixar Período Word</span>
-                </button>
-
-                <button
-                  onClick={handleDownloadConsolidatedExcel}
-                  disabled={filteredCiclos.length === 0}
-                  className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-xs font-bold px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                  title="Baixar todos os lançamentos do período em Excel (.xls)"
-                >
-                  <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>Baixar Período Excel</span>
-                </button>
+              {/* Selected Interval Pill */}
+              <div className="bg-white border border-blue-200 px-3 py-1.5 rounded-lg text-xs font-bold text-blue-900 flex items-center justify-between sm:justify-start gap-2 shadow-2xs">
+                <span className="text-slate-500 font-medium">Intervalo Selecionado:</span>
+                <span className="text-blue-700 font-black">
+                  {startDate ? startDate.split('-').reverse().join('/') : 'Início'} até {endDate ? endDate.split('-').reverse().join('/') : 'Hoje'}
+                </span>
               </div>
-
             </div>
 
             {/* Search Input Bar */}
@@ -396,7 +652,7 @@ export const BancoDadosCaixaModal: React.FC<BancoDadosCaixaModalProps> = ({
 
           </div>
 
-          {/* DUAL COLUMN: LEFT IS INTERACTIVE CALENDAR, RIGHT IS CYCLES LIST */}
+          {/* DUAL COLUMN: LEFT IS INTERACTIVE CALENDAR, RIGHT IS CYCLES & PROCEDURES LIST */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
             
             {/* LEFT COLUMN: INTERACTIVE MONTH CALENDAR (4 COLS) */}
@@ -451,31 +707,31 @@ export const BancoDadosCaixaModal: React.FC<BancoDadosCaixaModalProps> = ({
                   const dayStr = `${currentYear}-${String(currentMonthIndex + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
                   const dayCycles = cyclesByDate[dayStr] || [];
                   const hasCycles = dayCycles.length > 0;
-                  const isSelected = selectedDate === dayStr;
+
+                  // Check range highlighting
+                  const isRangeStart = startDate === dayStr;
+                  const isRangeEnd = endDate === dayStr;
+                  const isInRange = Boolean(startDate && endDate && dayStr >= startDate && dayStr <= endDate);
 
                   return (
                     <button
                       key={dayStr}
-                      onClick={() => {
-                        if (isSelected) {
-                          setSelectedDate('');
-                        } else {
-                          setSelectedDate(dayStr);
-                        }
-                      }}
+                      onClick={() => handleCalendarDayClick(dayStr)}
                       className={`h-9 rounded-xl flex flex-col items-center justify-center relative text-xs font-bold transition-all cursor-pointer ${
-                        isSelected 
-                          ? 'bg-blue-600 text-white shadow-md ring-2 ring-blue-300' 
-                          : hasCycles 
-                            ? 'bg-emerald-50 text-emerald-900 border border-emerald-300 hover:bg-emerald-100' 
-                            : 'hover:bg-slate-100 text-slate-700'
+                        isRangeStart || isRangeEnd
+                          ? 'bg-blue-600 text-white shadow-md ring-2 ring-blue-300 font-black z-10' 
+                          : isInRange
+                            ? 'bg-blue-100 text-blue-900 border border-blue-200 font-extrabold'
+                            : hasCycles 
+                              ? 'bg-emerald-50 text-emerald-900 border border-emerald-300 hover:bg-emerald-100' 
+                              : 'hover:bg-slate-100 text-slate-700'
                       }`}
                       title={hasCycles ? `${dayCycles.length} ciclo(s) arquivado(s) neste dia` : `Dia ${dayNum}`}
                     >
                       <span>{dayNum}</span>
                       {hasCycles && (
                         <span 
-                          className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-white' : 'bg-emerald-600'} -mt-0.5`}
+                          className={`w-1.5 h-1.5 rounded-full ${isRangeStart || isRangeEnd ? 'bg-white' : 'bg-emerald-600'} -mt-0.5`}
                         />
                       )}
                     </button>
@@ -483,14 +739,29 @@ export const BancoDadosCaixaModal: React.FC<BancoDadosCaixaModalProps> = ({
                 })}
               </div>
 
-              <div className="pt-2 border-t border-slate-100 space-y-1.5 text-[11px] text-slate-500">
-                <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
-                  <span>Dias destacados possuem ciclos de caixa arquivados.</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-blue-600 shrink-0" />
-                  <span>Clique em qualquer dia para filtrar e auditar.</span>
+              {/* Quick helper buttons below calendar */}
+              <div className="pt-2 border-t border-slate-100 space-y-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const today = getTodayStr();
+                    handlePullFromFirstToDate(today);
+                  }}
+                  className="w-full bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-xs font-bold py-1.5 px-2.5 rounded-xl transition-all text-center flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+                  <span>Puxar do dia 1º até o dia 16 (Hoje)</span>
+                </button>
+
+                <div className="space-y-1 text-[11px] text-slate-500">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-blue-600 shrink-0" />
+                    <span>Azul: Intervalo entre Data Inicial e Final.</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
+                    <span>Ponto verde: Ciclos arquivados no dia.</span>
+                  </div>
                 </div>
               </div>
 
@@ -498,8 +769,8 @@ export const BancoDadosCaixaModal: React.FC<BancoDadosCaixaModalProps> = ({
               <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2 text-xs">
                 <div className="font-extrabold text-slate-800 flex items-center justify-between">
                   <span>Resumo do Período:</span>
-                  <span className="text-[10px] text-blue-600 font-bold bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
-                    {filteredCiclos.length} ciclo(s)
+                  <span className="text-[10px] text-blue-700 font-black bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                    {periodTransactions.length} procedimento(s)
                   </span>
                 </div>
 
@@ -516,11 +787,15 @@ export const BancoDadosCaixaModal: React.FC<BancoDadosCaixaModalProps> = ({
                     <span>Procedimentos:</span>
                     <strong className="text-slate-900">{stats.procedures} ativo(s){stats.cancelled > 0 ? ` (${stats.cancelled} cancelados)` : ''}</strong>
                   </div>
+                  <div className="flex justify-between">
+                    <span>Ciclos Arquivados:</span>
+                    <strong className="text-slate-900">{filteredCiclos.length} ciclo(s)</strong>
+                  </div>
                 </div>
 
                 {Object.keys(stats.profMap).length > 0 && (
                   <div className="pt-2 border-t border-slate-200">
-                    <span className="text-[10px] font-bold text-slate-400 block mb-1">Comissões Pagas:</span>
+                    <span className="text-[10px] font-bold text-slate-400 block mb-1">Comissões Computadas:</span>
                     <div className="flex flex-wrap gap-1">
                       {Object.entries(stats.profMap).map(([name, val]) => (
                         <span key={name} className="bg-white text-emerald-800 border border-emerald-200 px-1.5 py-0.5 rounded text-[10px] font-bold">
@@ -540,7 +815,7 @@ export const BancoDadosCaixaModal: React.FC<BancoDadosCaixaModalProps> = ({
               <div className="flex items-center justify-between px-1">
                 <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
                   <Layers className="w-3.5 h-3.5 text-blue-600" />
-                  Ciclos Arquivados Encontrados ({filteredCiclos.length})
+                  Ciclos e Lançamentos no Período ({periodTransactions.length} procedimentos | {filteredCiclos.length} ciclos)
                 </h4>
                 <button
                   onClick={loadData}
@@ -551,15 +826,12 @@ export const BancoDadosCaixaModal: React.FC<BancoDadosCaixaModalProps> = ({
                 </button>
               </div>
 
-              {filteredCiclos.length === 0 ? (
+              {filteredCiclos.length === 0 && periodTransactions.length === 0 ? (
                 <div className="bg-white p-8 rounded-2xl border border-slate-200 text-center space-y-2">
                   <Database className="w-10 h-10 text-slate-300 mx-auto" />
-                  <h4 className="text-sm font-bold text-slate-700">Nenhum ciclo arquivado encontrado</h4>
+                  <h4 className="text-sm font-bold text-slate-700">Nenhum lançamento encontrado no período</h4>
                   <p className="text-xs text-slate-400 max-w-sm mx-auto">
-                    {ciclos.length === 0 
-                      ? 'Quando você fechar o caixa e clicar no botão "Limpar", o ciclo atual de lançamentos será arquivado com 100% de segurança aqui no Banco de Dados para consultas futuras.'
-                      : 'Nenhum ciclo corresponde aos filtros selecionados. Altere o período ou a data no calendário.'
-                    }
+                    Altere as datas inicial e final, escolha outro período ou clique em "Todos" para visualizar todos os lançamentos históricos.
                   </p>
                 </div>
               ) : (

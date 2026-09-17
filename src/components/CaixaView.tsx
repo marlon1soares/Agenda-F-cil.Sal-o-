@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Transaction, SalonConfig, UserRole } from '../types';
-import { parsePOSCommand } from '../utils/storage';
+import { Transaction, SalonConfig, UserRole, CaixaFechamentoCiclo } from '../types';
+import { parsePOSCommand, Storage } from '../utils/storage';
 import { exportToExcel, exportToWord } from '../utils/exporters';
 import { CreditCard, Trash2, FileSpreadsheet, FileText, Send, Sparkles, Filter, X, FolderOpen, Settings, CheckCircle2, Lock, Database, Calendar as CalendarIcon, ShieldCheck } from 'lucide-react';
 import { BancoDadosCaixaModal } from './BancoDadosCaixaModal';
@@ -101,6 +101,8 @@ export const CaixaView: React.FC<CaixaViewProps> = ({
 
     const now = new Date();
     const formattedDate = `${now.toLocaleDateString('pt-BR')} às ${now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
+    const yyyymmdd = now.toISOString().split('T')[0];
+
     const info = {
       date: formattedDate,
       totalGross: Number(totalGross) || 0,
@@ -113,6 +115,66 @@ export const CaixaView: React.FC<CaixaViewProps> = ({
     } catch (e) {
       console.warn("Aviso ao salvar registro local do fechamento:", e);
     }
+
+    // Calcula resumo de comissões e formas de pagamento
+    const profCommissionMap = new Map<string, { totalAmount: number; count: number }>();
+    let totalCommissions = 0;
+    activeTransactions.forEach(t => {
+      if (t.commissions && t.commissions.length > 0) {
+        t.commissions.forEach(c => {
+          const current = profCommissionMap.get(c.professionalName) || { totalAmount: 0, count: 0 };
+          const amt = Number(c.amount) || 0;
+          totalCommissions += amt;
+          profCommissionMap.set(c.professionalName, {
+            totalAmount: current.totalAmount + amt,
+            count: current.count + 1
+          });
+        });
+      }
+    });
+
+    const commissionsByProf = Array.from(profCommissionMap.entries()).map(([profName, val]) => ({
+      professionalName: profName,
+      amount: val.totalAmount,
+      count: val.count
+    }));
+
+    const methodMap = new Map<string, { total: number; count: number }>();
+    activeTransactions.forEach(t => {
+      const m = t.paymentMethod || 'dinheiro';
+      const cur = methodMap.get(m) || { total: 0, count: 0 };
+      methodMap.set(m, {
+        total: cur.total + (Number(t.grossAmount) || 0),
+        count: cur.count + 1
+      });
+    });
+    const paymentMethodsSummary = Array.from(methodMap.entries()).map(([m, v]) => ({
+      method: m as any,
+      total: v.total,
+      count: v.count
+    }));
+
+    const cycleId = `fechamento_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const ciclo: CaixaFechamentoCiclo = {
+      id: cycleId,
+      salonId: config.id || 'default',
+      salonName: config.nomeSalao || 'Meu Salão',
+      closedAt: now.toISOString(),
+      closedAtFormatted: formattedDate,
+      date: yyyymmdd,
+      totalGross,
+      totalNet,
+      totalCommissions,
+      activeCount: activeTransactions.length,
+      cancelledCount: cancelledTransactionsCount,
+      commissionsByProf,
+      paymentMethodsSummary,
+      transactions: [...filteredTransactions],
+      clearedBy: userRole
+    };
+
+    // Salva o fechamento no Banco de Dados Histórico com 100% de segurança
+    Storage.saveCaixaFechamento(ciclo);
 
     // 1. Gera e baixa o relatório em Word (.doc)
     exportToWord(filteredTransactions, config);
@@ -557,6 +619,7 @@ export const CaixaView: React.FC<CaixaViewProps> = ({
         salonName={config.nomeSalao}
         config={config}
         userRole={userRole}
+        currentTransactions={transactions}
       />
 
     </div>
