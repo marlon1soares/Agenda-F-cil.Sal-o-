@@ -4,7 +4,7 @@ import {
   FileSpreadsheet, Search, ChevronLeft, ChevronRight, CheckCircle2, 
   Clock, ShieldCheck, Eye, Sparkles, Filter, ChevronDown, 
   ChevronUp, AlertCircle, RefreshCw, Layers, DollarSign, UserCheck,
-  ArrowRight, RotateCcw
+  ArrowRight, RotateCcw, Cloud
 } from 'lucide-react';
 import { CaixaFechamentoCiclo, SalonConfig, UserRole, Transaction } from '../types';
 import { Storage } from '../utils/storage';
@@ -80,84 +80,154 @@ export const BancoDadosCaixaModal: React.FC<BancoDadosCaixaModalProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
+  // Full Report View state (for "Ver" button)
+  const [reportModal, setReportModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    subtitle: string;
+    periodLabel: string;
+    transactions: Transaction[];
+    cycle?: CaixaFechamentoCiclo;
+  }>({
+    isOpen: false,
+    title: '',
+    subtitle: '',
+    periodLabel: '',
+    transactions: [],
+  });
+
+  // Timezone-safe local date string parsers
+  const getCycleLocalDateStr = (c: CaixaFechamentoCiclo): string => {
+    if (c.date && /^\d{4}-\d{2}-\d{2}$/.test(c.date)) {
+      return c.date;
+    }
+    if (c.closedAtFormatted) {
+      const m = c.closedAtFormatted.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+      if (m) {
+        return `${m[3]}-${m[2]}-${m[1]}`;
+      }
+    }
+    if (c.closedAt) {
+      try {
+        const d = new Date(c.closedAt);
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      } catch {}
+    }
+    return '';
+  };
+
+  const getTxLocalDateStr = (tx: Transaction): string => {
+    if (tx.date && /^\d{4}-\d{2}-\d{2}$/.test(tx.date)) {
+      return tx.date;
+    }
+    if (tx.date && /^\d{2}\/\d{2}\/\d{4}$/.test(tx.date)) {
+      const parts = tx.date.split('/');
+      return `${parts[2]}-${parts[1]}-${parts[0]}`;
+    }
+    if (tx.deletedAt) {
+      return tx.deletedAt.split('T')[0];
+    }
+    const anyTx = tx as any;
+    if (anyTx.createdAt) {
+      try {
+        const d = new Date(anyTx.createdAt);
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      } catch {}
+    }
+    return '';
+  };
+
   // Load data from local storage and firestore
   const loadData = async () => {
     setIsLoading(true);
     try {
       // 1. Local storage first
       let localData = Storage.getCaixaFechamentos(salonId);
+      let remoteCiclos: CaixaFechamentoCiclo[] = [];
 
-      // Verify if there was a saved fechamento in localStorage that hasn't been archived as a cycle yet
-      const savedFechamentoStr = localStorage.getItem(`fechamento_caixa_${salonId || 'default'}`);
-      const liveTxs = (currentTransactions && currentTransactions.length > 0)
-        ? currentTransactions
-        : Storage.getTransactions();
-
-      if (localData.length === 0 && (savedFechamentoStr || liveTxs.length > 0)) {
-        let savedFechamento: any = null;
-        try {
-          if (savedFechamentoStr) savedFechamento = JSON.parse(savedFechamentoStr);
-        } catch { /* ignore */ }
-
-        const now = new Date();
-        const formattedDate = savedFechamento?.date || `${now.toLocaleDateString('pt-BR')} às ${now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
-        const yyyymmdd = now.toISOString().split('T')[0];
-
-        const activeTxs = liveTxs.filter(t => !t.deleted && t.status !== 'cancelado');
-        const gross = savedFechamento?.totalGross ?? activeTxs.reduce((acc, t) => acc + (Number(t.grossAmount) || 0), 0);
-        const net = activeTxs.reduce((acc, t) => acc + (Number(t.netAmount) || 0), 0);
-
-        const syntheticCycle: CaixaFechamentoCiclo = {
-          id: `fechamento_recuperado_${Date.now()}`,
-          salonId: salonId || 'default',
-          salonName: config.nomeSalao || salonName,
-          closedAt: now.toISOString(),
-          closedAtFormatted: formattedDate,
-          date: yyyymmdd,
-          totalGross: gross,
-          totalNet: net,
-          totalCommissions: 0,
-          activeCount: savedFechamento?.count ?? activeTxs.length,
-          cancelledCount: liveTxs.length - activeTxs.length,
-          commissionsByProf: [],
-          paymentMethodsSummary: [],
-          transactions: [...liveTxs],
-          clearedBy: userRole
-        };
-
-        Storage.saveCaixaFechamento(syntheticCycle);
-        localData = [syntheticCycle];
-      }
-
-      setCiclos(localData);
-
-      // 2. Query Firestore if available to sync any cycles made on other devices
+      // 2. Query Firestore to sync any cycles made or stored in cloud
       if (db) {
         try {
           const coll = collection(db, 'caixa_fechamentos');
           const snap = await getDocs(coll);
           if (!snap.empty) {
-            const remoteCiclos: CaixaFechamentoCiclo[] = [];
             snap.forEach(docSnap => {
               const data = docSnap.data() as CaixaFechamentoCiclo;
-              if (data && (!data.salonId || data.salonId === salonId)) {
+              if (data && (!data.salonId || data.salonId === salonId || salonId === 'default')) {
                 remoteCiclos.push(data);
               }
             });
-            if (remoteCiclos.length > 0) {
-              // Merge
-              const map = new Map<string, CaixaFechamentoCiclo>();
-              localData.forEach(c => map.set(c.id, c));
-              remoteCiclos.forEach(c => map.set(c.id, c));
-              const merged = Array.from(map.values()).sort((a, b) => {
-                return new Date(b.closedAt).getTime() - new Date(a.closedAt).getTime();
-              });
-              setCiclos(merged);
-              localStorage.setItem('salao_fechamentos_caixa', JSON.stringify(merged));
-            }
           }
         } catch (err) {
           console.warn('[BancoDadosCaixaModal] Firestore fetch notice:', err);
+        }
+      }
+
+      // Merge local with remote, giving priority to whichever has transactions populated
+      const map = new Map<string, CaixaFechamentoCiclo>();
+      localData.forEach(c => map.set(c.id, c));
+      remoteCiclos.forEach(c => {
+        const existing = map.get(c.id);
+        if (!existing || (c.transactions && c.transactions.length > (existing.transactions?.length || 0))) {
+          map.set(c.id, c);
+        }
+      });
+
+      let merged = Array.from(map.values()).sort((a, b) => {
+        return new Date(b.closedAt).getTime() - new Date(a.closedAt).getTime();
+      });
+
+      if (merged.length > 0) {
+        setCiclos(merged);
+        localStorage.setItem('salao_fechamentos_caixa', JSON.stringify(merged));
+      } else {
+        // Fallback: check if there's a recent live closure in localStorage
+        const savedFechamentoStr = localStorage.getItem(`fechamento_caixa_${salonId || 'default'}`);
+        const liveTxs = (currentTransactions && currentTransactions.length > 0)
+          ? currentTransactions
+          : Storage.getTransactions();
+
+        if (savedFechamentoStr || liveTxs.length > 0) {
+          let savedFechamento: any = null;
+          try {
+            if (savedFechamentoStr) savedFechamento = JSON.parse(savedFechamentoStr);
+          } catch { /* ignore */ }
+
+          const now = new Date();
+          const formattedDate = savedFechamento?.date || `${now.toLocaleDateString('pt-BR')} às ${now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
+          const yyyymmdd = now.toISOString().split('T')[0];
+
+          const activeTxs = liveTxs.filter(t => !t.deleted && t.status !== 'cancelado');
+          const gross = savedFechamento?.totalGross ?? activeTxs.reduce((acc, t) => acc + (Number(t.grossAmount) || 0), 0);
+          const net = activeTxs.reduce((acc, t) => acc + (Number(t.netAmount) || 0), 0);
+
+          const syntheticCycle: CaixaFechamentoCiclo = {
+            id: `fechamento_${Date.now()}`,
+            salonId: salonId || 'default',
+            salonName: config.nomeSalao || salonName,
+            closedAt: now.toISOString(),
+            closedAtFormatted: formattedDate,
+            date: yyyymmdd,
+            totalGross: gross,
+            totalNet: net,
+            totalCommissions: 0,
+            activeCount: savedFechamento?.count ?? activeTxs.length,
+            cancelledCount: liveTxs.length - activeTxs.length,
+            commissionsByProf: [],
+            paymentMethodsSummary: [],
+            transactions: [...liveTxs],
+            clearedBy: userRole
+          };
+
+          setCiclos([syntheticCycle]);
+        } else {
+          setCiclos([]);
         }
       }
     } finally {
@@ -218,7 +288,7 @@ export const BancoDadosCaixaModal: React.FC<BancoDadosCaixaModalProps> = ({
   const periodTransactions = useMemo<Transaction[]>(() => {
     const txList: Transaction[] = Array.from(allTransactionsMap.values());
     return txList.filter((tx: Transaction) => {
-      const txDate = tx.date || (tx.deletedAt ? tx.deletedAt.split('T')[0] : '');
+      const txDate = getTxLocalDateStr(tx);
       if (startDate && txDate && txDate < startDate) return false;
       if (endDate && txDate && txDate > endDate) return false;
 
@@ -245,7 +315,7 @@ export const BancoDadosCaixaModal: React.FC<BancoDadosCaixaModalProps> = ({
   const cyclesByDate = useMemo(() => {
     const map: Record<string, CaixaFechamentoCiclo[]> = {};
     ciclos.forEach(c => {
-      const d = c.date || (c.closedAt ? c.closedAt.split('T')[0] : '');
+      const d = getCycleLocalDateStr(c);
       if (d) {
         if (!map[d]) map[d] = [];
         map[d].push(c);
@@ -257,7 +327,7 @@ export const BancoDadosCaixaModal: React.FC<BancoDadosCaixaModalProps> = ({
   // Filter cycles based on date range and search term
   const filteredCiclos = useMemo(() => {
     return ciclos.filter(c => {
-      const cycleDate = c.date || (c.closedAt ? c.closedAt.split('T')[0] : '');
+      const cycleDate = getCycleLocalDateStr(c);
 
       if (startDate && cycleDate && cycleDate < startDate) return false;
       if (endDate && cycleDate && cycleDate > endDate) return false;
@@ -433,6 +503,38 @@ export const BancoDadosCaixaModal: React.FC<BancoDadosCaixaModalProps> = ({
     setTimeout(() => setNotice(null), 6000);
   };
 
+  // Open Full Report saved in Firebase (for "Ver" button)
+  const handleOpenCycleReport = (ciclo: CaixaFechamentoCiclo) => {
+    const txs = (ciclo.transactions && ciclo.transactions.length > 0)
+      ? ciclo.transactions
+      : Array.from(allTransactionsMap.values()).filter((t: Transaction) => {
+          const d = getTxLocalDateStr(t);
+          const cD = getCycleLocalDateStr(ciclo);
+          return d === cD;
+        });
+
+    setReportModal({
+      isOpen: true,
+      title: `Relatório de Fechamento de Caixa Salvo no Firebase`,
+      subtitle: `Ciclo arquivado em ${ciclo.closedAtFormatted || ciclo.date}`,
+      periodLabel: ciclo.closedAtFormatted || ciclo.date || 'Ciclo de Caixa',
+      transactions: txs,
+      cycle: ciclo,
+    });
+  };
+
+  const handleOpenPeriodReport = () => {
+    const startLabel = startDate ? startDate.split('-').reverse().join('/') : 'Início';
+    const endLabel = endDate ? endDate.split('-').reverse().join('/') : 'Hoje';
+    setReportModal({
+      isOpen: true,
+      title: `Relatório Consolidado de Lançamentos Salvos no Firebase`,
+      subtitle: `Período Solicitado: ${startLabel} até ${endLabel}`,
+      periodLabel: `${startLabel} a ${endLabel}`,
+      transactions: periodTransactions,
+    });
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -526,8 +628,23 @@ export const BancoDadosCaixaModal: React.FC<BancoDadosCaixaModalProps> = ({
                 })}
               </div>
 
-              {/* Word and Excel Action Buttons (ALWAYS FUNCTIONAL) */}
+              {/* Action Buttons: Ver Relatório Completo, Baixar Word, Baixar Excel */}
               <div className="flex items-center gap-2 self-start lg:self-auto shrink-0 flex-wrap">
+                {/* VER RELATORIO COMPLETO */}
+                <button
+                  type="button"
+                  id="btn-banco-ver-relatorio"
+                  onClick={handleOpenPeriodReport}
+                  className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-extrabold px-3.5 py-2 rounded-xl transition-all shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-95 shrink-0"
+                  title="Abrir o relatório completo com todos os lançamentos salvos no Firebase para conferência"
+                >
+                  <Eye className="w-4 h-4 text-white" />
+                  <span>Ver Relatório do Período</span>
+                  <span className="bg-blue-800/80 text-white text-[10px] px-2 py-0.5 rounded-full font-mono font-bold">
+                    {periodTransactions.length}
+                  </span>
+                </button>
+
                 <button
                   type="button"
                   id="btn-banco-baixar-word"
@@ -896,15 +1013,23 @@ export const BancoDadosCaixaModal: React.FC<BancoDadosCaixaModalProps> = ({
                               <span className="hidden sm:inline">Excel</span>
                             </button>
 
-                            {/* TOGGLE EXPAND / VIEW */}
+                            {/* VER RELATORIO DO CICLO */}
                             <button
-                              onClick={() => setSelectedCycleId(isExpanded ? null : ciclo.id)}
-                              className="bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs font-bold px-2.5 py-2 rounded-xl transition-all cursor-pointer flex items-center gap-1"
-                              title="Ver todos os lançamentos deste ciclo na íntegra"
+                              onClick={() => handleOpenCycleReport(ciclo)}
+                              className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3 py-2 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs active:scale-95"
+                              title="Abrir o relatório completo deste ciclo salvo no Firebase para conferência"
                             >
                               <Eye className="w-3.5 h-3.5" />
-                              <span>{isExpanded ? 'Ocultar' : 'Ver'}</span>
-                              {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                              <span>Ver</span>
+                            </button>
+
+                            {/* TOGGLE EXPAND ACCORDION */}
+                            <button
+                              onClick={() => setSelectedCycleId(isExpanded ? null : ciclo.id)}
+                              className="bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs font-bold p-2 rounded-xl transition-all cursor-pointer flex items-center"
+                              title={isExpanded ? 'Recolher lançamentos' : 'Expandir lançamentos'}
+                            >
+                              {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                             </button>
                           </div>
                         </div>
@@ -925,11 +1050,42 @@ export const BancoDadosCaixaModal: React.FC<BancoDadosCaixaModalProps> = ({
                       {/* EXPANDED TRANSACTION LIST / VERIFICATION SCREEN */}
                       {isExpanded && (
                         <div className="p-3 sm:p-4 border-t border-slate-200 bg-white space-y-3 animate-fadeIn">
-                          <div className="flex items-center justify-between text-xs font-bold text-slate-700">
-                            <span>Lançamentos Contabilizados no Ciclo ({txList.length}):</span>
-                            <span className="text-[11px] text-slate-400">
-                              Valores originais e comissões preservados na íntegra
-                            </span>
+                          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                            <div>
+                              <div className="text-xs font-black text-slate-800 flex items-center gap-1.5">
+                                <span>Lançamentos Contabilizados no Ciclo ({txList.length})</span>
+                                <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.2 rounded font-bold">Salvo no Firebase</span>
+                              </div>
+                              <span className="text-[11px] text-slate-400">
+                                Valores originais e comissões preservados na íntegra
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <button
+                                onClick={() => handleOpenCycleReport(ciclo)}
+                                className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1 cursor-pointer shadow-xs active:scale-95"
+                                title="Abrir relatório completo salvo no Firebase"
+                              >
+                                <Eye className="w-3.5 h-3.5" />
+                                <span>Ver Completo</span>
+                              </button>
+                              <button
+                                onClick={() => handleDownloadCycleWord(ciclo)}
+                                className="bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1 cursor-pointer shadow-xs active:scale-95"
+                                title="Baixar relatório deste ciclo no Word (.doc)"
+                              >
+                                <FileText className="w-3.5 h-3.5" />
+                                <span>Baixar Word</span>
+                              </button>
+                              <button
+                                onClick={() => handleDownloadCycleExcel(ciclo)}
+                                className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1 cursor-pointer shadow-xs active:scale-95"
+                                title="Baixar planilha deste ciclo no Excel (.xls)"
+                              >
+                                <FileSpreadsheet className="w-3.5 h-3.5" />
+                                <span>Baixar Excel</span>
+                              </button>
+                            </div>
                           </div>
 
                           <div className="overflow-x-auto rounded-xl border border-slate-200">
@@ -1031,6 +1187,318 @@ export const BancoDadosCaixaModal: React.FC<BancoDadosCaixaModalProps> = ({
         </div>
 
       </div>
+
+      {/* DEDICATED FULL REPORT OVERLAY MODAL (SALVO NO FIREBASE) */}
+      {reportModal.isOpen && (
+        <div className="fixed inset-0 z-60 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 overflow-y-auto animate-fadeIn">
+          <div className="bg-slate-50 border border-slate-300 w-full max-w-5xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh] my-auto">
+            
+            {/* REPORT HEADER */}
+            <div 
+              style={{ backgroundColor: config.corCustom || '#2563eb' }}
+              className="p-4 sm:p-5 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-md"
+            >
+              <div>
+                <div className="flex items-center gap-2 flex-wrap mb-1">
+                  <span className="bg-white/20 text-white text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full flex items-center gap-1 border border-white/20">
+                    <Cloud className="w-3 h-3 text-emerald-300" />
+                    Salvo no Firebase
+                  </span>
+                  <span className="text-white/90 text-xs font-semibold">
+                    {reportModal.subtitle}
+                  </span>
+                </div>
+                <h3 className="text-base sm:text-xl font-black tracking-tight text-white">
+                  {reportModal.title}
+                </h3>
+                <p className="text-xs text-white/80 font-medium">
+                  {config.nomeSalao} &bull; Período Selecionado: <strong>{reportModal.periodLabel}</strong>
+                </p>
+              </div>
+
+              {/* ACTION BUTTONS (DOWNLOAD WORD & EXCEL & CLOSE) */}
+              <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+                {/* WORD BUTTON */}
+                <button
+                  type="button"
+                  id="btn-report-baixar-word"
+                  onClick={() => {
+                    const title = `${reportModal.title} - ${config.nomeSalao} (${reportModal.periodLabel})`;
+                    const safePeriod = reportModal.periodLabel.replace(/[\/\s]/g, '_').replace(/_+/g, '_');
+                    const filename = `Relatorio_${config.nomeSalao.replace(/\s+/g, '_')}_${safePeriod}.doc`;
+                    exportToWord(reportModal.transactions, config, title, filename);
+                    setNotice('Relatório em formato Word (.doc) baixado com sucesso!');
+                    setTimeout(() => setNotice(null), 5000);
+                  }}
+                  className="bg-sky-500 hover:bg-sky-600 text-white text-xs font-extrabold px-3.5 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-95 transition-all"
+                  title="Baixar em Word (.doc) o relatório completo com a planilha de lançamentos"
+                >
+                  <FileText className="w-4 h-4" />
+                  <span>Baixar no Word (.doc)</span>
+                </button>
+
+                {/* EXCEL BUTTON */}
+                <button
+                  type="button"
+                  id="btn-report-baixar-excel"
+                  onClick={() => {
+                    const title = `${reportModal.title} - ${config.nomeSalao} (${reportModal.periodLabel})`;
+                    const safePeriod = reportModal.periodLabel.replace(/[\/\s]/g, '_').replace(/_+/g, '_');
+                    const filename = `Relatorio_${config.nomeSalao.replace(/\s+/g, '_')}_${safePeriod}.xls`;
+                    exportToExcel(reportModal.transactions, config, title, filename);
+                    setNotice('Planilha em formato Excel (.xls) baixada com sucesso!');
+                    setTimeout(() => setNotice(null), 5000);
+                  }}
+                  className="bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-extrabold px-3.5 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-95 transition-all"
+                  title="Baixar em Excel (.xls) a planilha com todos os lançamentos"
+                >
+                  <FileSpreadsheet className="w-4 h-4" />
+                  <span>Baixar no Excel (.xls)</span>
+                </button>
+
+                {/* CLOSE BUTTON */}
+                <button
+                  type="button"
+                  onClick={() => setReportModal(prev => ({ ...prev, isOpen: false }))}
+                  className="bg-white/20 hover:bg-white/30 text-white p-2 rounded-xl transition-all cursor-pointer ml-1"
+                  title="Fechar relatório"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* REPORT BODY */}
+            <div className="p-4 sm:p-6 overflow-y-auto space-y-4 bg-slate-50 flex-1">
+              {/* METRIC SUMMARY CARDS */}
+              {(() => {
+                const txs = reportModal.transactions;
+                const active = txs.filter(t => !t.deleted && t.status !== 'cancelado');
+                const cancelled = txs.length - active.length;
+                const gross = active.reduce((acc, t) => acc + (Number(t.grossAmount) || 0), 0);
+                const net = active.reduce((acc, t) => acc + (Number(t.netAmount) || 0), 0);
+                
+                // Commissions calculation
+                const profMap: Record<string, number> = {};
+                active.forEach(t => {
+                  (t.commissions || []).forEach(c => {
+                    profMap[c.professionalName] = (profMap[c.professionalName] || 0) + (Number(c.amount) || 0);
+                  });
+                });
+
+                return (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                      <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-2xs">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">Faturamento Bruto</span>
+                        <strong className="text-base sm:text-lg font-black text-slate-900 block mt-0.5">
+                          R$ {gross.toFixed(2)}
+                        </strong>
+                      </div>
+
+                      <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-2xs">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">Total Líquido</span>
+                        <strong className="text-base sm:text-lg font-black text-blue-700 block mt-0.5">
+                          R$ {net.toFixed(2)}
+                        </strong>
+                      </div>
+
+                      <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-2xs">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">Procedimentos</span>
+                        <strong className="text-base sm:text-lg font-black text-slate-800 block mt-0.5">
+                          {active.length} ativos{cancelled > 0 ? ` (${cancelled} canc.)` : ''}
+                        </strong>
+                      </div>
+
+                      <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-2xs">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">Status Firestore</span>
+                        <span className="inline-flex items-center gap-1 text-xs font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md mt-1 border border-emerald-200">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Sincronizado
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Commissions Pills */}
+                    {Object.keys(profMap).length > 0 && (
+                      <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-2xs">
+                        <span className="text-[10px] font-black uppercase text-slate-400 block mb-1.5">
+                          Comissões Computadas no Relatório:
+                        </span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {Object.entries(profMap).map(([name, amount]) => (
+                            <span key={name} className="bg-slate-100 text-slate-800 border border-slate-200 text-xs px-2.5 py-1 rounded-lg font-bold">
+                              {name}: <strong className="text-emerald-700 font-extrabold">R$ {amount.toFixed(2)}</strong>
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* COMPLETE SPREADSHEET TABLE (PLANILHA) */}
+                    <div className="bg-white rounded-2xl border border-slate-200 shadow-2xs overflow-hidden">
+                      <div className="p-3 bg-slate-100/70 border-b border-slate-200 flex items-center justify-between">
+                        <span className="text-xs font-black text-slate-700 uppercase tracking-wider">
+                          Planilha Completa de Lançamentos ({txs.length} itens)
+                        </span>
+                        <span className="text-[11px] text-slate-400 font-medium">
+                          Conferência e auditoria oficial
+                        </span>
+                      </div>
+
+                      {txs.length === 0 ? (
+                        <div className="p-8 text-center text-xs text-slate-400">
+                          Nenhum procedimento encontrado para este período.
+                        </div>
+                      ) : (
+                        <div className="overflow-x-auto max-h-[50vh]">
+                          <table className="w-full text-left text-xs border-collapse">
+                            <thead 
+                              style={{ backgroundColor: config.corCustom || '#2563eb' }}
+                              className="text-white font-bold text-[11px] sticky top-0 z-10"
+                            >
+                              <tr>
+                                <th className="p-2.5 text-center w-20">Data</th>
+                                <th className="p-2.5 text-center w-16">Hora</th>
+                                <th className="p-2.5">Descrição / Procedimento</th>
+                                <th className="p-2.5 text-center">Pagamento</th>
+                                <th className="p-2.5 text-right">Bruto (R$)</th>
+                                <th className="p-2.5 text-center">Taxa</th>
+                                <th className="p-2.5 text-right">Líquido (R$)</th>
+                                <th className="p-2.5">Comissões</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 font-medium">
+                              {txs.map((tx) => {
+                                const isCancelled = Boolean(tx.deleted || tx.status === 'cancelado');
+                                return (
+                                  <tr 
+                                    key={tx.id}
+                                    className={isCancelled ? 'bg-rose-50/70 text-rose-800' : 'hover:bg-slate-50/80 text-slate-800'}
+                                  >
+                                    <td className="p-2.5 text-center font-mono text-[11px] text-slate-500 whitespace-nowrap">
+                                      {tx.date ? tx.date.split('-').reverse().join('/') : '-'}
+                                    </td>
+                                    <td className="p-2.5 text-center font-mono text-[11px] text-slate-400 whitespace-nowrap">
+                                      {tx.time || '-'}
+                                    </td>
+                                    <td className="p-2.5">
+                                      <div className="font-bold text-slate-900">{tx.description}</div>
+                                      {tx.clientName && (
+                                        <div className="text-[10px] text-slate-400">Cliente: {tx.clientName}</div>
+                                      )}
+                                      {isCancelled && (
+                                        <span className="inline-block bg-rose-600 text-white text-[9px] font-bold px-1.5 py-0.2 rounded mt-0.5">
+                                          Cancelado
+                                        </span>
+                                      )}
+                                    </td>
+                                    <td className="p-2.5 text-center uppercase font-mono text-[10px] whitespace-nowrap">
+                                      {tx.paymentMethod}
+                                    </td>
+                                    <td className={`p-2.5 text-right font-bold whitespace-nowrap ${isCancelled ? 'line-through text-rose-600' : 'text-slate-900'}`}>
+                                      R$ {(Number(tx.grossAmount) || 0).toFixed(2)}
+                                    </td>
+                                    <td className="p-2.5 text-center text-[10px] text-slate-400 whitespace-nowrap">
+                                      {tx.cardFeePercent > 0 ? `${tx.cardFeePercent}%` : '-'}
+                                    </td>
+                                    <td className={`p-2.5 text-right font-bold whitespace-nowrap ${isCancelled ? 'line-through text-rose-600' : 'text-blue-700'}`}>
+                                      R$ {(Number(tx.netAmount) || 0).toFixed(2)}
+                                    </td>
+                                    <td className="p-2.5 text-[10px]">
+                                      {tx.commissions && tx.commissions.length > 0 ? (
+                                        <div className="flex flex-wrap gap-1">
+                                          {tx.commissions.map(c => (
+                                            <span key={c.professionalName} className="bg-slate-100 text-slate-700 px-1 py-0.5 rounded font-bold">
+                                              {c.professionalName}: R$ {c.amount.toFixed(2)}
+                                            </span>
+                                          ))}
+                                        </div>
+                                      ) : '-'}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                            <tfoot className="bg-slate-100/90 font-bold text-xs border-t-2 border-slate-300">
+                              <tr>
+                                <td colSpan={4} className="p-2.5 text-right font-black text-slate-800">
+                                  TOTAIS DO RELATÓRIO:
+                                </td>
+                                <td className="p-2.5 text-right font-black text-slate-900 whitespace-nowrap">
+                                  R$ {gross.toFixed(2)}
+                                </td>
+                                <td></td>
+                                <td className="p-2.5 text-right font-black text-blue-800 whitespace-nowrap">
+                                  R$ {net.toFixed(2)}
+                                </td>
+                                <td className="p-2.5 text-[11px] text-slate-600 font-bold">
+                                  {active.length} procedimentos
+                                </td>
+                              </tr>
+                            </tfoot>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* REPORT FOOTER WITH DOWNLOAD BUTTONS */}
+            <div className="p-3.5 sm:p-4 bg-white border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+              <div className="flex items-center gap-2 text-slate-500 font-medium text-[11px]">
+                <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>Relatório oficial salvo no banco de dados. Para arquivar ou imprimir, utilize os botões Word e Excel.</span>
+              </div>
+
+              <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const title = `${reportModal.title} - ${config.nomeSalao} (${reportModal.periodLabel})`;
+                    const safePeriod = reportModal.periodLabel.replace(/[\/\s]/g, '_').replace(/_+/g, '_');
+                    const filename = `Relatorio_${config.nomeSalao.replace(/\s+/g, '_')}_${safePeriod}.doc`;
+                    exportToWord(reportModal.transactions, config, title, filename);
+                    setNotice('Relatório em formato Word (.doc) baixado com sucesso!');
+                    setTimeout(() => setNotice(null), 5000);
+                  }}
+                  className="bg-sky-600 hover:bg-sky-700 text-white font-extrabold px-4 py-2 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 shadow-xs active:scale-95"
+                >
+                  <FileText className="w-4 h-4" />
+                  <span>Baixar no Word (.doc)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const title = `${reportModal.title} - ${config.nomeSalao} (${reportModal.periodLabel})`;
+                    const safePeriod = reportModal.periodLabel.replace(/[\/\s]/g, '_').replace(/_+/g, '_');
+                    const filename = `Relatorio_${config.nomeSalao.replace(/\s+/g, '_')}_${safePeriod}.xls`;
+                    exportToExcel(reportModal.transactions, config, title, filename);
+                    setNotice('Planilha em formato Excel (.xls) baixada com sucesso!');
+                    setTimeout(() => setNotice(null), 5000);
+                  }}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold px-4 py-2 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 shadow-xs active:scale-95"
+                >
+                  <FileSpreadsheet className="w-4 h-4" />
+                  <span>Baixar no Excel (.xls)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setReportModal(prev => ({ ...prev, isOpen: false }))}
+                  className="bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold px-4 py-2 rounded-xl transition-all cursor-pointer"
+                >
+                  Fechar
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };
