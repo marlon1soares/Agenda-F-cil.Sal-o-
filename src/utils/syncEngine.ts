@@ -178,6 +178,9 @@ class SyncEngine {
       const clients = getLocalOrFallback('salaoClientes');
       if (clients) seedData.clients = clients;
 
+      const fechamentos = getLocalOrFallback('salao_fechamentos_caixa');
+      if (fechamentos) seedData.caixaFechamentos = fechamentos;
+
       const adminPay = getLocalOrFallback('salaoAdminPaymentConfig');
       if (adminPay) seedData.adminPaymentConfig = adminPay;
 
@@ -424,6 +427,24 @@ class SyncEngine {
             }
           });
           localStorage.setItem('salaoLancamentos', JSON.stringify(Array.from(txMap.values())));
+        } catch {}
+      }
+      if (state.caixaFechamentos && Array.isArray(state.caixaFechamentos)) {
+        try {
+          const localFechRaw = localStorage.getItem('salao_fechamentos_caixa');
+          const localFech = localFechRaw ? JSON.parse(localFechRaw) : [];
+          const fechMap = new Map<string, any>();
+          if (Array.isArray(localFech)) {
+            localFech.forEach((f: any) => { if (f && f.id) fechMap.set(f.id, f); });
+          }
+          state.caixaFechamentos.forEach((f: any) => {
+            if (f && f.id) {
+              const existing = fechMap.get(f.id);
+              fechMap.set(f.id, existing ? { ...f, ...existing } : f);
+            }
+          });
+          const mergedFech = Array.from(fechMap.values());
+          localStorage.setItem('salao_fechamentos_caixa', JSON.stringify(mergedFech));
         } catch {}
       }
       if (state.timeAdjustments) {

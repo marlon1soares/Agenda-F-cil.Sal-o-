@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { Transaction, SalonConfig, UserRole } from '../types';
 import { parsePOSCommand } from '../utils/storage';
 import { exportToExcel, exportToWord } from '../utils/exporters';
-import { CreditCard, Trash2, FileSpreadsheet, FileText, Send, Sparkles, Filter, X, FolderOpen, Settings, CheckCircle2, Lock } from 'lucide-react';
+import { CreditCard, Trash2, FileSpreadsheet, FileText, Send, Sparkles, Filter, X, FolderOpen, Settings, CheckCircle2, Lock, Database, Calendar as CalendarIcon, ShieldCheck } from 'lucide-react';
+import { BancoDadosCaixaModal } from './BancoDadosCaixaModal';
 
 interface CaixaViewProps {
   transactions: Transaction[];
@@ -27,6 +28,8 @@ export const CaixaView: React.FC<CaixaViewProps> = ({
 }) => {
   const [commandInput, setCommandInput] = useState('');
   const [filterQuery, setFilterQuery] = useState('');
+  const [isBancoDadosOpen, setIsBancoDadosOpen] = useState(false);
+  const [showConfirmClearModal, setShowConfirmClearModal] = useState(false);
 
   const handleLaunchCommand = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -197,21 +200,45 @@ export const CaixaView: React.FC<CaixaViewProps> = ({
             )}
           </div>
 
-          <div className="flex items-center gap-2">
-            <button
-              onClick={onOpenCatalog}
-              className="flex-1 sm:flex-initial bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold px-3 py-2 rounded-xl transition-all shadow-xs flex items-center justify-center gap-1.5 shrink-0 hover:opacity-90 active:scale-95 cursor-pointer"
-            >
-              <FolderOpen className="w-3.5 h-3.5" />
-              <span>Catálogo</span>
-            </button>
+          <div className="flex flex-col gap-1.5 shrink-0">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={onOpenCatalog}
+                className="flex-1 sm:flex-initial bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold px-3 py-2 rounded-xl transition-all shadow-xs flex items-center justify-center gap-1.5 shrink-0 hover:opacity-90 active:scale-95 cursor-pointer"
+              >
+                <FolderOpen className="w-3.5 h-3.5" />
+                <span>Catálogo</span>
+              </button>
 
+              <button
+                type="button"
+                id="btn-caixa-limpar"
+                onClick={() => {
+                  if (transactions.length === 0) {
+                    alert("O painel já está limpo e pronto para novos lançamentos.");
+                    return;
+                  }
+                  setShowConfirmClearModal(true);
+                }}
+                className="flex-1 sm:flex-initial bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold px-3 py-2 rounded-xl transition-all shadow-xs flex items-center justify-center gap-1.5 shrink-0 hover:opacity-90 active:scale-95 cursor-pointer"
+                title="Limpar para iniciar um novo ciclo: Salva todos os lançamentos com segurança no Banco de Dados com consulta por calendário"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Limpar</span>
+              </button>
+            </div>
+
+            {/* Botão Banco de Dados exatamente abaixo do Limpar conforme solicitado */}
             <button
-              onClick={onClearAllTransactions}
-              className="flex-1 sm:flex-initial bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold px-3 py-2 rounded-xl transition-all shadow-xs flex items-center justify-center gap-1.5 shrink-0 hover:opacity-90 active:scale-95 cursor-pointer"
+              type="button"
+              id="btn-banco-dados-caixa"
+              onClick={() => setIsBancoDadosOpen(true)}
+              className="w-full bg-slate-900 hover:bg-slate-800 text-cyan-300 hover:text-white border border-slate-700 hover:border-cyan-500/60 text-[11px] font-black py-1.5 px-3 rounded-xl transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+              title="Banco de Dados dos lançamentos globais: consulte o histórico por calendário e baixe relatórios a qualquer momento"
             >
-              <Trash2 className="w-3.5 h-3.5" />
-              <span>Limpar</span>
+              <Database className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Banco de Dados</span>
             </button>
           </div>
 
@@ -462,6 +489,75 @@ export const CaixaView: React.FC<CaixaViewProps> = ({
           🔒 Relatórios de fechamento em Excel e Word são reservados exclusivamente para o Dono do Salão e Administrador.
         </div>
       )}
+
+      {/* Modal de Confirmação para Iniciar Novo Ciclo & Salvar no Banco de Dados */}
+      {showConfirmClearModal && (
+        <div className="fixed inset-0 z-[9999] bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4 animate-in fade-in zoom-in-95 duration-200">
+            <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-600 flex items-center justify-center mx-auto">
+              <ShieldCheck className="w-6 h-6" />
+            </div>
+
+            <div className="text-center space-y-1.5">
+              <h3 className="text-base font-black text-slate-900">
+                Iniciar Novo Ciclo de Lançamentos?
+              </h3>
+              <p className="text-xs text-slate-500 leading-relaxed">
+                Ao confirmar a limpeza do painel, todos os <b>{activeTransactions.length} lançamentos</b> do ciclo atual serão salvos com <b>100% de segurança no Banco de Dados Histórico</b> com data, hora e estatísticas consolidadas.
+              </p>
+              <div className="bg-slate-50 rounded-xl p-3 border border-slate-200 text-left text-xs space-y-1 text-slate-700 mt-2">
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Total Faturado no Ciclo:</span>
+                  <span className="font-extrabold text-emerald-600">R$ {totalGross.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Procedimentos Ativos:</span>
+                  <span className="font-bold text-slate-800">{activeTransactions.length}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Consulta Posterior:</span>
+                  <span className="font-bold text-cyan-700 flex items-center gap-1">
+                    <Database className="w-3 h-3" /> Botão Banco de Dados
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowConfirmClearModal(false)}
+                className="flex-1 py-2.5 px-4 rounded-xl border border-slate-200 text-slate-700 font-bold text-xs hover:bg-slate-50 transition-colors cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowConfirmClearModal(false);
+                  onClearAllTransactions();
+                  setFechamentoNotice("Novo ciclo iniciado! Os lançamentos anteriores foram arquivados com sucesso no Banco de Dados.");
+                  setTimeout(() => setFechamentoNotice(null), 8000);
+                }}
+                className="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-700 hover:to-rose-800 text-white font-extrabold text-xs shadow-md shadow-rose-200 transition-all cursor-pointer flex items-center justify-center gap-1.5"
+              >
+                <Database className="w-3.5 h-3.5" />
+                <span>Salvar & Iniciar Ciclo</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Completo do Banco de Dados com Calendário */}
+      <BancoDadosCaixaModal
+        isOpen={isBancoDadosOpen}
+        onClose={() => setIsBancoDadosOpen(false)}
+        salonId={config.id || 'default'}
+        salonName={config.nomeSalao}
+        config={config}
+        userRole={userRole}
+      />
 
     </div>
   );

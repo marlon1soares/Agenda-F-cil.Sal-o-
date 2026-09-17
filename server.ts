@@ -57,8 +57,11 @@ function getLunaVideoPath(): string | null {
   return null;
 }
 
-// Upload custom MP4/video from computer directly (Supports Stream, JSON Base64 and Raw Binary)
-app.all(["/api/upload-video", "/api/upload-video-mp4", "/api/video-upload"], (req, res, next) => {
+// Raw binary parser for video uploads (supports files up to 300MB)
+app.use(["/api/upload-video*", "/api/video-upload*"], express.raw({ limit: "300mb", type: ["video/*", "application/octet-stream", "application/binary"] }));
+
+// Upload custom MP4/video from computer directly (Supports Raw Binary, Stream, and JSON Base64)
+app.all(["/api/upload-video", "/api/upload-video-mp4", "/api/video-upload"], (req, res) => {
   if (req.method === "OPTIONS") {
     return res.sendStatus(200);
   }
@@ -82,43 +85,59 @@ app.all(["/api/upload-video", "/api/upload-video-mp4", "/api/video-upload"], (re
     const finalFilename = `${baseName}_${uniqueSuffix}${ext.toLowerCase()}`;
     const targetFilePath = path.resolve(uploadsVideosDir, finalFilename);
 
-    // Case 1: Client sent JSON payload with base64 data
-    if (req.body && (req.body.base64 || req.body.videoBase64)) {
-      const b64 = (req.body.base64 || req.body.videoBase64).replace(/^data:video\/[a-zA-Z0-9]+;base64,/, "");
-      const buffer = Buffer.from(b64, "base64");
-      fs.writeFileSync(targetFilePath, buffer);
+    // Case 1: Raw binary buffer from express.raw
+    if (Buffer.isBuffer(req.body) && req.body.length > 0) {
+      fs.writeFileSync(targetFilePath, req.body);
       return res.json({
         success: true,
         url: `/uploads/videos/${finalFilename}`,
         filename: finalFilename,
         originalName: rawFilename,
-        size: buffer.length,
+        size: req.body.length,
       });
     }
 
-    // Case 2: Client streamed binary data
-    const writeStream = fs.createWriteStream(targetFilePath);
-    req.pipe(writeStream);
-
-    writeStream.on("finish", () => {
-      try {
-        const stats = fs.statSync(targetFilePath);
-        const fileUrl = `/uploads/videos/${finalFilename}`;
-        res.json({
+    // Case 2: Client sent JSON payload with base64 data
+    if (req.body && (req.body.base64 || req.body.videoBase64)) {
+      let b64 = req.body.base64 || req.body.videoBase64;
+      if (typeof b64 === "string") {
+        if (b64.includes(",")) {
+          b64 = b64.split(",")[1];
+        }
+        const buffer = Buffer.from(b64.replace(/\s+/g, ""), "base64");
+        fs.writeFileSync(targetFilePath, buffer);
+        return res.json({
           success: true,
-          url: fileUrl,
+          url: `/uploads/videos/${finalFilename}`,
           filename: finalFilename,
           originalName: rawFilename,
-          size: stats.size,
+          size: buffer.length,
         });
-      } catch (e: any) {
-        res.status(500).json({ error: "Erro ao verificar arquivo gravado." });
+      }
+    }
+
+    // Case 3: Streaming chunk collection
+    const chunks: Buffer[] = [];
+    req.on("data", (chunk) => chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)));
+    req.on("end", () => {
+      const buffer = Buffer.concat(chunks);
+      if (buffer.length > 0) {
+        fs.writeFileSync(targetFilePath, buffer);
+        return res.json({
+          success: true,
+          url: `/uploads/videos/${finalFilename}`,
+          filename: finalFilename,
+          originalName: rawFilename,
+          size: buffer.length,
+        });
+      } else {
+        return res.status(400).json({ error: "Nenhum dado de vídeo foi recebido pelo servidor." });
       }
     });
 
-    writeStream.on("error", (err) => {
-      console.error("Upload video error:", err);
-      res.status(500).json({ error: "Erro ao salvar vídeo." });
+    req.on("error", (err) => {
+      console.error("Upload video stream error:", err);
+      res.status(500).json({ error: "Erro ao receber fluxo de vídeo." });
     });
   } catch (err: any) {
     console.error("Upload catch error:", err);
@@ -130,18 +149,33 @@ app.get(["/video", "/video.html", "/tutorial", "/tutorial.html"], (_req, res) =>
   res.sendFile(path.resolve(process.cwd(), "video.html"));
 });
 
-// Direct MP4 Download endpoint (Ready official video from Luna)
-app.get(["/api/download-tutorial-mp4", "/api/video-mp4", "/download-mp4", "/api/download-luna-mp4"], (_req, res) => {
-  const mp4Path = getLunaVideoPath();
-  if (mp4Path) {
+// Direct MP4 Download endpoint (Ready official video from Luna or custom uploaded video)
+app.get(["/api/download-tutorial-mp4", "/api/video-mp4", "/download-mp4", "/api/download-luna-mp4", "/api/download-current-video"], (req, res) => {
+  const reqFile = req.query.file as string;
+  let targetPath: string | null = null;
+
+  if (reqFile) {
+    const safeFile = path.basename(reqFile);
+    const candidate = path.resolve(uploadsVideosDir, safeFile);
+    if (fs.existsSync(candidate)) {
+      targetPath = candidate;
+    }
+  }
+
+  if (!targetPath) {
+    targetPath = getLunaVideoPath();
+  }
+
+  if (targetPath && fs.existsSync(targetPath)) {
+    const filename = path.basename(targetPath);
     res.setHeader("Content-Type", "video/mp4");
-    res.setHeader("Content-Disposition", 'attachment; filename="video_tutorial_agenda_mais_facil_luna.mp4"');
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
     res.setHeader("Accept-Ranges", "bytes");
-    const stat = fs.statSync(mp4Path);
+    const stat = fs.statSync(targetPath);
     res.setHeader("Content-Length", stat.size);
-    fs.createReadStream(mp4Path).pipe(res);
+    fs.createReadStream(targetPath).pipe(res);
   } else {
-    res.status(404).send("Arquivo MP4 ainda não gerado.");
+    res.status(404).send("Arquivo de vídeo MP4 não encontrado.");
   }
 });
 

@@ -80,6 +80,34 @@ export interface EmployeeFechamentoRecord {
   notes?: string;
 }
 
+export interface CaixaFechamentoCiclo {
+  id: string;
+  salonId: string;
+  salonName: string;
+  cycleNumber?: number;
+  closedAt: string; // ISO string
+  closedAtFormatted: string; // e.g. "16/09/2026 às 14:35"
+  date: string; // YYYY-MM-DD
+  totalGross: number;
+  totalNet: number;
+  totalCommissions: number;
+  activeCount: number;
+  cancelledCount: number;
+  commissionsByProf: {
+    professionalName: string;
+    amount: number;
+    count: number;
+  }[];
+  paymentMethodsSummary: {
+    method: PaymentMethod;
+    total: number;
+    count: number;
+  }[];
+  transactions: Transaction[];
+  clearedBy: UserRole;
+  notes?: string;
+}
+
 export interface ServiceItem {
   id: string;
   name: string;

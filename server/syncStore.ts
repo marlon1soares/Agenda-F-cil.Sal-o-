@@ -19,6 +19,7 @@ export interface SyncDatabaseState {
   onlineUsers: any[];
   usedTrialCpfs?: string[];
   paymentOrders?: Record<string, any>;
+  caixaFechamentos?: any[];
   lastUpdated: number;
 }
 
@@ -251,6 +252,7 @@ const DEFAULT_STATE: SyncDatabaseState = {
   ],
   onlineUsers: [],
   usedTrialCpfs: [],
+  caixaFechamentos: [],
   lastUpdated: Date.now()
 };
 

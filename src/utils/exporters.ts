@@ -1,10 +1,11 @@
 import { Transaction, SalonConfig } from '../types';
 
-export function exportToExcel(transactions: Transaction[], config: SalonConfig) {
+export function exportToExcel(transactions: Transaction[], config: SalonConfig, customTitle?: string, customFilename?: string) {
   const dateStr = new Date().toISOString().split('T')[0];
   let tableHtml = `
     <table border="1" style="border-collapse: collapse; font-family: Arial, sans-serif; font-size: 12px;">
       <thead>
+        ${customTitle ? `<tr><th colspan="${7 + config.profs.length}" style="background-color: #1e293b; color: #ffffff; padding: 10px; font-size: 14px; text-align: center;">${customTitle}</th></tr>` : ''}
         <tr style="background-color: ${config.corCustom || '#2563eb'}; color: white; font-weight: bold;">
           <th style="padding: 8px;">Data</th>
           <th style="padding: 8px;">Horário</th>
@@ -109,11 +110,11 @@ export function exportToExcel(transactions: Transaction[], config: SalonConfig) 
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `Fechamento_Caixa_${config.nomeSalao.replace(/\s+/g, '_')}_${dateStr}.xls`;
+  a.download = customFilename || `Fechamento_Caixa_${config.nomeSalao.replace(/\s+/g, '_')}_${dateStr}.xls`;
   a.click();
 }
 
-export function exportToWord(transactions: Transaction[], config: SalonConfig) {
+export function exportToWord(transactions: Transaction[], config: SalonConfig, customTitle?: string, customFilename?: string) {
   const dateStr = new Date().toLocaleDateString('pt-BR');
   const corHeader = config.corCustom || '#2563eb';
 
@@ -193,7 +194,7 @@ export function exportToWord(transactions: Transaction[], config: SalonConfig) {
   </head>
   <body>
     <h2>${config.nomeSalao}</h2>
-    <p><b>Relatório de Fechamento de Caixa</b> - ${dateStr}</p>
+    <p><b>${customTitle || `Relatório de Fechamento de Caixa - ${dateStr}`}</b></p>
     <p>Procedimentos Ativos: <b>${activeCount}</b>${cancelledCount > 0 ? ` | Cancelados/Apagados: <b style="color: #dc2626;">${cancelledCount}</b>` : ''}</p>
     <table>
       <thead>
@@ -231,6 +232,6 @@ export function exportToWord(transactions: Transaction[], config: SalonConfig) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `Fechamento_Caixa_${config.nomeSalao.replace(/\s+/g, '_')}_${dateStr.replace(/\//g, '-')}.doc`;
+  a.download = customFilename || `Fechamento_Caixa_${config.nomeSalao.replace(/\s+/g, '_')}_${dateStr.replace(/\//g, '-')}.doc`;
   a.click();
 }

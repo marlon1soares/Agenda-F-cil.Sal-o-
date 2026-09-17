@@ -1,11 +1,14 @@
 import { 
   SalonConfig, Transaction, Appointment, Professional, ServiceItem, ClientRecord, 
   CatalogMedia, CatalogFolder, AdminCredentials, SalonApp, AdminPaymentConfig,
-  ChatMessage, SystemBroadcastNotice, LivePresenceUser, EmployeeFechamentoRecord
+  ChatMessage, SystemBroadcastNotice, LivePresenceUser, EmployeeFechamentoRecord,
+  CaixaFechamentoCiclo
 } from '../types';
 import { DEFAULT_CONFIG, DEFAULT_PROFESSIONALS, DEFAULT_SERVICES, DEFAULT_CLIENTS, INITIAL_TRANSACTIONS, INITIAL_APPOINTMENTS, INITIAL_CATALOG, DEFAULT_SALON_APPS } from '../data/mockData';
 import { DEFAULT_SCHEDULE_CONFIG } from './schedule';
 import { syncEngine } from './syncEngine';
+import { db } from '../lib/firebase';
+import { doc, setDoc } from 'firebase/firestore';
 
 // IndexedDB for media storage (Photos & Videos without size limits)
 const DB_NAME = 'SalaoFlutuanteDB';
@@ -196,6 +199,56 @@ export const Storage = {
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('salao_sync_data', { detail: { key: 'salaoLancamentos' } }));
     }
+  },
+
+  getCaixaFechamentos(salonId?: string): CaixaFechamentoCiclo[] {
+    const saved = safeGetItem('salao_fechamentos_caixa');
+    let list: CaixaFechamentoCiclo[] = saved ? JSON.parse(saved) : [];
+    if (salonId) {
+      const specificSaved = safeGetItem(`salao_fechamentos_caixa_${salonId}`);
+      if (specificSaved) {
+        try {
+          const specificList: CaixaFechamentoCiclo[] = JSON.parse(specificSaved);
+          const map = new Map<string, CaixaFechamentoCiclo>();
+          list.forEach(item => map.set(item.id, item));
+          specificList.forEach(item => map.set(item.id, item));
+          list = Array.from(map.values());
+        } catch {}
+      }
+      return list.filter(item => !item.salonId || item.salonId === salonId);
+    }
+    return list;
+  },
+
+  saveCaixaFechamento(ciclo: CaixaFechamentoCiclo): CaixaFechamentoCiclo[] {
+    const current = this.getCaixaFechamentos();
+    const filtered = current.filter(c => c.id !== ciclo.id);
+    const updated = [ciclo, ...filtered];
+    
+    safeSetItem('salao_fechamentos_caixa', JSON.stringify(updated));
+    if (ciclo.salonId) {
+      const salonList = updated.filter(c => c.salonId === ciclo.salonId);
+      safeSetItem(`salao_fechamentos_caixa_${ciclo.salonId}`, JSON.stringify(salonList));
+    }
+
+    // Direct Firestore write for permanent cloud persistence
+    if (db) {
+      try {
+        setDoc(doc(db, 'caixa_fechamentos', ciclo.id), ciclo, { merge: true }).catch(err => {
+          console.warn('[Storage] Firestore saveCaixaFechamento error:', err);
+        });
+      } catch (err) {
+        console.warn('[Storage] Error saving ciclo to Firestore:', err);
+      }
+    }
+
+    // Push via syncEngine for cross-device broadcast
+    syncEngine.pushUpdateImmediate({ caixaFechamentos: updated });
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('salao_sync_data', { detail: { key: 'caixaFechamentos', ciclo } }));
+    }
+    return updated;
   },
 
   getAppointments(): Record<string, Record<string, Appointment>> {

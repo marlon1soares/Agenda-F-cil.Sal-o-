@@ -24,7 +24,7 @@ import { LiveConnectionHubModal } from './components/LiveConnectionHubModal';
 import { AdminVideoConfigModal } from './components/AdminVideoConfigModal';
 import { AdminBroadcastModal } from './components/AdminBroadcastModal';
 
-import { Transaction, Appointment, SalonConfig, UserRole, Professional, ServiceItem, ClientRecord, SalonApp } from './types';
+import { Transaction, Appointment, SalonConfig, UserRole, Professional, ServiceItem, ClientRecord, SalonApp, CaixaFechamentoCiclo } from './types';
 import { Storage } from './utils/storage';
 import { syncEngine } from './utils/syncEngine';
 import { DEFAULT_SALON_APPS, DEFAULT_CONFIG } from './data/mockData';
@@ -538,17 +538,80 @@ export function App() {
   };
 
   const handleClearAllTransactions = () => {
-    if (confirm("Tem certeza que deseja apagar os lançamentos do caixa? Eles permanecerão cancelados e destacados em vermelho nos relatórios Word/Excel para auditoria.")) {
-      const updated = transactions.map(t => ({
-        ...t,
-        status: 'cancelado' as const,
-        deleted: true,
-        deletedAt: new Date().toISOString(),
-        deletedBy: userRole,
-      }));
-      setTransactions(updated);
-      Storage.saveTransactions(updated);
-    }
+    if (transactions.length === 0) return;
+
+    const activeTx = transactions.filter(t => !t.deleted && t.status !== 'cancelado');
+    const totalGross = activeTx.reduce((acc, t) => acc + (Number(t.grossAmount) || 0), 0);
+    const totalNet = activeTx.reduce((acc, t) => acc + (Number(t.netAmount) || 0), 0);
+
+    // Calculate commissions by prof for this cycle
+    const profCommissionMap = new Map<string, { totalAmount: number; count: number }>();
+    let totalCommissions = 0;
+    activeTx.forEach(t => {
+      if (t.commissions && t.commissions.length > 0) {
+        t.commissions.forEach(c => {
+          const current = profCommissionMap.get(c.professionalName) || { totalAmount: 0, count: 0 };
+          const amt = Number(c.amount) || 0;
+          totalCommissions += amt;
+          profCommissionMap.set(c.professionalName, {
+            totalAmount: current.totalAmount + amt,
+            count: current.count + 1
+          });
+        });
+      }
+    });
+
+    const commissionsByProf = Array.from(profCommissionMap.entries()).map(([profName, val]) => ({
+      professionalName: profName,
+      amount: val.totalAmount,
+      count: val.count
+    }));
+
+    // Payment methods summary
+    const methodMap = new Map<string, { total: number; count: number }>();
+    activeTx.forEach(t => {
+      const m = t.paymentMethod || 'dinheiro';
+      const cur = methodMap.get(m) || { total: 0, count: 0 };
+      methodMap.set(m, {
+        total: cur.total + (Number(t.grossAmount) || 0),
+        count: cur.count + 1
+      });
+    });
+    const paymentMethodsSummary = Array.from(methodMap.entries()).map(([m, v]) => ({
+      method: m as any,
+      total: v.total,
+      count: v.count
+    }));
+
+    const now = new Date();
+    const cycleId = `ciclo_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const formattedDate = `${now.toLocaleDateString('pt-BR')} às ${now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
+    const yyyymmdd = now.toISOString().split('T')[0];
+
+    const ciclo: CaixaFechamentoCiclo = {
+      id: cycleId,
+      salonId: activeSalonId || config.id || 'default',
+      salonName: config.nomeSalao || 'Meu Salão',
+      closedAt: now.toISOString(),
+      closedAtFormatted: formattedDate,
+      date: yyyymmdd,
+      totalGross,
+      totalNet,
+      totalCommissions,
+      activeCount: activeTx.length,
+      cancelledCount: transactions.length - activeTx.length,
+      commissionsByProf,
+      paymentMethodsSummary,
+      transactions: [...transactions],
+      clearedBy: userRole
+    };
+
+    // 1. Salva o ciclo com 100% de segurança no Banco de Dados (LocalStorage + Firestore)
+    Storage.saveCaixaFechamento(ciclo);
+
+    // 2. Limpa o painel de lançamentos atual para iniciar um novo ciclo
+    setTransactions([]);
+    Storage.saveTransactions([]);
   };
 
   // Handlers for Appointments
