@@ -318,6 +318,40 @@ class SyncEngine {
       let appointmentsChanged = false;
       let messagesChanged = false;
 
+      // 0. Multi-tenant Partitioned Salon Data
+      if (state.salonData && typeof state.salonData === 'object') {
+        try {
+          Object.keys(state.salonData).forEach((sId) => {
+            const sData = (state.salonData as any)[sId];
+            if (!sData) return;
+            if (sData.appointments) {
+              localStorage.setItem(`salaoAgenda_${sId}`, JSON.stringify(sData.appointments));
+            }
+            if (sData.transactions && Array.isArray(sData.transactions)) {
+              localStorage.setItem(`salaoLancamentos_${sId}`, JSON.stringify(sData.transactions));
+            }
+            if (sData.timeAdjustments) {
+              localStorage.setItem(`salaoAjustesHorarios_${sId}`, JSON.stringify(sData.timeAdjustments));
+            }
+            if (sData.professionals && Array.isArray(sData.professionals)) {
+              localStorage.setItem(`salaoProfissionais_${sId}`, JSON.stringify(sData.professionals));
+            }
+            if (sData.services && Array.isArray(sData.services)) {
+              localStorage.setItem(`salaoServicos_${sId}`, JSON.stringify(sData.services));
+            }
+            if (sData.clients && Array.isArray(sData.clients)) {
+              localStorage.setItem(`salaoClientes_${sId}`, JSON.stringify(sData.clients));
+            }
+            if (sData.caixaFechamentos && Array.isArray(sData.caixaFechamentos)) {
+              localStorage.setItem(`salao_fechamentos_caixa_${sId}`, JSON.stringify(sData.caixaFechamentos));
+            }
+            if (sData.config) {
+              localStorage.setItem(`salaoConfig_${sId}`, JSON.stringify(sData.config));
+            }
+          });
+        } catch {}
+      }
+
       if (state.salons && Array.isArray(state.salons) && state.salons.length > 0) {
         try { 
           const localSalonsRaw = localStorage.getItem('salaoAppsList');
@@ -555,6 +589,12 @@ class SyncEngine {
         setDoc(globalDocRef, sanitizeForFirestore(toSend), { merge: true }).catch((err) => {
           console.warn('[SyncEngine] Firestore immediate push error:', err);
         });
+
+        // Dedicated Cloud Salon Partition Document
+        if (toSend.salonId && toSend.salonData && (toSend.salonData as any)[toSend.salonId]) {
+          const salonDocRef = doc(db, 'salons', toSend.salonId);
+          setDoc(salonDocRef, sanitizeForFirestore({ ...(toSend.salonData as any)[toSend.salonId], lastUpdated: Date.now() }), { merge: true }).catch(() => {});
+        }
       } catch (err) {
         console.warn('[SyncEngine] Error triggering Firestore setDoc:', err);
       }
@@ -605,6 +645,12 @@ class SyncEngine {
       try {
         const globalDocRef = doc(db, 'system', 'global_sync_state');
         await setDoc(globalDocRef, sanitizeForFirestore(toSend), { merge: true });
+
+        // Dedicated Cloud Salon Partition Document
+        if (toSend.salonId && toSend.salonData && (toSend.salonData as any)[toSend.salonId]) {
+          const salonDocRef = doc(db, 'salons', toSend.salonId);
+          setDoc(salonDocRef, sanitizeForFirestore({ ...(toSend.salonData as any)[toSend.salonId], lastUpdated: Date.now() }), { merge: true }).catch(() => {});
+        }
       } catch (err) {
         console.warn('[SyncEngine] Firestore debounced push error:', err);
       }

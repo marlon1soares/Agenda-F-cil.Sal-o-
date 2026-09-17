@@ -63,6 +63,7 @@ export type FechamentoPeriodType = 'diario' | 'quinzenal_1' | 'quinzenal_2' | 'm
 
 export interface EmployeeFechamentoRecord {
   id: string;
+  salonId?: string;
   professionalId: string;
   professionalName: string;
   periodType: FechamentoPeriodType;

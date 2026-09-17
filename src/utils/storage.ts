@@ -189,15 +189,60 @@ export const Storage = {
     }
   },
 
-  getTransactions(): Transaction[] {
+  getTransactions(salonId?: string): Transaction[] {
+    const effectiveSalonId = salonId || safeGetItem('salao_active_id') || 'salon-parcas';
+    // 1. Dedicated partitioned transactions for this salon
+    const specific = safeGetItem(`salaoLancamentos_${effectiveSalonId}`);
+    if (specific) {
+      try {
+        return JSON.parse(specific);
+      } catch {}
+    }
+    // 2. Legacy fallback
     const saved = safeGetItem('salaoLancamentos');
-    return saved ? JSON.parse(saved) : INITIAL_TRANSACTIONS;
+    if (saved) {
+      try {
+        const all: Transaction[] = JSON.parse(saved);
+        const filtered = all.filter(t => t.salonId === effectiveSalonId);
+        if (filtered.length > 0) {
+          safeSetItem(`salaoLancamentos_${effectiveSalonId}`, JSON.stringify(filtered));
+          return filtered;
+        }
+        if (effectiveSalonId === 'salon-parcas') {
+          const unassigned = all.filter(t => !t.salonId);
+          if (unassigned.length > 0) {
+            safeSetItem(`salaoLancamentos_${effectiveSalonId}`, JSON.stringify(unassigned));
+            return unassigned;
+          }
+          return all;
+        }
+      } catch {}
+    }
+    if (effectiveSalonId === 'salon-parcas') {
+      return INITIAL_TRANSACTIONS;
+    }
+    return [];
   },
-  saveTransactions(transactions: Transaction[]) {
-    safeSetItem('salaoLancamentos', JSON.stringify(transactions));
-    syncEngine.pushUpdate({ transactions });
+  saveTransactions(transactions: Transaction[], salonId?: string) {
+    const effectiveSalonId = salonId || safeGetItem('salao_active_id') || 'salon-parcas';
+    const tagged = transactions.map(t => ({ ...t, salonId: effectiveSalonId }));
+    safeSetItem(`salaoLancamentos_${effectiveSalonId}`, JSON.stringify(tagged));
+
+    // Update global list safely by keeping other salons' data 100% intact
+    const saved = safeGetItem('salaoLancamentos');
+    let all: Transaction[] = saved ? JSON.parse(saved) : [];
+    const others = all.filter(t => t.salonId && t.salonId !== effectiveSalonId);
+    safeSetItem('salaoLancamentos', JSON.stringify([...tagged, ...others]));
+
+    syncEngine.pushUpdate({ 
+      transactions: tagged, 
+      salonId: effectiveSalonId,
+      salonData: {
+        [effectiveSalonId]: { transactions: tagged }
+      }
+    });
     if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('salao_sync_data', { detail: { key: 'salaoLancamentos' } }));
+      window.dispatchEvent(new CustomEvent('salao_sync_data', { detail: { key: 'salaoLancamentos', salonId: effectiveSalonId } }));
     }
   },
 
@@ -243,51 +288,99 @@ export const Storage = {
     }
 
     // Push via syncEngine for cross-device broadcast
-    syncEngine.pushUpdateImmediate({ caixaFechamentos: updated });
+    syncEngine.pushUpdateImmediate({ 
+      caixaFechamentos: updated,
+      salonId: ciclo.salonId,
+      salonData: ciclo.salonId ? {
+        [ciclo.salonId]: { caixaFechamentos: updated.filter(c => c.salonId === ciclo.salonId) }
+      } : undefined
+    });
 
     if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('salao_sync_data', { detail: { key: 'caixaFechamentos', ciclo } }));
+      window.dispatchEvent(new CustomEvent('salao_sync_data', { detail: { key: 'caixaFechamentos', ciclo, salonId: ciclo.salonId } }));
     }
     return updated;
   },
 
-  getAppointments(): Record<string, Record<string, Appointment>> {
-    const saved = safeGetItem('salaoAgenda');
-    return saved ? JSON.parse(saved) : INITIAL_APPOINTMENTS;
+  getAppointments(salonId?: string): Record<string, Record<string, Appointment>> {
+    const effectiveSalonId = salonId || safeGetItem('salao_active_id') || 'salon-parcas';
+    const specific = safeGetItem(`salaoAgenda_${effectiveSalonId}`);
+    if (specific) {
+      try {
+        return JSON.parse(specific);
+      } catch {}
+    }
+    if (effectiveSalonId === 'salon-parcas') {
+      const saved = safeGetItem('salaoAgenda');
+      return saved ? JSON.parse(saved) : INITIAL_APPOINTMENTS;
+    }
+    return {};
   },
-  saveAppointments(agenda: Record<string, Record<string, Appointment>>) {
-    safeSetItem('salaoAgenda', JSON.stringify(agenda));
-    syncEngine.pushUpdateImmediate({ appointments: agenda });
+  saveAppointments(agenda: Record<string, Record<string, Appointment>>, salonId?: string) {
+    const effectiveSalonId = salonId || safeGetItem('salao_active_id') || 'salon-parcas';
+    safeSetItem(`salaoAgenda_${effectiveSalonId}`, JSON.stringify(agenda));
+    if (effectiveSalonId === 'salon-parcas') {
+      safeSetItem('salaoAgenda', JSON.stringify(agenda));
+    }
+    syncEngine.pushUpdateImmediate({ 
+      appointments: agenda, 
+      salonId: effectiveSalonId,
+      salonData: {
+        [effectiveSalonId]: { appointments: agenda }
+      }
+    });
     if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('salao_sync_data', { detail: { key: 'salaoAgenda' } }));
+      window.dispatchEvent(new CustomEvent('salao_sync_data', { detail: { key: 'salaoAgenda', salonId: effectiveSalonId } }));
     }
   },
-  addAppointment(date: string, timeSlot: string, ap: Appointment): Record<string, Record<string, Appointment>> {
-    const current = this.getAppointments();
+  addAppointment(date: string, timeSlot: string, ap: Appointment, salonId?: string): Record<string, Record<string, Appointment>> {
+    const effectiveSalonId = salonId || safeGetItem('salao_active_id') || 'salon-parcas';
+    const current = this.getAppointments(effectiveSalonId);
     const updated = { ...current };
     if (!updated[date]) updated[date] = {};
-    updated[date][timeSlot] = ap;
-    this.saveAppointments(updated);
+    updated[date][timeSlot] = { ...ap, salonId: effectiveSalonId };
+    this.saveAppointments(updated, effectiveSalonId);
     return updated;
   },
 
-  getTimeAdjustments(): Record<string, number> {
-    const saved = safeGetItem('salaoAjustesHorarios');
-    return saved ? JSON.parse(saved) : {};
+  getTimeAdjustments(salonId?: string): Record<string, number> {
+    const effectiveSalonId = salonId || safeGetItem('salao_active_id') || 'salon-parcas';
+    const specific = safeGetItem(`salaoAjustesHorarios_${effectiveSalonId}`);
+    if (specific) {
+      try {
+        return JSON.parse(specific);
+      } catch {}
+    }
+    if (effectiveSalonId === 'salon-parcas') {
+      const saved = safeGetItem('salaoAjustesHorarios');
+      return saved ? JSON.parse(saved) : {};
+    }
+    return {};
   },
-  saveTimeAdjustments(adjustments: Record<string, number>) {
-    safeSetItem('salaoAjustesHorarios', JSON.stringify(adjustments));
-    syncEngine.pushUpdate({ timeAdjustments: adjustments });
+  saveTimeAdjustments(adjustments: Record<string, number>, salonId?: string) {
+    const effectiveSalonId = salonId || safeGetItem('salao_active_id') || 'salon-parcas';
+    safeSetItem(`salaoAjustesHorarios_${effectiveSalonId}`, JSON.stringify(adjustments));
+    if (effectiveSalonId === 'salon-parcas') {
+      safeSetItem('salaoAjustesHorarios', JSON.stringify(adjustments));
+    }
+    syncEngine.pushUpdate({ 
+      timeAdjustments: adjustments, 
+      salonId: effectiveSalonId,
+      salonData: {
+        [effectiveSalonId]: { timeAdjustments: adjustments }
+      }
+    });
     if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('salao_sync_data', { detail: { key: 'salaoAjustesHorarios' } }));
+      window.dispatchEvent(new CustomEvent('salao_sync_data', { detail: { key: 'salaoAjustesHorarios', salonId: effectiveSalonId } }));
     }
   },
 
-  getProfessionals(): Professional[] {
+  getProfessionals(salonId?: string): Professional[] {
+    const effectiveSalonId = salonId || safeGetItem('salao_active_id') || 'salon-parcas';
     try {
-      const saved = safeGetItem('salaoProfissionais');
-      if (saved) {
-        const parsed = JSON.parse(saved);
+      const specific = safeGetItem(`salaoProfissionais_${effectiveSalonId}`);
+      if (specific) {
+        const parsed = JSON.parse(specific);
         if (Array.isArray(parsed) && parsed.length > 0) {
           return parsed.map((p: any, idx: number) => ({
             id: p.id || `prof-${idx + 1}`,
@@ -300,51 +393,164 @@ export const Storage = {
           }));
         }
       }
+
+      // Check salon config profs
+      const salon = this.getSalons().find(s => s.id === effectiveSalonId);
+      if (salon && salon.config && Array.isArray(salon.config.profs) && salon.config.profs.length > 0) {
+        return salon.config.profs.map((p: any, idx: number) => ({
+          id: p.id || `prof-${idx + 1}`,
+          name: p.nome || p.name || `Profissional ${idx + 1}`,
+          role: 'Cabeleireiro(a)',
+          commissionPercent: typeof p.porc === 'number' ? p.porc : 50,
+          phone: '',
+          active: true
+        }));
+      }
+
+      if (effectiveSalonId === 'salon-parcas') {
+        const saved = safeGetItem('salaoProfissionais');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            return parsed;
+          }
+        }
+        return DEFAULT_PROFESSIONALS;
+      }
     } catch (e) {
       console.error("Error loading salaoProfissionais:", e);
     }
-    return DEFAULT_PROFESSIONALS;
+    return [];
   },
-  saveProfessionals(profs: Professional[]) {
-    safeSetItem('salaoProfissionais', JSON.stringify(profs));
-    syncEngine.pushUpdate({ professionals: profs });
+  saveProfessionals(profs: Professional[], salonId?: string) {
+    const effectiveSalonId = salonId || safeGetItem('salao_active_id') || 'salon-parcas';
+    safeSetItem(`salaoProfissionais_${effectiveSalonId}`, JSON.stringify(profs));
+    if (effectiveSalonId === 'salon-parcas') {
+      safeSetItem('salaoProfissionais', JSON.stringify(profs));
+    }
+
+    // Sync to salon config profs
+    const currentSalons = this.getSalons();
+    const updatedSalons = currentSalons.map(s => {
+      if (s.id === effectiveSalonId) {
+        return {
+          ...s,
+          config: {
+            ...s.config,
+            profs: profs.map(p => ({ id: p.id, nome: p.name, porc: p.commissionPercent }))
+          }
+        };
+      }
+      return s;
+    });
+    this.saveSalons(updatedSalons);
+
+    syncEngine.pushUpdate({ 
+      professionals: profs, 
+      salonId: effectiveSalonId,
+      salonData: {
+        [effectiveSalonId]: { professionals: profs }
+      }
+    });
     if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('salao_sync_data', { detail: { key: 'salaoProfissionais' } }));
+      window.dispatchEvent(new CustomEvent('salao_sync_data', { detail: { key: 'salaoProfissionais', salonId: effectiveSalonId } }));
     }
   },
 
-  getServices(): ServiceItem[] {
-    const saved = safeGetItem('salaoServicos');
-    return saved ? JSON.parse(saved) : DEFAULT_SERVICES;
+  getServices(salonId?: string): ServiceItem[] {
+    const effectiveSalonId = salonId || safeGetItem('salao_active_id') || 'salon-parcas';
+    const specific = safeGetItem(`salaoServicos_${effectiveSalonId}`);
+    if (specific) {
+      try {
+        return JSON.parse(specific);
+      } catch {}
+    }
+    if (effectiveSalonId === 'salon-parcas') {
+      const saved = safeGetItem('salaoServicos');
+      return saved ? JSON.parse(saved) : DEFAULT_SERVICES;
+    }
+    return DEFAULT_SERVICES;
   },
-  saveServices(services: ServiceItem[]) {
-    safeSetItem('salaoServicos', JSON.stringify(services));
-    syncEngine.pushUpdate({ services });
+  saveServices(services: ServiceItem[], salonId?: string) {
+    const effectiveSalonId = salonId || safeGetItem('salao_active_id') || 'salon-parcas';
+    safeSetItem(`salaoServicos_${effectiveSalonId}`, JSON.stringify(services));
+    if (effectiveSalonId === 'salon-parcas') {
+      safeSetItem('salaoServicos', JSON.stringify(services));
+    }
+    syncEngine.pushUpdate({ 
+      services, 
+      salonId: effectiveSalonId,
+      salonData: {
+        [effectiveSalonId]: { services }
+      }
+    });
     if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('salao_sync_data', { detail: { key: 'salaoServicos' } }));
+      window.dispatchEvent(new CustomEvent('salao_sync_data', { detail: { key: 'salaoServicos', salonId: effectiveSalonId } }));
     }
   },
 
-  getClients(): ClientRecord[] {
-    const saved = safeGetItem('salaoClientes');
-    return saved ? JSON.parse(saved) : DEFAULT_CLIENTS;
+  getClients(salonId?: string): ClientRecord[] {
+    const effectiveSalonId = salonId || safeGetItem('salao_active_id') || 'salon-parcas';
+    const specific = safeGetItem(`salaoClientes_${effectiveSalonId}`);
+    if (specific) {
+      try {
+        return JSON.parse(specific);
+      } catch {}
+    }
+    if (effectiveSalonId === 'salon-parcas') {
+      const saved = safeGetItem('salaoClientes');
+      return saved ? JSON.parse(saved) : DEFAULT_CLIENTS;
+    }
+    return [];
   },
-  saveClients(clients: ClientRecord[]) {
-    safeSetItem('salaoClientes', JSON.stringify(clients));
-    syncEngine.pushUpdate({ clients });
+  saveClients(clients: ClientRecord[], salonId?: string) {
+    const effectiveSalonId = salonId || safeGetItem('salao_active_id') || 'salon-parcas';
+    safeSetItem(`salaoClientes_${effectiveSalonId}`, JSON.stringify(clients));
+    if (effectiveSalonId === 'salon-parcas') {
+      safeSetItem('salaoClientes', JSON.stringify(clients));
+    }
+    syncEngine.pushUpdate({ 
+      clients, 
+      salonId: effectiveSalonId,
+      salonData: {
+        [effectiveSalonId]: { clients }
+      }
+    });
     if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('salao_sync_data', { detail: { key: 'salaoClientes' } }));
+      window.dispatchEvent(new CustomEvent('salao_sync_data', { detail: { key: 'salaoClientes', salonId: effectiveSalonId } }));
     }
   },
 
-  getFechamentos(): EmployeeFechamentoRecord[] {
+  getFechamentos(salonId?: string): EmployeeFechamentoRecord[] {
+    const effectiveSalonId = salonId || safeGetItem('salao_active_id') || 'salon-parcas';
+    const specific = safeGetItem(`salaoFechamentos_${effectiveSalonId}`);
+    if (specific) {
+      try {
+        return JSON.parse(specific);
+      } catch {}
+    }
     const saved = safeGetItem('salaoFechamentos');
-    return saved ? JSON.parse(saved) : [];
+    if (!saved) return [];
+    try {
+      const all: EmployeeFechamentoRecord[] = JSON.parse(saved);
+      return all.filter(r => !r.salonId || r.salonId === effectiveSalonId);
+    } catch {
+      return [];
+    }
   },
-  saveFechamentos(records: EmployeeFechamentoRecord[]) {
-    safeSetItem('salaoFechamentos', JSON.stringify(records));
+  saveFechamentos(records: EmployeeFechamentoRecord[], salonId?: string) {
+    const effectiveSalonId = salonId || safeGetItem('salao_active_id') || 'salon-parcas';
+    const tagged = records.map(r => ({ ...r, salonId: r.salonId || effectiveSalonId }));
+    safeSetItem(`salaoFechamentos_${effectiveSalonId}`, JSON.stringify(tagged));
+
+    // Update global list safely preserving other salons
+    const allRaw = safeGetItem('salaoFechamentos');
+    let allList: EmployeeFechamentoRecord[] = allRaw ? JSON.parse(allRaw) : [];
+    const others = allList.filter(r => r.salonId && r.salonId !== effectiveSalonId);
+    safeSetItem('salaoFechamentos', JSON.stringify([...tagged, ...others]));
+
     if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('salao_sync_data', { detail: { key: 'salaoFechamentos' } }));
+      window.dispatchEvent(new CustomEvent('salao_sync_data', { detail: { key: 'salaoFechamentos', salonId: effectiveSalonId } }));
     }
   },
 

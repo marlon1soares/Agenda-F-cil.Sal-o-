@@ -71,7 +71,7 @@ export const ClientePortalView: React.FC<ClientePortalViewProps> = ({
 
         // Check if client name is already recorded in salon's clients database
         if (!effectiveName) {
-          const clients = Storage.getClients();
+          const clients = Storage.getClients(safeSalon.id);
           const found = clients.find(c => c.phone.replace(/\D/g, '') === effectivePhone);
           if (found && found.name) {
             effectiveName = found.name;
@@ -86,7 +86,7 @@ export const ClientePortalView: React.FC<ClientePortalViewProps> = ({
         try { localStorage.setItem('salao_cliente_name', effectiveName); } catch {}
       }
     } catch {}
-  }, []);
+  }, [safeSalon.id]);
 
   // Payment states for Client
   const [copiedPix, setCopiedPix] = useState(false);
@@ -107,7 +107,7 @@ export const ClientePortalView: React.FC<ClientePortalViewProps> = ({
   };
 
   // Salon Services and Professionals
-  const services: ServiceItem[] = Storage.getServices();
+  const services: ServiceItem[] = Storage.getServices(safeSalon.id);
   const profsList = safeConfig.profs || [];
   const profs: Professional[] = profsList.map((p, idx) => ({
     id: p.id || `prof-${idx}`,
@@ -177,7 +177,7 @@ export const ClientePortalView: React.FC<ClientePortalViewProps> = ({
     } catch {}
 
     // Save client in salon's client list
-    const currentClients = Storage.getClients();
+    const currentClients = Storage.getClients(safeSalon.id);
     const exists = currentClients.some(c => c.phone === clientPhone.trim());
     if (!exists) {
       const newClientRecord: ClientRecord = {
@@ -188,7 +188,7 @@ export const ClientePortalView: React.FC<ClientePortalViewProps> = ({
         totalSpent: selectedService.price,
         lastVisit: selectedDate
       };
-      Storage.saveClients([...currentClients, newClientRecord]);
+      Storage.saveClients([...currentClients, newClientRecord], safeSalon.id);
     }
 
     setLastAppointment(newAppointment);

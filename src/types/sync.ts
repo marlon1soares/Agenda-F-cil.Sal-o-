@@ -17,6 +17,17 @@ export interface FullSyncState {
   onlineUsers?: LivePresenceUser[];
   usedTrialCpfs?: string[];
   caixaFechamentos?: CaixaFechamentoCiclo[];
+  salonData?: Record<string, {
+    appointments?: Record<string, Record<string, Appointment>>;
+    transactions?: Transaction[];
+    timeAdjustments?: Record<string, number>;
+    professionals?: Professional[];
+    services?: ServiceItem[];
+    clients?: ClientRecord[];
+    config?: SalonConfig;
+    caixaFechamentos?: CaixaFechamentoCiclo[];
+  }>;
+  salonId?: string;
   lastSenderId?: string;
   lastUpdated: number;
 }

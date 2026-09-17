@@ -9,6 +9,7 @@ interface CaixaViewProps {
   transactions: Transaction[];
   config: SalonConfig;
   userRole: UserRole;
+  salonId?: string;
   onAddTransaction: (tx: Transaction) => void;
   onDeleteTransaction: (id: string) => void;
   onClearAllTransactions: () => void;
@@ -20,6 +21,7 @@ export const CaixaView: React.FC<CaixaViewProps> = ({
   transactions,
   config,
   userRole,
+  salonId,
   onAddTransaction,
   onDeleteTransaction,
   onClearAllTransactions,
@@ -78,13 +80,15 @@ export const CaixaView: React.FC<CaixaViewProps> = ({
 
   const [fechamentoNotice, setFechamentoNotice] = useState<string | null>(null);
   const [isClosingCaixa, setIsClosingCaixa] = useState(false);
+  const effectiveSalonId = salonId || config.id || 'default';
+
   const [lastFechamento, setLastFechamento] = useState<{
     date: string;
     totalGross: number;
     count: number;
   } | null>(() => {
     try {
-      const saved = localStorage.getItem(`fechamento_caixa_${config.id || 'default'}`);
+      const saved = localStorage.getItem(`fechamento_caixa_${effectiveSalonId}`);
       return saved ? JSON.parse(saved) : null;
     } catch {
       return null;
@@ -110,7 +114,7 @@ export const CaixaView: React.FC<CaixaViewProps> = ({
     };
 
     try {
-      localStorage.setItem(`fechamento_caixa_${config.id || 'default'}`, JSON.stringify(info));
+      localStorage.setItem(`fechamento_caixa_${effectiveSalonId}`, JSON.stringify(info));
       setLastFechamento(info);
     } catch (e) {
       console.warn("Aviso ao salvar registro local do fechamento:", e);
@@ -157,7 +161,7 @@ export const CaixaView: React.FC<CaixaViewProps> = ({
     const cycleId = `fechamento_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
     const ciclo: CaixaFechamentoCiclo = {
       id: cycleId,
-      salonId: config.id || 'default',
+      salonId: effectiveSalonId,
       salonName: config.nomeSalao || 'Meu Salão',
       closedAt: now.toISOString(),
       closedAtFormatted: formattedDate,
@@ -615,7 +619,7 @@ export const CaixaView: React.FC<CaixaViewProps> = ({
       <BancoDadosCaixaModal
         isOpen={isBancoDadosOpen}
         onClose={() => setIsBancoDadosOpen(false)}
-        salonId={config.id || 'default'}
+        salonId={effectiveSalonId}
         salonName={config.nomeSalao}
         config={config}
         userRole={userRole}

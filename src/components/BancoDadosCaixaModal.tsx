@@ -159,8 +159,12 @@ export const BancoDadosCaixaModal: React.FC<BancoDadosCaixaModalProps> = ({
           if (!snap.empty) {
             snap.forEach(docSnap => {
               const data = docSnap.data() as CaixaFechamentoCiclo;
-              if (data && (!data.salonId || data.salonId === salonId || salonId === 'default')) {
-                remoteCiclos.push(data);
+              if (data) {
+                const isMatch = (salonId && data.salonId === salonId) ||
+                  ((!salonId || salonId === 'salon-parcas' || salonId === 'default') && (!data.salonId || data.salonId === 'salon-parcas' || data.salonId === 'default'));
+                if (isMatch) {
+                  remoteCiclos.push(data);
+                }
               }
             });
           }
@@ -185,13 +189,21 @@ export const BancoDadosCaixaModal: React.FC<BancoDadosCaixaModalProps> = ({
 
       if (merged.length > 0) {
         setCiclos(merged);
-        localStorage.setItem('salao_fechamentos_caixa', JSON.stringify(merged));
+        if (salonId) {
+          localStorage.setItem(`salao_fechamentos_caixa_${salonId}`, JSON.stringify(merged));
+          const allRaw = localStorage.getItem('salao_fechamentos_caixa');
+          let allList: CaixaFechamentoCiclo[] = allRaw ? JSON.parse(allRaw) : [];
+          const otherSalons = allList.filter(c => c.salonId && c.salonId !== salonId);
+          localStorage.setItem('salao_fechamentos_caixa', JSON.stringify([...merged, ...otherSalons]));
+        } else {
+          localStorage.setItem('salao_fechamentos_caixa', JSON.stringify(merged));
+        }
       } else {
         // Fallback: check if there's a recent live closure in localStorage
         const savedFechamentoStr = localStorage.getItem(`fechamento_caixa_${salonId || 'default'}`);
         const liveTxs = (currentTransactions && currentTransactions.length > 0)
           ? currentTransactions
-          : Storage.getTransactions();
+          : Storage.getTransactions(salonId);
 
         if (savedFechamentoStr || liveTxs.length > 0) {
           let savedFechamento: any = null;
@@ -273,7 +285,7 @@ export const BancoDadosCaixaModal: React.FC<BancoDadosCaixaModalProps> = ({
     // 2. From current live transactions (or storage)
     const liveTxs: Transaction[] = (currentTransactions && currentTransactions.length > 0)
       ? currentTransactions
-      : Storage.getTransactions();
+      : Storage.getTransactions(salonId);
     
     liveTxs.forEach(tx => {
       if (tx && tx.id && !map.has(tx.id)) {

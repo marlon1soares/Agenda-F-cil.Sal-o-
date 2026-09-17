@@ -21,6 +21,7 @@ interface MeusFuncionariosViewProps {
   userRole?: UserRole;
   employeeName?: string;
   activeSalonSlug?: string;
+  salonId?: string;
   onSaveProfessionals: (profs: Professional[]) => void;
   onOpenEmployeeLink?: () => void;
   onOpenSpecificEmployeeAgenda?: (profName: string) => void;
@@ -34,6 +35,7 @@ export const MeusFuncionariosView: React.FC<MeusFuncionariosViewProps> = ({
   userRole = 'salao',
   employeeName,
   activeSalonSlug,
+  salonId,
   onSaveProfessionals,
   onOpenEmployeeLink,
   onOpenSpecificEmployeeAgenda,
@@ -98,11 +100,11 @@ export const MeusFuncionariosView: React.FC<MeusFuncionariosViewProps> = ({
       setEditingProfs(normalizeProfs(professionals));
     }
     try {
-      setSavedFechamentos(Storage.getFechamentos() || []);
+      setSavedFechamentos(Storage.getFechamentos(salonId) || []);
     } catch (e) {
       console.error("Error loading fechamentos:", e);
     }
-  }, [professionals]);
+  }, [professionals, salonId]);
 
   const salonSlug = activeSalonSlug || getSalonSlug(config?.nomeSalao || 'salao');
 
@@ -465,7 +467,7 @@ export const MeusFuncionariosView: React.FC<MeusFuncionariosViewProps> = ({
 
     const updated = [newRecord, ...savedFechamentos];
     setSavedFechamentos(updated);
-    Storage.saveFechamentos(updated);
+    Storage.saveFechamentos(updated, salonId);
     setFechamentoSuccessMsg(`Fechamento de ${prof.name} (${calc.periodLabel}) salvo com sucesso!`);
     setTimeout(() => setFechamentoSuccessMsg(null), 4000);
   };

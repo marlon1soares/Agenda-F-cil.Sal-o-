@@ -20,6 +20,8 @@ export interface SyncDatabaseState {
   usedTrialCpfs?: string[];
   paymentOrders?: Record<string, any>;
   caixaFechamentos?: any[];
+  salonData?: Record<string, any>;
+  salonId?: string;
   lastUpdated: number;
 }
 
@@ -386,12 +388,24 @@ class SyncStore {
       mergedTransactions = Array.from(txMap.values());
     }
 
+    let mergedSalonData = this.state.salonData || {};
+    if (updates.salonData && typeof updates.salonData === 'object') {
+      mergedSalonData = { ...mergedSalonData };
+      Object.keys(updates.salonData).forEach((sId: string) => {
+        mergedSalonData[sId] = {
+          ...(mergedSalonData[sId] || {}),
+          ...updates.salonData[sId]
+        };
+      });
+    }
+
     this.state = {
       ...this.state,
       ...updates,
       salons: updates.salons ? mergedSalons : this.state.salons,
       appointments: updates.appointments ? mergedAppointments : this.state.appointments,
       transactions: updates.transactions ? mergedTransactions : this.state.transactions,
+      salonData: mergedSalonData,
       lastUpdated: Date.now()
     };
 

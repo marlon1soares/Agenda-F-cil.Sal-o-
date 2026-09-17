@@ -166,12 +166,12 @@ export function App() {
     const active = list.find(s => s.id === activeSalonId);
     return Storage.getConfig(activeSalonId) || active?.config || DEFAULT_CONFIG;
   });
-  const [transactions, setTransactions] = useState<Transaction[]>(() => Storage.getTransactions());
-  const [appointments, setAppointments] = useState<Record<string, Record<string, Appointment>>>(() => Storage.getAppointments());
-  const [timeAdjustments, setTimeAdjustments] = useState<Record<string, number>>(() => Storage.getTimeAdjustments());
-  const [professionals, setProfessionals] = useState<Professional[]>(() => Storage.getProfessionals());
-  const [services, setServices] = useState<ServiceItem[]>(() => Storage.getServices());
-  const [clients, setClients] = useState<ClientRecord[]>(() => Storage.getClients());
+  const [transactions, setTransactions] = useState<Transaction[]>(() => Storage.getTransactions(activeSalonId));
+  const [appointments, setAppointments] = useState<Record<string, Record<string, Appointment>>>(() => Storage.getAppointments(activeSalonId));
+  const [timeAdjustments, setTimeAdjustments] = useState<Record<string, number>>(() => Storage.getTimeAdjustments(activeSalonId));
+  const [professionals, setProfessionals] = useState<Professional[]>(() => Storage.getProfessionals(activeSalonId));
+  const [services, setServices] = useState<ServiceItem[]>(() => Storage.getServices(activeSalonId));
+  const [clients, setClients] = useState<ClientRecord[]>(() => Storage.getClients(activeSalonId));
 
   // Window State
   const [isExpanded, setIsExpanded] = useState(false);
@@ -316,7 +316,18 @@ export function App() {
           
           if (matched) {
             setActiveSalonId(matched.id);
-            setConfig(matched.config);
+            try {
+              localStorage.setItem('salao_active_id', matched.id);
+              sessionStorage.setItem('salao_authenticated_id', matched.id);
+            } catch {}
+            const salonConfig = Storage.getConfig(matched.id) || matched.config;
+            setConfig(salonConfig);
+            setAppointments(Storage.getAppointments(matched.id));
+            setTransactions(Storage.getTransactions(matched.id));
+            setTimeAdjustments(Storage.getTimeAdjustments(matched.id));
+            setProfessionals(Storage.getProfessionals(matched.id));
+            setServices(Storage.getServices(matched.id));
+            setClients(Storage.getClients(matched.id));
             setUserRole('salao');
             setIsSalonAuthOpen(false);
           } else if (isAccessLink) {
@@ -399,12 +410,12 @@ export function App() {
         } else {
           setConfig(Storage.getConfig(activeSalonId));
         }
-        setAppointments(Storage.getAppointments());
-        setTransactions(Storage.getTransactions());
-        setTimeAdjustments(Storage.getTimeAdjustments());
-        setProfessionals(Storage.getProfessionals());
-        setServices(Storage.getServices());
-        setClients(Storage.getClients());
+        setAppointments(Storage.getAppointments(activeSalonId));
+        setTransactions(Storage.getTransactions(activeSalonId));
+        setTimeAdjustments(Storage.getTimeAdjustments(activeSalonId));
+        setProfessionals(Storage.getProfessionals(activeSalonId));
+        setServices(Storage.getServices(activeSalonId));
+        setClients(Storage.getClients(activeSalonId));
 
         resolveUrlParams();
       }
@@ -427,12 +438,12 @@ export function App() {
       } else {
         setConfig(Storage.getConfig(activeSalonId));
       }
-      setTransactions(Storage.getTransactions());
-      setAppointments(Storage.getAppointments());
-      setTimeAdjustments(Storage.getTimeAdjustments());
-      setProfessionals(Storage.getProfessionals());
-      setServices(Storage.getServices());
-      setClients(Storage.getClients());
+      setTransactions(Storage.getTransactions(activeSalonId));
+      setAppointments(Storage.getAppointments(activeSalonId));
+      setTimeAdjustments(Storage.getTimeAdjustments(activeSalonId));
+      setProfessionals(Storage.getProfessionals(activeSalonId));
+      setServices(Storage.getServices(activeSalonId));
+      setClients(Storage.getClients(activeSalonId));
     };
 
     window.addEventListener('salao_sync_data', handleSync);
@@ -453,6 +464,14 @@ export function App() {
     const salonConfig = Storage.getConfig(salon.id) || salon.config;
     setConfig(salonConfig);
     Storage.saveConfig(salonConfig, salon.id);
+
+    // Switch all active data strictly to this salon's isolated dataset
+    setAppointments(Storage.getAppointments(salon.id));
+    setTransactions(Storage.getTransactions(salon.id));
+    setTimeAdjustments(Storage.getTimeAdjustments(salon.id));
+    setProfessionals(Storage.getProfessionals(salon.id));
+    setServices(Storage.getServices(salon.id));
+    setClients(Storage.getClients(salon.id));
   };
 
   const handleCreateSalon = (newSalon: SalonApp) => {
@@ -517,7 +536,7 @@ export function App() {
     };
     const updated = [newTx, ...transactions];
     setTransactions(updated);
-    Storage.saveTransactions(updated);
+    Storage.saveTransactions(updated, activeSalonId);
   };
 
   const handleDeleteTransaction = (id: string) => {
@@ -534,7 +553,7 @@ export function App() {
       return t;
     });
     setTransactions(updated);
-    Storage.saveTransactions(updated);
+    Storage.saveTransactions(updated, activeSalonId);
   };
 
   const handleClearAllTransactions = () => {
@@ -609,9 +628,9 @@ export function App() {
     // 1. Salva o ciclo com 100% de segurança no Banco de Dados (LocalStorage + Firestore)
     Storage.saveCaixaFechamento(ciclo);
 
-    // 2. Limpa o painel de lançamentos atual para iniciar um novo ciclo
+    // 2. Limpa o painel de lançamentos atual para iniciar um novo ciclo isolado deste salão
     setTransactions([]);
-    Storage.saveTransactions([]);
+    Storage.saveTransactions([], activeSalonId);
   };
 
   // Handlers for Appointments
@@ -620,7 +639,7 @@ export function App() {
     if (!updated[date]) updated[date] = {};
     updated[date][timeSlot] = ap;
     setAppointments(updated);
-    Storage.saveAppointments(updated);
+    Storage.saveAppointments(updated, activeSalonId);
   };
 
   const handleDeleteAppointment = (date: string, timeSlot: string) => {
@@ -629,14 +648,14 @@ export function App() {
       delete updated[date][timeSlot];
     }
     setAppointments(updated);
-    Storage.saveAppointments(updated);
+    Storage.saveAppointments(updated, activeSalonId);
   };
 
   const handleShiftDayTime = (date: string, deltaMinutes: number) => {
     const updated = { ...timeAdjustments };
     updated[date] = (updated[date] || 0) + deltaMinutes;
     setTimeAdjustments(updated);
-    Storage.saveTimeAdjustments(updated);
+    Storage.saveTimeAdjustments(updated, activeSalonId);
   };
 
   const handleResetDaySchedule = (date: string) => {
@@ -645,7 +664,7 @@ export function App() {
     const updatedShifts = { ...timeAdjustments };
     delete updatedShifts[date];
     setTimeAdjustments(updatedShifts);
-    Storage.saveTimeAdjustments(updatedShifts);
+    Storage.saveTimeAdjustments(updatedShifts, activeSalonId);
   };
 
   // Convert completed appointment directly into POS Launch
@@ -1326,6 +1345,7 @@ export function App() {
                     transactions={transactions}
                     config={config}
                     userRole={userRole}
+                    salonId={activeSalonId}
                     onAddTransaction={handleAddTransaction}
                     onDeleteTransaction={handleDeleteTransaction}
                     onClearAllTransactions={handleClearAllTransactions}
@@ -1361,9 +1381,10 @@ export function App() {
                     userRole={userRole}
                     employeeName={employeeName}
                     activeSalonSlug={salons.find(s => s.id === activeSalonId)?.slug}
+                    salonId={activeSalonId}
                     onSaveProfessionals={(profs) => {
                       setProfessionals(profs);
-                      Storage.saveProfessionals(profs);
+                      Storage.saveProfessionals(profs, activeSalonId);
                     }}
                     onOpenEmployeeLink={() => setIsEmployeeLinkOpen(true)}
                     onOpenSpecificEmployeeAgenda={(profName) => {
@@ -1379,7 +1400,7 @@ export function App() {
                     services={services}
                     onSaveServices={(srvs) => {
                       setServices(srvs);
-                      Storage.saveServices(srvs);
+                      Storage.saveServices(srvs, activeSalonId);
                     }}
                   />
                 )}
@@ -1389,7 +1410,7 @@ export function App() {
                     clients={clients}
                     onSaveClients={(clis) => {
                       setClients(clis);
-                      Storage.saveClients(clis);
+                      Storage.saveClients(clis, activeSalonId);
                     }}
                   />
                 )}
