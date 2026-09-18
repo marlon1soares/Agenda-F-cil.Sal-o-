@@ -65,7 +65,8 @@ export function exportToExcel(transactions: Transaction[], config: SalonConfig, 
     `;
 
     config.profs.forEach((p, idx) => {
-      const comm = tx.commissions?.find(c => c.professionalName === p.nome)?.amount ?? (net * (p.porc / 100));
+      const commObj = tx.commissions?.find(c => c.professionalName.toLowerCase() === p.nome.toLowerCase());
+      const comm = (commObj && commObj.amount > 0) ? commObj.amount : (net * (p.porc / 100));
       if (!isCancelled) {
         profTotals[idx] += comm;
       }
@@ -157,7 +158,8 @@ export function exportToWord(transactions: Transaction[], config: SalonConfig, c
 
       let colsProf = '';
       config.profs.forEach((p, pIdx) => {
-        const comm = tx.commissions?.find(c => c.professionalName === p.nome)?.amount ?? (net * (p.porc / 100));
+        const commObj = tx.commissions?.find(c => c.professionalName.toLowerCase() === p.nome.toLowerCase());
+        const comm = (commObj && commObj.amount > 0) ? commObj.amount : (net * (p.porc / 100));
         if (!isCancelled) {
           profTotals[pIdx] += comm;
         }

@@ -191,11 +191,42 @@ export const Storage = {
 
   getTransactions(salonId?: string): Transaction[] {
     const effectiveSalonId = salonId || safeGetItem('salao_active_id') || 'salon-parcas';
+    // Helper to ensure commissions are correctly distributed across all configured percentages (e.g. 70% and 30%)
+    const sanitizeTransactions = (txList: Transaction[]): Transaction[] => {
+      const cfg = Storage.getConfig(effectiveSalonId);
+      if (!cfg.profs || cfg.profs.length === 0) return txList;
+      return txList.map(t => {
+        const net = Number(t.netAmount ?? t.grossAmount ?? 0);
+        let comms = t.commissions ? [...t.commissions] : [];
+        let modified = false;
+
+        // Ensure every configured prof is present and has proper share of netAmount
+        cfg.profs.forEach(p => {
+          const existing = comms.find(c => c.professionalName.toLowerCase() === p.nome.toLowerCase());
+          if (!existing) {
+            comms.push({
+              professionalId: p.id || `prof-${p.nome}`,
+              professionalName: p.nome,
+              percentage: p.porc,
+              amount: Number((net * (p.porc / 100)).toFixed(2))
+            });
+            modified = true;
+          } else if ((!existing.amount || existing.amount === 0) && p.porc > 0 && net > 0) {
+            existing.amount = Number((net * (p.porc / 100)).toFixed(2));
+            existing.percentage = p.porc;
+            modified = true;
+          }
+        });
+
+        return modified ? { ...t, commissions: comms } : t;
+      });
+    };
+
     // 1. Dedicated partitioned transactions for this salon
     const specific = safeGetItem(`salaoLancamentos_${effectiveSalonId}`);
     if (specific) {
       try {
-        return JSON.parse(specific);
+        return sanitizeTransactions(JSON.parse(specific));
       } catch {}
     }
     // 2. Legacy fallback
@@ -205,21 +236,23 @@ export const Storage = {
         const all: Transaction[] = JSON.parse(saved);
         const filtered = all.filter(t => t.salonId === effectiveSalonId);
         if (filtered.length > 0) {
-          safeSetItem(`salaoLancamentos_${effectiveSalonId}`, JSON.stringify(filtered));
-          return filtered;
+          const sanitized = sanitizeTransactions(filtered);
+          safeSetItem(`salaoLancamentos_${effectiveSalonId}`, JSON.stringify(sanitized));
+          return sanitized;
         }
         if (effectiveSalonId === 'salon-parcas') {
           const unassigned = all.filter(t => !t.salonId);
           if (unassigned.length > 0) {
-            safeSetItem(`salaoLancamentos_${effectiveSalonId}`, JSON.stringify(unassigned));
-            return unassigned;
+            const sanitized = sanitizeTransactions(unassigned);
+            safeSetItem(`salaoLancamentos_${effectiveSalonId}`, JSON.stringify(sanitized));
+            return sanitized;
           }
-          return all;
+          return sanitizeTransactions(all);
         }
       } catch {}
     }
     if (effectiveSalonId === 'salon-parcas') {
-      return INITIAL_TRANSACTIONS;
+      return sanitizeTransactions(INITIAL_TRANSACTIONS);
     }
     return [];
   },
@@ -1100,20 +1133,13 @@ export function parsePOSCommand(
 
   const netAmount = grossAmount * (1 - (cardFeePercent / 100));
 
-  // Split commissions according to salon setup or specific professional who performed the service
-  const matchingProf = options?.specificProfessionalName
-    ? profsConfig.find(p => p.nome.toLowerCase() === options.specificProfessionalName!.toLowerCase())
-    : undefined;
-
+  // Distribute net value across configured percentages for salon and professionals (e.g., 70% and 30%)
   const commissions = profsConfig.map(p => {
-    // If specific professional did the appointment, prioritize calculating their commission
-    const isMatched = matchingProf ? (p.nome.toLowerCase() === matchingProf.nome.toLowerCase()) : true;
-    const effectivePct = isMatched ? p.porc : 0;
     return {
       professionalId: p.id || `prof-${p.nome}`,
       professionalName: p.nome,
       percentage: p.porc,
-      amount: netAmount * (effectivePct / 100)
+      amount: Number((netAmount * (p.porc / 100)).toFixed(2))
     };
   });
 

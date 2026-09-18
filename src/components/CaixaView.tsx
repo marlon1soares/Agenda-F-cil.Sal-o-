@@ -172,7 +172,8 @@ export const CaixaView: React.FC<CaixaViewProps> = ({
   const profCommissionTotals = config.profs.map(p => {
     const totalAmount = activeTransactions.reduce((acc, t) => {
       const comm = t.commissions?.find(c => c.professionalName === p.nome);
-      return acc + (comm ? comm.amount : 0);
+      const val = (comm && comm.amount > 0) ? comm.amount : ((Number(t.netAmount ?? t.grossAmount) || 0) * (p.porc / 100));
+      return acc + val;
     }, 0);
     return { name: p.nome, percentage: p.porc, totalAmount };
   });
@@ -225,17 +226,16 @@ export const CaixaView: React.FC<CaixaViewProps> = ({
     const profCommissionMap = new Map<string, { totalAmount: number; count: number }>();
     let totalCommissions = 0;
     activeTransactions.forEach(t => {
-      if (t.commissions && t.commissions.length > 0) {
-        t.commissions.forEach(c => {
-          const current = profCommissionMap.get(c.professionalName) || { totalAmount: 0, count: 0 };
-          const amt = Number(c.amount) || 0;
-          totalCommissions += amt;
-          profCommissionMap.set(c.professionalName, {
-            totalAmount: current.totalAmount + amt,
-            count: current.count + 1
-          });
+      config.profs.forEach(p => {
+        const comm = t.commissions?.find(c => c.professionalName.toLowerCase() === p.nome.toLowerCase());
+        const amt = (comm && comm.amount > 0) ? comm.amount : (Number(t.netAmount ?? t.grossAmount ?? 0) * (p.porc / 100));
+        const current = profCommissionMap.get(p.nome) || { totalAmount: 0, count: 0 };
+        totalCommissions += amt;
+        profCommissionMap.set(p.nome, {
+          totalAmount: current.totalAmount + amt,
+          count: current.count + 1
         });
-      }
+      });
     });
 
     const commissionsByProf = Array.from(profCommissionMap.entries()).map(([profName, val]) => ({
@@ -802,21 +802,25 @@ export const CaixaView: React.FC<CaixaViewProps> = ({
                 <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center gap-1.5 text-[10px]">
                   <span className="text-slate-400 font-bold">Comissões:</span>
                   {config.profs.map(p => {
-                    const comm = tx.commissions.find(c => c.professionalName === p.nome);
-                    const amount = comm ? comm.amount : (tx.netAmount * (p.porc / 100));
+                    const comm = tx.commissions?.find(c => c.professionalName.toLowerCase() === p.nome.toLowerCase());
+                    const amount = (comm && comm.amount > 0) ? comm.amount : ((Number(tx.netAmount ?? tx.grossAmount) || 0) * (p.porc / 100));
                     return (
                       <span key={p.nome} className="bg-emerald-50 text-emerald-800 border border-emerald-200 px-1.5 py-0.5 rounded font-bold">
-                        {p.nome}: R$ {(Number(amount) || 0).toFixed(2)}
+                        {p.nome} ({p.porc}%): R$ {(Number(amount) || 0).toFixed(2)}
                       </span>
                     );
                   })}
                 </div>
               )}
 
-              {/* Delete Button */}
+              {/* Delete Button & Fee Info */}
               <div className="flex items-center justify-between pt-1 border-t border-slate-100 text-[11px]">
-                <span className="text-slate-400">
-                  {tx.cardFeePercent > 0 ? `Taxa Cartão: ${tx.cardFeePercent}%` : 'Sem taxa de cartão'}
+                <span className="text-slate-500 font-medium">
+                  {tx.cardFeePercent > 0 ? (
+                    <span>Taxa: <b className="text-rose-600">{tx.cardFeePercent}%</b> • Líquido: <b className="text-blue-700">R$ {(Number(tx.netAmount ?? tx.grossAmount) || 0).toFixed(2)}</b></span>
+                  ) : (
+                    <span>Sem taxa de cartão</span>
+                  )}
                 </span>
                 <button
                   onClick={() => onDeleteTransaction(tx.id)}
@@ -846,6 +850,7 @@ export const CaixaView: React.FC<CaixaViewProps> = ({
                 <th className="p-3 text-center">Pagamento</th>
                 <th className="p-3 text-center">Bruto (R$)</th>
                 <th className="p-3 text-center">Taxa</th>
+                <th className="p-3 text-center">Líquido (R$)</th>
                 {config.profs.map(p => (
                   <th key={p.nome} className="p-3 text-center">
                     {p.nome} ({p.porc}%)
@@ -858,7 +863,7 @@ export const CaixaView: React.FC<CaixaViewProps> = ({
             <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
               {activeTransactions.length === 0 ? (
                 <tr>
-                  <td colSpan={7 + config.profs.length} className="p-8 text-center text-slate-400">
+                  <td colSpan={8 + config.profs.length} className="p-8 text-center text-slate-400">
                     Nenhum lançamento ativo no caixa de hoje. Use o campo acima para lançar!
                   </td>
                 </tr>
@@ -895,11 +900,14 @@ export const CaixaView: React.FC<CaixaViewProps> = ({
                     <td className="p-3 text-center text-rose-600 font-semibold">
                       {tx.cardFeePercent > 0 ? `${tx.cardFeePercent}%` : '-'}
                     </td>
+                    <td className="p-3 text-center font-bold text-blue-700">
+                      R$ {(Number(tx.netAmount ?? tx.grossAmount) || 0).toFixed(2)}
+                    </td>
 
                     {/* Commissions for each professional */}
                     {config.profs.map(p => {
-                      const comm = tx.commissions.find(c => c.professionalName === p.nome);
-                      const amount = comm ? comm.amount : (tx.netAmount * (p.porc / 100));
+                      const comm = tx.commissions?.find(c => c.professionalName.toLowerCase() === p.nome.toLowerCase());
+                      const amount = (comm && comm.amount > 0) ? comm.amount : ((Number(tx.netAmount ?? tx.grossAmount) || 0) * (p.porc / 100));
                       return (
                         <td key={p.nome} className="p-3 text-center font-bold text-emerald-600">
                           R$ {(Number(amount) || 0).toFixed(2)}
