@@ -18,6 +18,7 @@ interface ClientePortalViewProps {
   appointments?: Record<string, Record<string, Appointment>>;
   timeAdjustments?: Record<string, number>;
   onAppointmentBooked: (date: string, timeSlot: string, ap: Appointment) => void;
+  onAppointmentCancelled?: (date: string, timeSlot: string) => void;
   onOpenCatalog?: () => void;
   onOpenLiveHub?: () => void;
 }
@@ -28,6 +29,7 @@ export const ClientePortalView: React.FC<ClientePortalViewProps> = ({
   appointments = {},
   timeAdjustments = {},
   onAppointmentBooked,
+  onAppointmentCancelled,
   onOpenCatalog,
   onOpenLiveHub,
 }) => {
@@ -209,6 +211,106 @@ export const ClientePortalView: React.FC<ClientePortalViewProps> = ({
     window.open(`https://api.whatsapp.com/send?phone=55${targetPhone}&text=${encodeURIComponent(msg)}`, '_blank');
   };
 
+  // Clean phone to track appointments and cancellations
+  const cleanPhone = (clientPhone || '').replace(/\D/g, '');
+
+  // Find all active appointments booked by this client
+  const myActiveAppointments: { date: string; timeSlot: string; ap: Appointment }[] = [];
+  if (cleanPhone || (clientName && clientName.trim().length >= 3)) {
+    Object.entries(appointments).forEach(([d, slots]) => {
+      Object.entries(slots || {}).forEach(([time, ap]) => {
+        if (ap && ap.status === 'agendado') {
+          const apPhone = (ap.clientPhone || '').replace(/\D/g, '');
+          const isPhoneMatch = Boolean(cleanPhone && apPhone && (apPhone === cleanPhone || apPhone.endsWith(cleanPhone) || cleanPhone.endsWith(apPhone)));
+          const isNameMatch = Boolean(clientName && clientName.trim().length >= 3 && ap.clientName && ap.clientName.trim().toLowerCase() === clientName.trim().toLowerCase());
+          if (isPhoneMatch || isNameMatch) {
+            myActiveAppointments.push({ date: d, timeSlot: time, ap });
+          }
+        }
+      });
+    });
+  }
+
+  // Count past cancellations by this client
+  const getClientCancellationCount = (): number => {
+    if (!cleanPhone) return 0;
+    try {
+      const key = `salao_cancel_count_${safeSalon.id}_${cleanPhone}`;
+      return Number(localStorage.getItem(key) || 0);
+    } catch {
+      return 0;
+    }
+  };
+
+  const [clientCancelModal, setClientCancelModal] = useState<{
+    date: string;
+    timeSlot: string;
+    ap: Appointment;
+    currentCancels: number;
+    hasFee: boolean;
+  } | null>(null);
+
+  const handleOpenClientCancelModal = (date: string, timeSlot: string, ap: Appointment) => {
+    const count = getClientCancellationCount();
+    setClientCancelModal({
+      date,
+      timeSlot,
+      ap,
+      currentCancels: count,
+      hasFee: count >= 2
+    });
+  };
+
+  const handleConfirmClientCancellation = () => {
+    if (!clientCancelModal) return;
+    const { date, timeSlot, ap, currentCancels, hasFee } = clientCancelModal;
+
+    // Increment cancellation count in client's storage
+    if (cleanPhone) {
+      try {
+        const key = `salao_cancel_count_${safeSalon.id}_${cleanPhone}`;
+        localStorage.setItem(key, String(currentCancels + 1));
+      } catch {}
+    }
+
+    // Call cancellation handler to free slot immediately
+    if (onAppointmentCancelled) {
+      onAppointmentCancelled(date, timeSlot);
+    }
+
+    // Send a real-time message to Salon chat / notifications
+    try {
+      const now = new Date();
+      Storage.addMessage({
+        id: `msg-${Date.now()}`,
+        salonId: safeSalon.id,
+        salonName: safeConfig.nomeSalao,
+        fromRole: 'cliente',
+        toRole: 'salao',
+        senderName: ap.clientName || 'Cliente',
+        clientPhone: ap.clientPhone || '',
+        content: `❌ [Agendamento Cancelado pelo Cliente] ${ap.clientName || 'Cliente'} (${ap.clientPhone || 'Sem tel'}) cancelou o horário das ${timeSlot} no dia ${date} (${ap.serviceName}). O horário foi reaberto e está LIVRE novamente para novos agendamentos!${hasFee ? ' (3º+ cancelamento - Taxa de R$ 5,00 aplicável)' : ' (Cancelamento gratuito)'}`,
+        timestamp: now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+        date: now.toISOString().split('T')[0],
+        createdAt: Date.now(),
+        type: 'status_update'
+      });
+    } catch {}
+
+    // Reset confirmation screen if it was the last appointment
+    if (lastAppointment && lastAppointment.date === date && lastAppointment.timeSlot === timeSlot) {
+      setIsSuccess(false);
+      setLastAppointment(null);
+    }
+
+    setClientCancelModal(null);
+    alert(
+      hasFee
+        ? 'Agendamento cancelado com sucesso. O horário foi liberado. Conforme a política do salão, para cancelamentos a partir do 3º é cobrada uma taxa de R$ 5,00.'
+        : 'Agendamento cancelado com sucesso. O horário foi reaberto e já está disponível para novos agendamentos.'
+    );
+  };
+
   return (
     <div className="space-y-3 animate-in fade-in duration-300">
       
@@ -289,6 +391,58 @@ export const ClientePortalView: React.FC<ClientePortalViewProps> = ({
           )}
         </div>
       </div>
+
+      {/* Active Client Appointments Banner */}
+      {myActiveAppointments.length > 0 && (
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-md space-y-3">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+            <h3 className="text-xs font-bold text-white flex items-center gap-2">
+              <Calendar className="w-4 h-4 text-rose-400" />
+              <span>Seus Agendamentos Marcados Neste Salão ({myActiveAppointments.length})</span>
+            </h3>
+            <span className="text-[10px] text-emerald-400 font-bold bg-emerald-950/60 px-2 py-0.5 rounded-full border border-emerald-500/30">
+              Confirmados
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            {myActiveAppointments.map((item, idx) => (
+              <div 
+                key={`${item.date}-${item.timeSlot}-${idx}`}
+                className="bg-slate-950 p-3 rounded-xl border border-slate-800 flex flex-col justify-between gap-2"
+              >
+                <div>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-extrabold text-white">{item.ap.serviceName}</span>
+                    <span className="font-bold text-emerald-400">R$ {(Number(item.ap.price) || 0).toFixed(2)}</span>
+                  </div>
+                  <div className="text-[11px] text-amber-300 font-semibold mt-0.5 flex items-center gap-1.5">
+                    <Clock className="w-3 h-3" />
+                    <span>{item.date} às {item.timeSlot}</span>
+                    {item.ap.professionalName && (
+                      <span className="text-slate-400">• {item.ap.professionalName}</span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between pt-1 border-t border-slate-800/80">
+                  <span className="text-[10px] text-slate-400">
+                    Deseja desmarcar?
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenClientCancelModal(item.date, item.timeSlot, item.ap)}
+                    className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 text-[11px] font-bold px-2.5 py-1 rounded-lg flex items-center gap-1 transition-all cursor-pointer"
+                  >
+                    <X className="w-3 h-3 text-rose-400" />
+                    <span>Cancelar Agendamento</span>
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {!isSuccess ? (
         /* BOOKING FORM */
@@ -790,15 +944,133 @@ export const ClientePortalView: React.FC<ClientePortalViewProps> = ({
             <span>Enviar Confirmação para o Salão via WhatsApp</span>
           </button>
 
+          {/* Cancel Appointment Button on Confirmation Screen */}
+          {lastAppointment && (
+            <button
+              type="button"
+              onClick={() => handleOpenClientCancelModal(lastAppointment.date, lastAppointment.timeSlot, lastAppointment)}
+              className="w-full bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 font-bold py-2.5 rounded-2xl text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+            >
+              <X className="w-4 h-4 text-rose-400" />
+              <span>Cancelar este Agendamento e Liberar Horário</span>
+            </button>
+          )}
+
           <button
             onClick={() => {
               setIsSuccess(false);
               setSelectedService(null);
             }}
-            className="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold py-2.5 rounded-2xl text-xs transition-colors flex items-center justify-center gap-2"
+            className="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold py-2.5 rounded-2xl text-xs transition-colors flex items-center justify-center gap-2 cursor-pointer"
           >
             <span>Fazer Outro Agendamento com Este Mesmo Link</span>
           </button>
+        </div>
+      )}
+
+      {/* Client Cancellation Modal */}
+      {clientCancelModal && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
+          <div className="bg-slate-900 border border-slate-700 rounded-3xl p-6 w-full max-w-md shadow-2xl text-white space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <h3 className="text-base font-black text-white flex items-center gap-2">
+                <AlertCircle className="w-5 h-5 text-rose-500" />
+                <span>Cancelar Agendamento</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => setClientCancelModal(null)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Appointment Details */}
+            <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800 text-xs space-y-1.5 text-slate-300">
+              <div className="flex justify-between font-bold text-white text-sm">
+                <span>{clientCancelModal.ap.serviceName}</span>
+                <span className="text-emerald-400">R$ {(Number(clientCancelModal.ap.price) || 0).toFixed(2)}</span>
+              </div>
+              <div className="text-amber-300 font-semibold flex items-center gap-1.5">
+                <Clock className="w-3.5 h-3.5" />
+                <span>{clientCancelModal.date} às {clientCancelModal.timeSlot}</span>
+              </div>
+              <div className="text-slate-400 text-[11px]">
+                Profissional: <strong className="text-slate-200">{clientCancelModal.ap.professionalName}</strong>
+              </div>
+            </div>
+
+            {/* Cancellation Policy Banner */}
+            {!clientCancelModal.hasFee ? (
+              <div className="bg-emerald-950/40 border border-emerald-500/30 rounded-2xl p-3.5 space-y-1.5 text-xs text-emerald-200">
+                <div className="flex items-center gap-2 font-bold text-emerald-300">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                  <span>Cancelamento Gratuito ({clientCancelModal.currentCancels + 1}º de 2 permitidos)</span>
+                </div>
+                <p className="text-[11px] text-slate-300 leading-relaxed">
+                  Você ainda tem direito a cancelamento sem custo. Ao confirmar, o horário das <strong>{clientCancelModal.timeSlot}</strong> será <strong className="text-emerald-400">liberado imediatamente</strong> para que outra pessoa possa agendar.
+                </p>
+                <p className="text-[10px] text-slate-400">
+                  Lembrete: Os 2 primeiros cancelamentos são 100% gratuitos. A partir do 3º cancelamento, é aplicada uma taxa de R$ 5,00.
+                </p>
+              </div>
+            ) : (
+              <div className="bg-rose-950/40 border border-rose-500/40 rounded-2xl p-3.5 space-y-2 text-xs text-rose-200">
+                <div className="flex items-center gap-2 font-extrabold text-rose-300">
+                  <AlertCircle className="w-4 h-4 text-rose-400" />
+                  <span>Taxa de Cancelamento: R$ 5,00 (3º+ Cancelamento)</span>
+                </div>
+                <p className="text-[11px] text-slate-300 leading-relaxed">
+                  Você já realizou <strong>{clientCancelModal.currentCancels} cancelamentos</strong> anteriores. Conforme as regras do salão, a partir do 3º cancelamento é gerada uma taxa de <strong>R$ 5,00</strong>.
+                </p>
+                <p className="text-[11px] text-slate-300 leading-relaxed">
+                  Ao confirmar, o horário será cancelado e ficará <strong className="text-emerald-400">LIVRE</strong> novamente para novos clientes.
+                </p>
+                
+                {/* Pix Fee Payment Box */}
+                <div className="bg-slate-950 p-3 rounded-xl border border-rose-500/30 space-y-1.5 mt-2">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                    Chave Pix para pagamento da Taxa de R$ 5,00:
+                  </span>
+                  <div className="flex items-center justify-between gap-2 bg-slate-900 px-2.5 py-1.5 rounded-lg border border-slate-800">
+                    <span className="font-mono text-xs text-amber-300 font-bold truncate">
+                      {safeConfig.chavePix || '11973395723'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(safeConfig.chavePix || '11973395723');
+                        alert('Chave Pix copiada com sucesso!');
+                      }}
+                      className="text-[10px] bg-rose-600 hover:bg-rose-500 text-white font-bold px-2 py-0.5 rounded cursor-pointer shrink-0"
+                    >
+                      Copiar Pix
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            <div className="pt-2 flex gap-2">
+              <button
+                type="button"
+                onClick={() => setClientCancelModal(null)}
+                className="flex-1 py-2.5 rounded-xl border border-slate-700 text-slate-300 font-bold hover:bg-slate-800 text-xs transition-colors cursor-pointer"
+              >
+                Voltar / Manter
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmClientCancellation}
+                className="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+                <span>Confirmar Cancelamento</span>
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

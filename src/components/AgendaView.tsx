@@ -75,6 +75,15 @@ export const AgendaView: React.FC<AgendaViewProps> = ({
   const [selectedProf, setSelectedProf] = useState(isFuncionario ? effectiveEmployee : (config.profs[0]?.nome || 'Michael'));
   const [price, setPrice] = useState('80');
   const [blockReason, setBlockReason] = useState('Horário de Almoço');
+  const [cancelingSlot, setCancelingSlot] = useState<{ date: string; time: string; ap?: Appointment } | null>(null);
+
+  const PRESET_BLOCK_REASONS = [
+    'Horário de Almoço',
+    'Salão Fechado',
+    'Motivos Especiais',
+    'Reunião de Equipe',
+    'Manutenção / Folga'
+  ];
 
   const currentDayAppointments = appointments[selectedDate] || {};
   const currentDayShift = timeAdjustments[selectedDate] || 0;
@@ -539,11 +548,12 @@ export const AgendaView: React.FC<AgendaViewProps> = ({
                       <span>Concluir</span>
                     </button>
                     <button
-                      onClick={() => onDeleteAppointment(selectedDate, timeBase)}
-                      className="bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold py-2 px-3 rounded-xl text-xs transition-colors flex items-center justify-center gap-1 border border-rose-200 cursor-pointer"
+                      onClick={() => setCancelingSlot({ date: selectedDate, time: timeBase, ap })}
+                      className="bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold py-2 px-3 rounded-xl text-xs transition-colors flex items-center justify-center gap-1 border border-rose-200 cursor-pointer shadow-2xs"
+                      title="Cancelar agendamento e liberar horário"
                     >
                       <X className="w-3.5 h-3.5" />
-                      <span>Cancelar</span>
+                      <span>Cancelar Agendamento</span>
                     </button>
                   </>
                 ) : status === 'bloqueado' ? (
@@ -555,9 +565,17 @@ export const AgendaView: React.FC<AgendaViewProps> = ({
                     <span>Desbloquear Horário</span>
                   </button>
                 ) : (
-                  <div className="w-full text-center text-xs font-bold text-purple-700 py-1 flex items-center justify-center gap-1">
-                    <CheckCircle2 className="w-4 h-4 text-purple-600" />
-                    <span>Atendimento Concluído com Sucesso</span>
+                  <div className="w-full flex items-center justify-between bg-purple-50 p-2 rounded-xl border border-purple-200">
+                    <span className="text-xs font-bold text-purple-700 flex items-center gap-1">
+                      <CheckCircle2 className="w-4 h-4 text-purple-600" />
+                      <span>Atendimento Concluído</span>
+                    </span>
+                    <button
+                      onClick={() => setCancelingSlot({ date: selectedDate, time: timeBase, ap })}
+                      className="text-[11px] text-rose-600 hover:text-rose-800 font-bold px-2 py-1 rounded bg-rose-100/60 hover:bg-rose-100 border border-rose-300 cursor-pointer"
+                    >
+                      Cancelar e Liberar
+                    </button>
                   </div>
                 )}
               </div>
@@ -580,7 +598,7 @@ export const AgendaView: React.FC<AgendaViewProps> = ({
                 <th className="p-3">Cliente / Motivo</th>
                 <th className="p-3">Serviço</th>
                 <th className="p-3">Profissional</th>
-                <th className="p-3 text-center w-48">Ações</th>
+                <th className="p-3 text-center min-w-[210px]">Ações</th>
               </tr>
             </thead>
 
@@ -707,18 +725,20 @@ export const AgendaView: React.FC<AgendaViewProps> = ({
 
                     {/* Actions */}
                     <td className="p-3 text-center">
-                      <div className="flex items-center justify-center gap-1.5">
+                      <div className="flex items-center justify-center gap-1.5 flex-wrap">
                         {status === 'livre' ? (
                           <>
                             <button
                               onClick={() => handleOpenBookModal(timeBase)}
-                              className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-2.5 py-1 rounded-md text-[11px] transition-colors flex items-center gap-1 cursor-pointer"
+                              className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-2.5 py-1.5 rounded-md text-[11px] transition-colors flex items-center gap-1 cursor-pointer shadow-xs"
+                              title="Agendar horário para cliente"
                             >
                               <Plus className="w-3 h-3" /> Agendar
                             </button>
                             <button
                               onClick={() => handleOpenBlockModal(timeBase)}
-                              className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-2 py-1 rounded-md text-[11px] transition-colors flex items-center gap-1 cursor-pointer"
+                              className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-2.5 py-1.5 rounded-md text-[11px] transition-colors flex items-center gap-1 cursor-pointer border border-slate-300"
+                              title="Bloquear horário (almoço, folga, salão fechado)"
                             >
                               <Lock className="w-3 h-3" /> Bloquear
                             </button>
@@ -728,29 +748,39 @@ export const AgendaView: React.FC<AgendaViewProps> = ({
                             <button
                               onClick={() => onConvertToPOS(ap)}
                               title="Concluir atendimento e lançar no Caixa"
-                              className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-2.5 py-1 rounded-md text-[11px] transition-colors flex items-center gap-1 shadow-xs cursor-pointer"
+                              className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-2.5 py-1.5 rounded-md text-[11px] transition-colors flex items-center gap-1 shadow-xs cursor-pointer"
                             >
                               <DollarSign className="w-3 h-3" /> Concluir
                             </button>
                             <button
-                              onClick={() => onDeleteAppointment(selectedDate, timeBase)}
-                              className="text-rose-600 hover:text-rose-800 p-1 rounded hover:bg-rose-50 cursor-pointer"
-                              title="Desmarcar / Cancelar"
+                              onClick={() => setCancelingSlot({ date: selectedDate, time: timeBase, ap })}
+                              className="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold px-2.5 py-1.5 rounded-md text-[11px] transition-colors flex items-center gap-1 cursor-pointer shadow-2xs"
+                              title="Cancelar agendamento e liberar horário para novos clientes"
                             >
-                              <X className="w-4 h-4" />
+                              <X className="w-3 h-3" /> Cancelar Agendamento
                             </button>
                           </>
                         ) : status === 'bloqueado' ? (
                           <button
                             onClick={() => onDeleteAppointment(selectedDate, timeBase)}
-                            className="text-xs text-rose-600 hover:text-rose-800 font-bold bg-rose-50 hover:bg-rose-100 px-2.5 py-1 rounded-md transition-colors cursor-pointer"
+                            className="text-xs text-rose-700 hover:text-rose-900 font-bold bg-rose-50 hover:bg-rose-100 border border-rose-200 px-3 py-1.5 rounded-md transition-colors cursor-pointer flex items-center gap-1"
+                            title="Desbloquear horário e deixar livre para agendamentos"
                           >
-                            Desbloquear
+                            <RotateCcw className="w-3 h-3" /> Desbloquear Horário
                           </button>
                         ) : (
-                          <span className="text-[11px] text-slate-500 font-semibold flex items-center gap-1 justify-center">
-                            <CheckCircle2 className="w-3 h-3 text-purple-600" /> Finalizado
-                          </span>
+                          <div className="flex items-center gap-1.5 justify-center">
+                            <span className="text-[11px] text-purple-700 font-bold bg-purple-50 px-2 py-1 rounded-md flex items-center gap-1 border border-purple-200">
+                              <CheckCircle2 className="w-3 h-3 text-purple-600" /> Finalizado
+                            </span>
+                            <button
+                              onClick={() => setCancelingSlot({ date: selectedDate, time: timeBase, ap })}
+                              className="text-[10px] text-rose-600 hover:text-rose-800 hover:bg-rose-50 font-bold px-1.5 py-1 rounded border border-rose-200 transition-colors cursor-pointer"
+                              title="Cancelar atendimento e reabrir horário livre"
+                            >
+                              Cancelar
+                            </button>
+                          </div>
                         )}
                       </div>
                     </td>
@@ -877,13 +907,29 @@ export const AgendaView: React.FC<AgendaViewProps> = ({
 
             <form onSubmit={handleConfirmBlock} className="space-y-3 text-xs">
               <div>
-                <label className="block font-bold text-slate-700 mb-1">Motivo do Bloqueio:</label>
+                <label className="block font-bold text-slate-700 mb-1.5">Escolha ou digite o Motivo do Bloqueio:</label>
+                <div className="flex flex-wrap gap-1.5 mb-2.5">
+                  {PRESET_BLOCK_REASONS.map(r => (
+                    <button
+                      key={r}
+                      type="button"
+                      onClick={() => setBlockReason(r)}
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-all cursor-pointer ${
+                        blockReason === r
+                          ? 'bg-rose-100 text-rose-800 border-rose-300 ring-1 ring-rose-400'
+                          : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
+                      }`}
+                    >
+                      {r}
+                    </button>
+                  ))}
+                </div>
                 <input
                   type="text"
                   required
                   value={blockReason}
                   onChange={(e) => setBlockReason(e.target.value)}
-                  placeholder="Ex: Horário de Almoço, Reunião..."
+                  placeholder="Ex: Horário de Almoço, Salão Fechado, Motivos Especiais..."
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 font-medium"
                 />
               </div>
@@ -892,7 +938,7 @@ export const AgendaView: React.FC<AgendaViewProps> = ({
                 <button
                   type="button"
                   onClick={() => setActiveModal(null)}
-                  className="flex-1 py-2 rounded-lg border border-slate-300 text-slate-700 font-bold hover:bg-slate-50"
+                  className="flex-1 py-2 rounded-lg border border-slate-300 text-slate-700 font-bold hover:bg-slate-50 cursor-pointer"
                 >
                   Cancelar
                 </button>
@@ -904,6 +950,64 @@ export const AgendaView: React.FC<AgendaViewProps> = ({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Cancel Appointment Confirmation Modal */}
+      {cancelingSlot && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl border border-slate-200 text-slate-800 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <AlertCircle className="w-5 h-5 text-rose-600" />
+                <span>Cancelar Agendamento</span>
+              </h3>
+              <button 
+                onClick={() => setCancelingSlot(null)} 
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-md"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="bg-rose-50 border border-rose-200 rounded-xl p-3.5 text-xs space-y-2 text-rose-900">
+              <p className="font-extrabold text-rose-800 text-sm">
+                Deseja cancelar este agendamento?
+              </p>
+              <p className="text-slate-600 leading-relaxed">
+                Ao confirmar o cancelamento, o horário das <strong>{cancelingSlot.time}</strong> no dia <strong>{cancelingSlot.date}</strong> ficará <span className="text-emerald-700 font-bold bg-emerald-100 px-1 py-0.5 rounded">LIVRE</span> imediatamente para que outros clientes possam agendar ou para o próprio estabelecimento agendar outro cliente.
+              </p>
+              {cancelingSlot.ap && (
+                <div className="pt-2 border-t border-rose-200/60 text-slate-700 space-y-1 text-[11px] bg-white/70 p-2.5 rounded-lg">
+                  <div><strong>Cliente:</strong> {cancelingSlot.ap.clientName || 'Cliente'}</div>
+                  {cancelingSlot.ap.clientPhone && <div><strong>WhatsApp:</strong> {cancelingSlot.ap.clientPhone}</div>}
+                  <div><strong>Serviço:</strong> {cancelingSlot.ap.serviceName || '-'}</div>
+                  <div><strong>Profissional:</strong> {cancelingSlot.ap.professionalName || '-'}</div>
+                </div>
+              )}
+            </div>
+
+            <div className="pt-2 flex gap-2">
+              <button
+                type="button"
+                onClick={() => setCancelingSlot(null)}
+                className="flex-1 py-2.5 rounded-xl border border-slate-300 text-slate-700 font-bold hover:bg-slate-50 text-xs transition-colors cursor-pointer"
+              >
+                Não, Manter
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onDeleteAppointment(cancelingSlot.date, cancelingSlot.time);
+                  setCancelingSlot(null);
+                }}
+                className="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+                <span>Sim, Cancelar e Liberar</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

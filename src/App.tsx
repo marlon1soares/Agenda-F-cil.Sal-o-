@@ -1026,6 +1026,9 @@ export function App() {
                 onAppointmentBooked={(date, timeSlot, ap) => {
                   handleSaveAppointment(date, timeSlot, ap);
                 }}
+                onAppointmentCancelled={(date, timeSlot) => {
+                  handleDeleteAppointment(date, timeSlot);
+                }}
                 onOpenCatalog={() => setIsCatalogOpen(true)}
                 onOpenLiveHub={() => setIsLiveHubOpen(true)}
               />

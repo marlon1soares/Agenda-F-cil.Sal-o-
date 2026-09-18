@@ -369,10 +369,7 @@ class SyncStore {
     if (updates.appointments && typeof updates.appointments === 'object') {
       mergedAppointments = { ...(this.state.appointments || {}) };
       Object.keys(updates.appointments).forEach((dateKey) => {
-        mergedAppointments[dateKey] = {
-          ...(mergedAppointments[dateKey] || {}),
-          ...updates.appointments![dateKey]
-        };
+        mergedAppointments[dateKey] = updates.appointments![dateKey];
       });
     }
 
