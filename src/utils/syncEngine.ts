@@ -38,9 +38,88 @@ class SyncEngine {
   private presenceInterval: any = null;
   private unsubscribeFirestore: (() => void) | null = null;
   private unsubscribePresence: (() => void) | null = null;
+  private activeSalonId: string = '';
+  private unsubscribeActiveSalon: (() => void) | null = null;
 
   public getClientId(): string {
     return CLIENT_ID;
+  }
+
+  public setActiveSalonId(salonId: string) {
+    if (!salonId) return;
+    if (this.activeSalonId === salonId && this.unsubscribeActiveSalon) return;
+    this.activeSalonId = salonId;
+
+    if (this.unsubscribeActiveSalon) {
+      try {
+        this.unsubscribeActiveSalon();
+      } catch {}
+      this.unsubscribeActiveSalon = null;
+    }
+
+    if (!db) return;
+
+    try {
+      const salonDocRef = doc(db, 'salons', salonId);
+      this.unsubscribeActiveSalon = onSnapshot(salonDocRef, (snap) => {
+        if (snap.exists()) {
+          const sData = snap.data();
+          if (sData) {
+            this.applySalonPartition(salonId, sData);
+          }
+        }
+      }, (err) => {
+        console.warn(`[SyncEngine] Firestore salon listener error (${salonId}):`, err);
+      });
+    } catch (err) {
+      console.warn(`[SyncEngine] Setup salon listener error:`, err);
+    }
+  }
+
+  public applySalonPartition(salonId: string, sData: any) {
+    if (!salonId || !sData) return;
+    try {
+      let changed = false;
+      if (sData.appointments) {
+        localStorage.setItem(`salaoAgenda_${salonId}`, JSON.stringify(sData.appointments));
+        if (salonId === 'salon-parcas') {
+          localStorage.setItem('salaoAgenda', JSON.stringify(sData.appointments));
+        }
+        changed = true;
+      }
+      if (sData.transactions && Array.isArray(sData.transactions)) {
+        localStorage.setItem(`salaoLancamentos_${salonId}`, JSON.stringify(sData.transactions));
+        changed = true;
+      }
+      if (sData.timeAdjustments) {
+        localStorage.setItem(`salaoAjustesHorarios_${salonId}`, JSON.stringify(sData.timeAdjustments));
+        changed = true;
+      }
+      if (sData.professionals && Array.isArray(sData.professionals)) {
+        localStorage.setItem(`salaoProfissionais_${salonId}`, JSON.stringify(sData.professionals));
+        changed = true;
+      }
+      if (sData.services && Array.isArray(sData.services)) {
+        localStorage.setItem(`salaoServicos_${salonId}`, JSON.stringify(sData.services));
+        changed = true;
+      }
+      if (sData.clients && Array.isArray(sData.clients)) {
+        localStorage.setItem(`salaoClientes_${salonId}`, JSON.stringify(sData.clients));
+        changed = true;
+      }
+      if (sData.caixaFechamentos && Array.isArray(sData.caixaFechamentos)) {
+        localStorage.setItem(`salao_fechamentos_caixa_${salonId}`, JSON.stringify(sData.caixaFechamentos));
+        changed = true;
+      }
+      if (sData.config) {
+        localStorage.setItem(`salaoConfig_${salonId}`, JSON.stringify(sData.config));
+        changed = true;
+      }
+
+      if (changed && typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('salao_sync_data', { detail: { source: 'remote', salonId } }));
+      }
+    } catch {}
   }
 
   public init() {
@@ -315,43 +394,54 @@ class SyncEngine {
 
     this.isApplyingRemote = true;
     try {
-      let appointmentsChanged = false;
-      let messagesChanged = false;
-
-      // 0. Multi-tenant Partitioned Salon Data
-      if (state.salonData && typeof state.salonData === 'object') {
+      // 0. Deletion of a specific salon (strictly remove that salon without touching others)
+      if (state.deletedSalonId) {
+        const dId = state.deletedSalonId;
         try {
-          Object.keys(state.salonData).forEach((sId) => {
-            const sData = (state.salonData as any)[sId];
-            if (!sData) return;
-            if (sData.appointments) {
-              localStorage.setItem(`salaoAgenda_${sId}`, JSON.stringify(sData.appointments));
+          localStorage.removeItem(`salaoConfig_${dId}`);
+          localStorage.removeItem(`salaoAgenda_${dId}`);
+          localStorage.removeItem(`salaoLancamentos_${dId}`);
+          localStorage.removeItem(`salao_fechamentos_caixa_${dId}`);
+          localStorage.removeItem(`salaoProfissionais_${dId}`);
+          localStorage.removeItem(`salaoServicos_${dId}`);
+          localStorage.removeItem(`salaoClientes_${dId}`);
+          localStorage.removeItem(`salaoAjustesHorarios_${dId}`);
+
+          const localSalonsRaw = localStorage.getItem('salaoAppsList');
+          if (localSalonsRaw) {
+            const list = JSON.parse(localSalonsRaw);
+            if (Array.isArray(list)) {
+              localStorage.setItem('salaoAppsList', JSON.stringify(list.filter((s: any) => s.id !== dId)));
             }
-            if (sData.transactions && Array.isArray(sData.transactions)) {
-              localStorage.setItem(`salaoLancamentos_${sId}`, JSON.stringify(sData.transactions));
-            }
-            if (sData.timeAdjustments) {
-              localStorage.setItem(`salaoAjustesHorarios_${sId}`, JSON.stringify(sData.timeAdjustments));
-            }
-            if (sData.professionals && Array.isArray(sData.professionals)) {
-              localStorage.setItem(`salaoProfissionais_${sId}`, JSON.stringify(sData.professionals));
-            }
-            if (sData.services && Array.isArray(sData.services)) {
-              localStorage.setItem(`salaoServicos_${sId}`, JSON.stringify(sData.services));
-            }
-            if (sData.clients && Array.isArray(sData.clients)) {
-              localStorage.setItem(`salaoClientes_${sId}`, JSON.stringify(sData.clients));
-            }
-            if (sData.caixaFechamentos && Array.isArray(sData.caixaFechamentos)) {
-              localStorage.setItem(`salao_fechamentos_caixa_${sId}`, JSON.stringify(sData.caixaFechamentos));
-            }
-            if (sData.config) {
-              localStorage.setItem(`salaoConfig_${sId}`, JSON.stringify(sData.config));
-            }
-          });
+          }
         } catch {}
       }
 
+      // 1. Multi-tenant Partitioned Salon Data
+      if (state.salonData && typeof state.salonData === 'object') {
+        Object.keys(state.salonData).forEach((sId) => {
+          const sData = (state.salonData as any)[sId];
+          if (sData) {
+            this.applySalonPartition(sId, sData);
+          }
+        });
+      }
+
+      // 2. Specific salon update via state.salonId
+      if (state.salonId) {
+        this.applySalonPartition(state.salonId, {
+          appointments: state.appointments,
+          transactions: state.transactions,
+          timeAdjustments: state.timeAdjustments,
+          professionals: state.professionals,
+          services: state.services,
+          clients: state.clients,
+          caixaFechamentos: state.caixaFechamentos,
+          config: state.config
+        });
+      }
+
+      // 3. Salons List (Multi-salon registry with independent preservation)
       if (state.salons && Array.isArray(state.salons) && state.salons.length > 0) {
         try { 
           const localSalonsRaw = localStorage.getItem('salaoAppsList');
@@ -360,37 +450,30 @@ class SyncEngine {
           if (Array.isArray(localSalons)) {
             localSalons.forEach((s: any) => { if (s && s.id) salonMap.set(s.id, s); });
           }
-          state.salons.forEach((s: any) => {
-            if (s && s.id) {
-              const existing = salonMap.get(s.id);
-              if (existing) {
-                // Strictly preserve local owner details and registration information
-                salonMap.set(s.id, {
-                  ...s,
-                  ...existing,
-                  name: existing.name || s.name,
-                  ownerName: existing.ownerName || s.ownerName,
-                  ownerPhone: existing.ownerPhone || s.ownerPhone,
-                  ownerEmail: existing.ownerEmail || s.ownerEmail,
-                  ownerCpf: existing.ownerCpf || s.ownerCpf,
-                  ownerRg: existing.ownerRg || s.ownerRg,
-                  cep: existing.cep || s.cep,
-                  logradouro: existing.logradouro || s.logradouro,
-                  numero: existing.numero || s.numero,
-                  bairro: existing.bairro || s.bairro,
-                  cidade: existing.cidade || s.cidade,
-                  uf: existing.uf || s.uf,
-                  config: {
-                    ...(s.config || {}),
-                    ...(existing.config || {})
-                  }
-                });
-              } else {
-                salonMap.set(s.id, s);
+          const mergedSalons = state.salons.map((remoteSalon: any) => {
+            const local = salonMap.get(remoteSalon.id);
+            if (!local) return remoteSalon;
+            return {
+              ...local,
+              ...remoteSalon,
+              name: remoteSalon.name || local.name,
+              ownerName: remoteSalon.ownerName || local.ownerName,
+              ownerPhone: remoteSalon.ownerPhone || local.ownerPhone,
+              ownerEmail: remoteSalon.ownerEmail || local.ownerEmail,
+              ownerCpf: remoteSalon.ownerCpf || local.ownerCpf,
+              ownerRg: remoteSalon.ownerRg || local.ownerRg,
+              cep: remoteSalon.cep || local.cep,
+              logradouro: remoteSalon.logradouro || local.logradouro,
+              numero: remoteSalon.numero || local.numero,
+              bairro: remoteSalon.bairro || local.bairro,
+              cidade: remoteSalon.cidade || local.cidade,
+              uf: remoteSalon.uf || local.uf,
+              config: {
+                ...(local.config || {}),
+                ...(remoteSalon.config || {})
               }
-            }
+            };
           });
-          const mergedSalons = Array.from(salonMap.values());
           localStorage.setItem('salaoAppsList', JSON.stringify(mergedSalons));
           mergedSalons.forEach((s: any) => {
             if (s && s.id && s.config) {
@@ -398,100 +481,6 @@ class SyncEngine {
             }
           });
         } catch {}
-      }
-      if (state.config && state.config.nomeSalao) {
-        try {
-          const currentConfigRaw = localStorage.getItem('salaoConfig');
-          if (currentConfigRaw) {
-            const currentConfig = JSON.parse(currentConfigRaw);
-            localStorage.setItem('salaoConfig', JSON.stringify({
-              ...state.config,
-              ...currentConfig,
-              nomeSalao: currentConfig.nomeSalao || state.config.nomeSalao
-            }));
-          } else {
-            localStorage.setItem('salaoConfig', JSON.stringify(state.config));
-          }
-        } catch {}
-      }
-      if (state.appointments && typeof state.appointments === 'object') {
-        appointmentsChanged = true;
-        try {
-          const localAgendaRaw = localStorage.getItem('salaoAgenda');
-          const localAgenda = localAgendaRaw ? JSON.parse(localAgendaRaw) : {};
-          const mergedAgenda = { ...localAgenda };
-          Object.keys(state.appointments).forEach((dateKey) => {
-            const localDateSlots = mergedAgenda[dateKey] || {};
-            const remoteDateSlots = state.appointments![dateKey] || {};
-            const mergedDateSlots = { ...localDateSlots };
-
-            Object.keys(remoteDateSlots).forEach((slotKey) => {
-              const localSlot = localDateSlots[slotKey];
-              const remoteSlot = remoteDateSlots[slotKey];
-
-              // If local slot is booked (has clientName or booked status), NEVER overwrite with empty/livre
-              if (localSlot && (localSlot.clientName || localSlot.status === 'agendado' || localSlot.status === 'em_atendimento' || localSlot.status === 'concluido')) {
-                if (remoteSlot && remoteSlot.clientName) {
-                  mergedDateSlots[slotKey] = { ...localSlot, ...remoteSlot };
-                } else {
-                  mergedDateSlots[slotKey] = localSlot;
-                }
-              } else {
-                mergedDateSlots[slotKey] = remoteSlot || localSlot;
-              }
-            });
-
-            mergedAgenda[dateKey] = mergedDateSlots;
-          });
-          localStorage.setItem('salaoAgenda', JSON.stringify(mergedAgenda));
-        } catch {}
-      }
-      if (state.transactions && Array.isArray(state.transactions)) {
-        try {
-          const localTxRaw = localStorage.getItem('salaoLancamentos');
-          const localTx = localTxRaw ? JSON.parse(localTxRaw) : [];
-          const txMap = new Map<string, any>();
-          if (Array.isArray(localTx)) {
-            localTx.forEach((t: any) => { if (t && t.id) txMap.set(t.id, t); });
-          }
-          state.transactions.forEach((t: any) => {
-            if (t && t.id) {
-              const existing = txMap.get(t.id);
-              txMap.set(t.id, existing ? { ...t, ...existing } : t);
-            }
-          });
-          localStorage.setItem('salaoLancamentos', JSON.stringify(Array.from(txMap.values())));
-        } catch {}
-      }
-      if (state.caixaFechamentos && Array.isArray(state.caixaFechamentos)) {
-        try {
-          const localFechRaw = localStorage.getItem('salao_fechamentos_caixa');
-          const localFech = localFechRaw ? JSON.parse(localFechRaw) : [];
-          const fechMap = new Map<string, any>();
-          if (Array.isArray(localFech)) {
-            localFech.forEach((f: any) => { if (f && f.id) fechMap.set(f.id, f); });
-          }
-          state.caixaFechamentos.forEach((f: any) => {
-            if (f && f.id) {
-              const existing = fechMap.get(f.id);
-              fechMap.set(f.id, existing ? { ...f, ...existing } : f);
-            }
-          });
-          const mergedFech = Array.from(fechMap.values());
-          localStorage.setItem('salao_fechamentos_caixa', JSON.stringify(mergedFech));
-        } catch {}
-      }
-      if (state.timeAdjustments) {
-        try { localStorage.setItem('salaoAjustesHorarios', JSON.stringify(state.timeAdjustments)); } catch {}
-      }
-      if (state.professionals && Array.isArray(state.professionals) && state.professionals.length > 0) {
-        try { localStorage.setItem('salaoProfissionais', JSON.stringify(state.professionals)); } catch {}
-      }
-      if (state.services && Array.isArray(state.services) && state.services.length > 0) {
-        try { localStorage.setItem('salaoServicos', JSON.stringify(state.services)); } catch {}
-      }
-      if (state.clients && Array.isArray(state.clients)) {
-        try { localStorage.setItem('salaoClientes', JSON.stringify(state.clients)); } catch {}
       }
       if (state.adminPaymentConfig && state.adminPaymentConfig.chavePix) {
         try { localStorage.setItem('salaoAdminPaymentConfig', JSON.stringify(state.adminPaymentConfig)); } catch {}
@@ -545,7 +534,6 @@ class SyncEngine {
         } catch {}
       }
       if (state.messages && Array.isArray(state.messages)) {
-        messagesChanged = true;
         try { localStorage.setItem('salaoMessages', JSON.stringify(state.messages)); } catch {}
       }
       if (state.notices && Array.isArray(state.notices)) {
@@ -594,6 +582,13 @@ class SyncEngine {
         if (toSend.salonId && toSend.salonData && (toSend.salonData as any)[toSend.salonId]) {
           const salonDocRef = doc(db, 'salons', toSend.salonId);
           setDoc(salonDocRef, sanitizeForFirestore({ ...(toSend.salonData as any)[toSend.salonId], lastUpdated: Date.now() }), { merge: true }).catch(() => {});
+        }
+
+        if (toSend.deletedSalonId) {
+          try {
+            const delRef = doc(db, 'salons', toSend.deletedSalonId);
+            deleteDoc(delRef).catch(() => {});
+          } catch {}
         }
       } catch (err) {
         console.warn('[SyncEngine] Error triggering Firestore setDoc:', err);
@@ -650,6 +645,13 @@ class SyncEngine {
         if (toSend.salonId && toSend.salonData && (toSend.salonData as any)[toSend.salonId]) {
           const salonDocRef = doc(db, 'salons', toSend.salonId);
           setDoc(salonDocRef, sanitizeForFirestore({ ...(toSend.salonData as any)[toSend.salonId], lastUpdated: Date.now() }), { merge: true }).catch(() => {});
+        }
+
+        if (toSend.deletedSalonId) {
+          try {
+            const delRef = doc(db, 'salons', toSend.deletedSalonId);
+            deleteDoc(delRef).catch(() => {});
+          } catch {}
         }
       } catch (err) {
         console.warn('[SyncEngine] Firestore debounced push error:', err);

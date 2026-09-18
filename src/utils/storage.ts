@@ -143,8 +143,10 @@ export const Storage = {
   saveConfig(config: SalonConfig, salonId?: string) {
     const effectiveSalonId = salonId || safeGetItem('salao_active_id') || 'salon-parcas';
 
-    // 1. Global config fallback
-    safeSetItem('salaoConfig', JSON.stringify(config));
+    // 1. Global config fallback (only for salon-parcas)
+    if (effectiveSalonId === 'salon-parcas') {
+      safeSetItem('salaoConfig', JSON.stringify(config));
+    }
 
     // 2. Dedicated storage key for the individual salon
     if (effectiveSalonId) {
@@ -153,10 +155,8 @@ export const Storage = {
 
     // 3. Update the specific salon in salaoAppsList
     const currentSalons = this.getSalons();
-    let updated = false;
     const updatedSalons = currentSalons.map(s => {
       if (s.id === effectiveSalonId) {
-        updated = true;
         return {
           ...s,
           name: config.nomeSalao || s.name,
@@ -166,20 +166,15 @@ export const Storage = {
       return s;
     });
 
-    if (!updated && currentSalons.length > 0) {
-      updatedSalons[0] = {
-        ...updatedSalons[0],
-        name: config.nomeSalao || updatedSalons[0].name,
-        config: config
-      };
-    }
-
     safeSetItem('salaoAppsList', JSON.stringify(updatedSalons));
 
     // 4. Push updates to syncEngine with immediate persistence (Firestore + SSE)
     syncEngine.pushUpdateImmediate({ 
-      config, 
-      salons: updatedSalons 
+      salonId: effectiveSalonId,
+      salons: updatedSalons,
+      salonData: {
+        [effectiveSalonId]: { config }
+      }
     });
 
     if (typeof window !== 'undefined') {
@@ -959,7 +954,26 @@ export const Storage = {
   deleteSalonApp(id: string): SalonApp[] {
     const current = this.getSalons();
     const updated = current.filter(s => s.id !== id);
-    this.saveSalons(updated);
+
+    try {
+      localStorage.removeItem(`salaoConfig_${id}`);
+      localStorage.removeItem(`salaoAgenda_${id}`);
+      localStorage.removeItem(`salaoLancamentos_${id}`);
+      localStorage.removeItem(`salao_fechamentos_caixa_${id}`);
+      localStorage.removeItem(`salaoProfissionais_${id}`);
+      localStorage.removeItem(`salaoServicos_${id}`);
+      localStorage.removeItem(`salaoClientes_${id}`);
+      localStorage.removeItem(`salaoAjustesHorarios_${id}`);
+    } catch {}
+
+    safeSetItem('salaoAppsList', JSON.stringify(updated));
+    syncEngine.pushUpdateImmediate({ 
+      salons: updated,
+      deletedSalonId: id
+    });
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('salao_sync_data', { detail: { key: 'salaoAppsList', deletedSalonId: id } }));
+    }
     return updated;
   },
 

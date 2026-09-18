@@ -377,7 +377,7 @@ export function App() {
           if (targetSalon) {
             setActiveSalonId(targetSalon.id);
             setConfig(targetSalon.config);
-            Storage.saveConfig(targetSalon.config);
+            Storage.saveConfig(targetSalon.config, targetSalon.id);
             if (roleParam === 'funcionario' || roleParam === 'equipe') {
               setUserRole('funcionario');
               setActiveTab('agenda');
@@ -430,7 +430,19 @@ export function App() {
 
   // Sync state event listener
   useEffect(() => {
-    const handleSync = () => {
+    if (activeSalonId) {
+      syncEngine.setActiveSalonId(activeSalonId);
+    }
+
+    const handleSync = (e?: any) => {
+      // If event targets a specific different salon, don't overwrite current salon's active state
+      if (e?.detail?.salonId && e.detail.salonId !== activeSalonId) {
+        if (e.detail.key === 'salaoAppsList' || !e.detail.key) {
+          setSalons(Storage.getSalons());
+        }
+        return;
+      }
+
       const currentSalons = Storage.getSalons();
       setSalons(currentSalons);
       const active = currentSalons.find(s => s.id === activeSalonId);

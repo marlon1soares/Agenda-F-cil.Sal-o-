@@ -22,6 +22,7 @@ export interface SyncDatabaseState {
   caixaFechamentos?: any[];
   salonData?: Record<string, any>;
   salonId?: string;
+  deletedSalonId?: string;
   lastUpdated: number;
 }
 
@@ -399,12 +400,37 @@ class SyncStore {
       });
     }
 
+    if (updates.deletedSalonId) {
+      if (mergedSalons) {
+        mergedSalons = mergedSalons.filter((s: any) => s.id !== updates.deletedSalonId);
+      }
+      if (mergedSalonData && mergedSalonData[updates.deletedSalonId]) {
+        delete mergedSalonData[updates.deletedSalonId];
+      }
+    }
+
+    if (updates.salonId) {
+      const sId = updates.salonId;
+      mergedSalonData[sId] = {
+        ...(mergedSalonData[sId] || {}),
+        ...(updates.salonData && updates.salonData[sId] ? updates.salonData[sId] : {}),
+        ...(updates.appointments ? { appointments: updates.appointments } : {}),
+        ...(updates.transactions ? { transactions: updates.transactions } : {}),
+        ...(updates.config ? { config: updates.config } : {}),
+        ...(updates.timeAdjustments ? { timeAdjustments: updates.timeAdjustments } : {}),
+        ...(updates.professionals ? { professionals: updates.professionals } : {}),
+        ...(updates.services ? { services: updates.services } : {}),
+        ...(updates.clients ? { clients: updates.clients } : {}),
+        ...(updates.caixaFechamentos ? { caixaFechamentos: updates.caixaFechamentos } : {})
+      };
+    }
+
     this.state = {
       ...this.state,
       ...updates,
       salons: updates.salons ? mergedSalons : this.state.salons,
-      appointments: updates.appointments ? mergedAppointments : this.state.appointments,
-      transactions: updates.transactions ? mergedTransactions : this.state.transactions,
+      appointments: (!updates.salonId || updates.salonId === 'salon-parcas') && updates.appointments ? mergedAppointments : this.state.appointments,
+      transactions: (!updates.salonId || updates.salonId === 'salon-parcas') && updates.transactions ? mergedTransactions : this.state.transactions,
       salonData: mergedSalonData,
       lastUpdated: Date.now()
     };

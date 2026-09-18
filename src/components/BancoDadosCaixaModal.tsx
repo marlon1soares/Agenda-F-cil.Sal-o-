@@ -1156,7 +1156,7 @@ export const BancoDadosCaixaModal: React.FC<BancoDadosCaixaModalProps> = ({
                                           <div className="flex flex-wrap gap-1">
                                             {tx.commissions.map(c => (
                                               <span key={c.professionalName} className="bg-slate-100 text-slate-700 px-1 py-0.5 rounded font-bold">
-                                                {c.professionalName}: R$ {c.amount.toFixed(2)}
+                                                {c.professionalName} ({c.percentage}%): R$ {c.amount.toFixed(2)}
                                               </span>
                                             ))}
                                           </div>
@@ -1421,7 +1421,7 @@ export const BancoDadosCaixaModal: React.FC<BancoDadosCaixaModalProps> = ({
                                         <div className="flex flex-wrap gap-1">
                                           {tx.commissions.map(c => (
                                             <span key={c.professionalName} className="bg-slate-100 text-slate-700 px-1 py-0.5 rounded font-bold">
-                                              {c.professionalName}: R$ {c.amount.toFixed(2)}
+                                              {c.professionalName} ({c.percentage}%): R$ {c.amount.toFixed(2)}
                                             </span>
                                           ))}
                                         </div>

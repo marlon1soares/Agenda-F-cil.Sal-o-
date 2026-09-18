@@ -28,6 +28,7 @@ export interface FullSyncState {
     caixaFechamentos?: CaixaFechamentoCiclo[];
   }>;
   salonId?: string;
+  deletedSalonId?: string;
   lastSenderId?: string;
   lastUpdated: number;
 }
