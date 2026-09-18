@@ -172,6 +172,7 @@ export function App() {
   const [professionals, setProfessionals] = useState<Professional[]>(() => Storage.getProfessionals(activeSalonId));
   const [services, setServices] = useState<ServiceItem[]>(() => Storage.getServices(activeSalonId));
   const [clients, setClients] = useState<ClientRecord[]>(() => Storage.getClients(activeSalonId));
+  const [pendingAppointmentToLaunch, setPendingAppointmentToLaunch] = useState<Appointment | null>(null);
 
   // Window State
   const [isExpanded, setIsExpanded] = useState(false);
@@ -667,37 +668,10 @@ export function App() {
     Storage.saveTimeAdjustments(updatedShifts, activeSalonId);
   };
 
-  // Convert completed appointment directly into POS Launch
+  // Convert completed appointment directly into POS Launch:
+  // Preloads the procedure into Caixa for payment method selection (Cartão, Plano Mensal, Pix, etc.)
   const handleConvertAppointmentToPOS = (ap: Appointment) => {
-    const now = new Date();
-    const timeStr = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-    const netAmount = ap.price || 0;
-
-    const commissions = config.profs.map(p => ({
-      professionalId: p.id || `prof-${p.nome}`,
-      professionalName: p.nome,
-      percentage: p.porc,
-      amount: netAmount * (p.porc / 100)
-    }));
-
-    const newTx: Transaction = {
-      id: `tx-${Date.now()}`,
-      date: ap.date,
-      time: timeStr,
-      description: `${ap.serviceName || 'Atendimento Agenda'} - ${ap.clientName || 'Cliente'}`,
-      grossAmount: ap.price || 0,
-      cardFeePercent: 0,
-      netAmount,
-      paymentMethod: 'pix',
-      clientName: ap.clientName,
-      commissions,
-      createdBy: userRole
-    };
-
-    handleAddTransaction(newTx);
-
-    // Update appointment status to 'concluido'
-    handleSaveAppointment(ap.date, ap.timeSlot, { ...ap, status: 'concluido' });
+    setPendingAppointmentToLaunch(ap);
     setActiveTab('caixa');
   };
 
@@ -1346,6 +1320,9 @@ export function App() {
                     config={config}
                     userRole={userRole}
                     salonId={activeSalonId}
+                    pendingAppointment={pendingAppointmentToLaunch}
+                    onClearPendingAppointment={() => setPendingAppointmentToLaunch(null)}
+                    onCompleteAppointment={(date, timeSlot, ap) => handleSaveAppointment(date, timeSlot, ap)}
                     onAddTransaction={handleAddTransaction}
                     onDeleteTransaction={handleDeleteTransaction}
                     onClearAllTransactions={handleClearAllTransactions}

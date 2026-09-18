@@ -1,6 +1,6 @@
 export type UserRole = 'admin' | 'salao' | 'funcionario' | 'cliente';
 
-export type PaymentMethod = 'pix' | 'cartao_credito' | 'cartao_debito' | 'dinheiro' | 'outro';
+export type PaymentMethod = 'pix' | 'cartao_credito' | 'cartao_debito' | 'dinheiro' | 'plano_mensal' | 'outro';
 
 export interface StaffCommission {
   professionalId: string;

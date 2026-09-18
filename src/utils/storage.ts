@@ -2,7 +2,7 @@ import {
   SalonConfig, Transaction, Appointment, Professional, ServiceItem, ClientRecord, 
   CatalogMedia, CatalogFolder, AdminCredentials, SalonApp, AdminPaymentConfig,
   ChatMessage, SystemBroadcastNotice, LivePresenceUser, EmployeeFechamentoRecord,
-  CaixaFechamentoCiclo
+  CaixaFechamentoCiclo, PaymentMethod
 } from '../types';
 import { DEFAULT_CONFIG, DEFAULT_PROFESSIONALS, DEFAULT_SERVICES, DEFAULT_CLIENTS, INITIAL_TRANSACTIONS, INITIAL_APPOINTMENTS, INITIAL_CATALOG, DEFAULT_SALON_APPS } from '../data/mockData';
 import { DEFAULT_SCHEDULE_CONFIG } from './schedule';
@@ -1030,12 +1030,22 @@ export const Storage = {
 };
 
 // Natural language command parser for POS
-export function parsePOSCommand(cmd: string, userRole: 'admin' | 'salao', profsConfig: { id?: string; nome: string; porc: number }[]): Transaction | null {
+export function parsePOSCommand(
+  cmd: string,
+  userRole: 'admin' | 'salao',
+  profsConfig: { id?: string; nome: string; porc: number }[],
+  options?: {
+    defaultClientName?: string;
+    overridePaymentMethod?: PaymentMethod | 'plano_mensal';
+    overrideCardFee?: number;
+    specificProfessionalName?: string;
+  }
+): Transaction | null {
   if (!cmd || !cmd.trim()) return null;
   let text = cmd.trim();
 
   // Extract card/tax fee percentage if present (e.g. "cartão 5%" or "5%")
-  let cardFeePercent = 0;
+  let cardFeePercent = options?.overrideCardFee !== undefined ? options.overrideCardFee : 0;
   const taxMatch = text.match(/(\d+(?:[\.,]\d+)?)%/);
   if (taxMatch) {
     cardFeePercent = parseFloat(taxMatch[1].replace(',', '.'));
@@ -1043,11 +1053,20 @@ export function parsePOSCommand(cmd: string, userRole: 'admin' | 'salao', profsC
   }
 
   // Detect Payment method
-  let paymentMethod: any = 'pix';
-  if (/\b(cartao|cartão|credito|crédito)\b/i.test(text)) paymentMethod = 'cartao_credito';
-  else if (/\b(debito|débito)\b/i.test(text)) paymentMethod = 'cartao_debito';
-  else if (/\b(dinheiro|especie|espécie)\b/i.test(text)) paymentMethod = 'dinheiro';
-  else if (/\b(pix)\b/i.test(text)) paymentMethod = 'pix';
+  let paymentMethod: PaymentMethod = 'pix';
+  if (options?.overridePaymentMethod) {
+    paymentMethod = options.overridePaymentMethod as PaymentMethod;
+  } else if (/\b(cartao|cartão|credito|crédito)\b/i.test(text)) {
+    paymentMethod = 'cartao_credito';
+  } else if (/\b(debito|débito)\b/i.test(text)) {
+    paymentMethod = 'cartao_debito';
+  } else if (/\b(dinheiro|especie|espécie)\b/i.test(text)) {
+    paymentMethod = 'dinheiro';
+  } else if (/\b(plano\s*mensal|plano)\b/i.test(text)) {
+    paymentMethod = 'plano_mensal';
+  } else if (/\b(pix)\b/i.test(text)) {
+    paymentMethod = 'pix';
+  }
 
   // Extract numbers
   const numberMatches = text.match(/\b\d+(?:[\.,]\d+)?\b/g);
@@ -1061,16 +1080,18 @@ export function parsePOSCommand(cmd: string, userRole: 'admin' | 'salao', profsC
   }
 
   // Clean description
-  let description = text.replace(/\b(cartao|cartão|debito|débito|credito|crédito|pix|taxa|no|na)\b/gi, '').trim();
+  let description = text.replace(/\b(cartao|cartão|debito|débito|credito|crédito|pix|dinheiro|taxa|no|na)\b/gi, '').trim();
   if (!description) description = "Procedimento do Salão";
 
   // Check if monthly plan formula applies (1/8 calculation)
-  const isMonthlyPlan = /\b(plano|mensal)\b/i.test(description);
+  const isMonthlyPlan = paymentMethod === 'plano_mensal' || /\b(plano\s*mensal|plano)\b/i.test(description) || /\b(plano\s*mensal|plano)\b/i.test(cmd);
   let grossAmount = typedValue;
 
   if (isMonthlyPlan && typedValue > 0) {
     grossAmount = typedValue / 8;
-    description += ` (1/8 de R$ ${typedValue.toFixed(2)})`;
+    if (!description.includes('(1/8')) {
+      description += ` (1/8 de R$ ${typedValue.toFixed(2)})`;
+    }
   }
 
   const now = new Date();
@@ -1079,13 +1100,22 @@ export function parsePOSCommand(cmd: string, userRole: 'admin' | 'salao', profsC
 
   const netAmount = grossAmount * (1 - (cardFeePercent / 100));
 
-  // Split commissions according to salon setup
-  const commissions = profsConfig.map(p => ({
-    professionalId: p.id || `prof-${p.nome}`,
-    professionalName: p.nome,
-    percentage: p.porc,
-    amount: netAmount * (p.porc / 100)
-  }));
+  // Split commissions according to salon setup or specific professional who performed the service
+  const matchingProf = options?.specificProfessionalName
+    ? profsConfig.find(p => p.nome.toLowerCase() === options.specificProfessionalName!.toLowerCase())
+    : undefined;
+
+  const commissions = profsConfig.map(p => {
+    // If specific professional did the appointment, prioritize calculating their commission
+    const isMatched = matchingProf ? (p.nome.toLowerCase() === matchingProf.nome.toLowerCase()) : true;
+    const effectivePct = isMatched ? p.porc : 0;
+    return {
+      professionalId: p.id || `prof-${p.nome}`,
+      professionalName: p.nome,
+      percentage: p.porc,
+      amount: netAmount * (effectivePct / 100)
+    };
+  });
 
   return {
     id: `tx-${Date.now()}`,
@@ -1096,6 +1126,7 @@ export function parsePOSCommand(cmd: string, userRole: 'admin' | 'salao', profsC
     cardFeePercent,
     netAmount,
     paymentMethod,
+    clientName: options?.defaultClientName,
     commissions,
     createdBy: userRole
   };

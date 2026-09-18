@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
-import { Transaction, SalonConfig, UserRole, CaixaFechamentoCiclo } from '../types';
+import React, { useState, useEffect, useRef } from 'react';
+import { Transaction, SalonConfig, UserRole, CaixaFechamentoCiclo, Appointment, PaymentMethod } from '../types';
 import { parsePOSCommand, Storage } from '../utils/storage';
 import { exportToExcel, exportToWord } from '../utils/exporters';
-import { CreditCard, Trash2, FileSpreadsheet, FileText, Send, Sparkles, Filter, X, FolderOpen, Settings, CheckCircle2, Lock, Database, Calendar as CalendarIcon, ShieldCheck } from 'lucide-react';
+import { CreditCard, Trash2, FileSpreadsheet, FileText, Send, Sparkles, Filter, X, FolderOpen, Settings, CheckCircle2, Lock, Database, Calendar as CalendarIcon, ShieldCheck, Zap, Coins, Check, UserCheck, AlertCircle } from 'lucide-react';
 import { BancoDadosCaixaModal } from './BancoDadosCaixaModal';
 
 interface CaixaViewProps {
@@ -10,6 +10,9 @@ interface CaixaViewProps {
   config: SalonConfig;
   userRole: UserRole;
   salonId?: string;
+  pendingAppointment?: Appointment | null;
+  onClearPendingAppointment?: () => void;
+  onCompleteAppointment?: (date: string, timeSlot: string, ap: Appointment) => void;
   onAddTransaction: (tx: Transaction) => void;
   onDeleteTransaction: (id: string) => void;
   onClearAllTransactions: () => void;
@@ -22,6 +25,9 @@ export const CaixaView: React.FC<CaixaViewProps> = ({
   config,
   userRole,
   salonId,
+  pendingAppointment,
+  onClearPendingAppointment,
+  onCompleteAppointment,
   onAddTransaction,
   onDeleteTransaction,
   onClearAllTransactions,
@@ -32,19 +38,114 @@ export const CaixaView: React.FC<CaixaViewProps> = ({
   const [filterQuery, setFilterQuery] = useState('');
   const [isBancoDadosOpen, setIsBancoDadosOpen] = useState(false);
   const [showConfirmClearModal, setShowConfirmClearModal] = useState(false);
+  const [activePaymentMethod, setActivePaymentMethod] = useState<'pix' | 'cartao' | 'plano_mensal' | 'dinheiro' | null>(null);
+  const [cardTaxPercent, setCardTaxPercent] = useState<number>(5);
+  const [launchSuccessNotice, setLaunchSuccessNotice] = useState<string | null>(null);
+  const [showCompletionModal, setShowCompletionModal] = useState<boolean>(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const modalInputRef = useRef<HTMLInputElement>(null);
+
+  // When a pending appointment arrives from "Concluir" on Agenda
+  useEffect(() => {
+    if (pendingAppointment) {
+      const sName = pendingAppointment.serviceName || 'Procedimento';
+      const sPrice = pendingAppointment.price ? `${pendingAppointment.price}` : '';
+      setCommandInput(`${sName} ${sPrice}`.trim());
+      setActivePaymentMethod('pix');
+      setShowCompletionModal(true);
+      setTimeout(() => {
+        inputRef.current?.focus();
+        modalInputRef.current?.focus();
+      }, 150);
+    }
+  }, [pendingAppointment]);
+
+  const handleSelectPaymentMethodQuick = (method: 'pix' | 'cartao' | 'plano_mensal' | 'dinheiro') => {
+    setActivePaymentMethod(method);
+    let cur = commandInput.trim();
+    if (!cur) return;
+
+    if (method === 'cartao') {
+      if (!cur.match(/\b(cartao|cartão|credito|crédito|debito|débito)\b/i)) {
+        cur = cur.replace(/\b(pix|dinheiro|especie|espécie|plano\s*mensal|plano)\b/gi, '').trim();
+        setCommandInput(`${cur} cartão ${cardTaxPercent}%`.trim());
+      }
+    } else if (method === 'plano_mensal') {
+      if (!cur.match(/\b(plano\s*mensal|plano)\b/i)) {
+        cur = cur.replace(/\b(cartao|cartão|debito|débito|credito|crédito|pix|dinheiro|taxa\s*\d+%?)\b/gi, '').trim();
+        setCommandInput(`plano mensal ${cur}`.trim());
+      }
+    } else if (method === 'pix') {
+      if (!cur.match(/\b(pix)\b/i)) {
+        cur = cur.replace(/\b(cartao|cartão|debito|débito|credito|crédito|dinheiro|plano\s*mensal|plano|taxa\s*\d+%?)\b/gi, '').trim();
+        setCommandInput(`${cur} pix`.trim());
+      }
+    } else if (method === 'dinheiro') {
+      if (!cur.match(/\b(dinheiro|especie|espécie)\b/i)) {
+        cur = cur.replace(/\b(cartao|cartão|debito|débito|credito|crédito|pix|plano\s*mensal|plano|taxa\s*\d+%?)\b/gi, '').trim();
+        setCommandInput(`${cur} dinheiro`.trim());
+      }
+    }
+  };
 
   const handleLaunchCommand = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (!commandInput.trim()) return;
-
-    const newTx = parsePOSCommand(commandInput, userRole, config.profs);
-    if (!newTx || newTx.grossAmount <= 0) {
-      alert("Por favor, informe uma descrição e um valor numérico válido (Ex: 'corte e barba 80' ou 'plano mensal 160').");
+    const textToParse = commandInput.trim();
+    if (!textToParse) {
+      alert("Por favor, digite o procedimento e o valor (Ex: 'unhas 34', 'barba 50 cartão 5%' ou 'plano mensal 80').");
       return;
+    }
+
+    let overrideMethod: PaymentMethod | 'plano_mensal' | undefined = undefined;
+    let overrideFee: number | undefined = undefined;
+
+    if (activePaymentMethod === 'pix') overrideMethod = 'pix';
+    else if (activePaymentMethod === 'cartao') {
+      overrideMethod = 'cartao_credito';
+      overrideFee = cardTaxPercent;
+    } else if (activePaymentMethod === 'plano_mensal') {
+      overrideMethod = 'plano_mensal';
+    } else if (activePaymentMethod === 'dinheiro') {
+      overrideMethod = 'dinheiro';
+    }
+
+    const newTx = parsePOSCommand(textToParse, userRole, config.profs, {
+      defaultClientName: pendingAppointment?.clientName,
+      overridePaymentMethod: overrideMethod,
+      overrideCardFee: overrideFee,
+      specificProfessionalName: pendingAppointment?.professionalName
+    });
+
+    if (!newTx || newTx.grossAmount <= 0) {
+      alert("Por favor, informe uma descrição e um valor numérico válido (Ex: 'unhas 34', 'barba 50 cartão 5%' ou 'plano mensal 80').");
+      return;
+    }
+
+    if (pendingAppointment) {
+      newTx.clientName = pendingAppointment.clientName;
+      if (pendingAppointment.date) {
+        newTx.date = pendingAppointment.date;
+      }
+      if (onCompleteAppointment) {
+        onCompleteAppointment(pendingAppointment.date, pendingAppointment.timeSlot, {
+          ...pendingAppointment,
+          status: 'concluido'
+        });
+      }
+      if (onClearPendingAppointment) {
+        onClearPendingAppointment();
+      }
+      setLaunchSuccessNotice(`Atendimento de ${pendingAppointment.clientName} concluído com sucesso e lançado no caixa!`);
+      setTimeout(() => setLaunchSuccessNotice(null), 5000);
+    } else {
+      setLaunchSuccessNotice(`Lançamento realizado no caixa com sucesso: R$ ${newTx.grossAmount.toFixed(2)}!`);
+      setTimeout(() => setLaunchSuccessNotice(null), 4000);
     }
 
     onAddTransaction(newTx);
     setCommandInput('');
+    setActivePaymentMethod(null);
+    setShowCompletionModal(false);
   };
 
   // Filtered transactions (including both active and cancelled for export)
@@ -195,35 +296,377 @@ export const CaixaView: React.FC<CaixaViewProps> = ({
   return (
     <div className="space-y-6">
       
+      {/* Toast Notice for Launch or Fechamento */}
+      {launchSuccessNotice && (
+        <div className="bg-emerald-600 text-white p-3.5 rounded-2xl shadow-lg flex items-center justify-between gap-3 animate-in fade-in slide-in-from-top-2">
+          <div className="flex items-center gap-2 font-bold text-xs sm:text-sm">
+            <CheckCircle2 className="w-5 h-5 shrink-0 text-emerald-200" />
+            <span>{launchSuccessNotice}</span>
+          </div>
+          <button
+            onClick={() => setLaunchSuccessNotice(null)}
+            className="text-white/80 hover:text-white p-1 rounded-lg hover:bg-white/10"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
       {/* Instructions & POS Command Input Box */}
-      <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-xs space-y-3">
+      <div id="caixa-pos-input-section" className={`bg-white p-4 sm:p-5 rounded-2xl border ${pendingAppointment ? 'border-emerald-400 ring-2 ring-emerald-400/30' : 'border-slate-200'} shadow-xs space-y-3.5 transition-all`}>
+        
+        {/* Pending Appointment Banner if coming from "Concluir" on Agenda */}
+        {pendingAppointment && (
+          <div className="bg-emerald-50 border border-emerald-300 p-3 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 shadow-xs animate-in fade-in">
+            <div className="flex items-start sm:items-center gap-2.5">
+              <div className="w-7 h-7 rounded-lg bg-emerald-600 text-white flex items-center justify-center shrink-0 font-bold text-xs shadow-xs">
+                $
+              </div>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-extrabold text-xs sm:text-sm text-emerald-950">
+                    Concluindo Atendimento: {pendingAppointment.clientName}
+                  </span>
+                  <span className="bg-emerald-200 text-emerald-900 text-[10px] font-extrabold px-2 py-0.5 rounded-full">
+                    Horário: {pendingAppointment.timeSlot}
+                  </span>
+                </div>
+                <p className="text-xs text-emerald-800 mt-0.5 font-medium">
+                  Procedimento marcado: <b>{pendingAppointment.serviceName || 'Atendimento'}</b>
+                  {pendingAppointment.professionalName && (
+                    <span> • Profissional: <b>{pendingAppointment.professionalName}</b></span>
+                  )}
+                  {pendingAppointment.price ? (
+                    <span> • Valor base: <b>R$ {Number(pendingAppointment.price).toFixed(2)}</b></span>
+                  ) : null}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 self-end sm:self-auto">
+              <button
+                type="button"
+                onClick={() => setShowCompletionModal(true)}
+                className="text-xs font-bold text-emerald-700 hover:text-emerald-900 bg-emerald-100/70 hover:bg-emerald-200/80 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
+              >
+                Abrir na Janela
+              </button>
+              <button
+                type="button"
+                onClick={onClearPendingAppointment}
+                className="text-xs font-bold text-slate-500 hover:text-rose-600 px-2 py-1 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+                title="Descartar conclusão e voltar ao modo manual"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
-          <div className="text-xs text-slate-500 font-medium">
-            Digite o procedimento (ex: <i className="text-slate-700">unhas 34</i>, <i className="text-slate-700">barba 50 cartão 5%</i> ou <i className="text-slate-700">plano mensal 80</i>):
+          <div className="text-xs text-slate-600 font-medium">
+            Digite o procedimento (ex: <i className="text-slate-800 font-semibold">unhas 34</i>, <i className="text-slate-800 font-semibold">barba 50 cartão 5%</i> ou <i className="text-slate-800 font-semibold">plano mensal 80</i>):
           </div>
           <span className="text-[11px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-100 flex items-center gap-1 self-start sm:self-auto">
             <Sparkles className="w-3 h-3" /> Lançamento Rápido POS
           </span>
         </div>
 
-        <form onSubmit={handleLaunchCommand} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-          <input
-            type="text"
-            value={commandInput}
-            onChange={(e) => setCommandInput(e.target.value)}
-            placeholder="Ex: plano mensal 80 ou barba 50 cartão 5%"
-            className="flex-1 px-3.5 py-2.5 sm:px-4 sm:py-3 rounded-xl border border-slate-300 text-sm font-medium focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-slate-900 bg-slate-50/50"
-          />
-          <button
-            type="submit"
-            style={{ backgroundColor: config.corCustom || '#2563eb' }}
-            className="text-white font-extrabold text-sm px-6 py-2.5 sm:py-3 rounded-xl hover:opacity-90 active:scale-95 transition-all shadow-sm flex items-center justify-center gap-2 shrink-0 cursor-pointer"
-          >
-            <Send className="w-4 h-4" />
-            <span>Lançar no Caixa</span>
-          </button>
+        <form onSubmit={handleLaunchCommand} className="space-y-3">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+            <input
+              ref={inputRef}
+              type="text"
+              value={commandInput}
+              onChange={(e) => setCommandInput(e.target.value)}
+              placeholder="Ex: plano mensal 80 ou barba 50 cartão 5%"
+              className="flex-1 px-3.5 py-2.5 sm:px-4 sm:py-3 rounded-xl border border-slate-300 text-sm font-medium focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-slate-900 bg-slate-50/50"
+            />
+            <button
+              type="submit"
+              style={{ backgroundColor: config.corCustom || '#2563eb' }}
+              className="text-white font-extrabold text-sm px-6 py-2.5 sm:py-3 rounded-xl hover:opacity-90 active:scale-95 transition-all shadow-sm flex items-center justify-center gap-2 shrink-0 cursor-pointer"
+            >
+              <Send className="w-4 h-4" />
+              <span>Lançar no Caixa</span>
+            </button>
+          </div>
+
+          {/* Quick Payment Method Selector */}
+          <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100">
+            <span className="text-xs font-bold text-slate-500 mr-1 flex items-center gap-1">
+              <span>Forma de Pagamento:</span>
+            </span>
+
+            {/* PIX */}
+            <button
+              type="button"
+              onClick={() => handleSelectPaymentMethodQuick('pix')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                activePaymentMethod === 'pix'
+                  ? 'bg-emerald-600 text-white shadow-xs scale-105'
+                  : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+              }`}
+            >
+              <Zap className="w-3.5 h-3.5 text-amber-300 fill-amber-300" />
+              <span>Pix</span>
+            </button>
+
+            {/* CARTÃO */}
+            <button
+              type="button"
+              onClick={() => handleSelectPaymentMethodQuick('cartao')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                activePaymentMethod === 'cartao'
+                  ? 'bg-blue-600 text-white shadow-xs scale-105'
+                  : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+              }`}
+            >
+              <CreditCard className="w-3.5 h-3.5" />
+              <span>Cartão</span>
+            </button>
+
+            {/* PLANO MENSAL */}
+            <button
+              type="button"
+              onClick={() => handleSelectPaymentMethodQuick('plano_mensal')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                activePaymentMethod === 'plano_mensal'
+                  ? 'bg-purple-600 text-white shadow-xs scale-105'
+                  : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+              }`}
+              title="Plano Mensal (Calcula automaticamente 1/8 do valor digitado)"
+            >
+              <CalendarIcon className="w-3.5 h-3.5" />
+              <span>Plano Mensal (1/8)</span>
+            </button>
+
+            {/* DINHEIRO */}
+            <button
+              type="button"
+              onClick={() => handleSelectPaymentMethodQuick('dinheiro')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                activePaymentMethod === 'dinheiro'
+                  ? 'bg-amber-600 text-white shadow-xs scale-105'
+                  : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+              }`}
+            >
+              <Coins className="w-3.5 h-3.5 text-amber-300" />
+              <span>Dinheiro</span>
+            </button>
+
+            {/* Taxa Cartão */}
+            {activePaymentMethod === 'cartao' && (
+              <div className="flex items-center gap-1.5 ml-auto text-xs bg-blue-50 border border-blue-200 px-2 py-1 rounded-lg">
+                <span className="text-blue-900 font-bold">Taxa Cartão:</span>
+                <select
+                  value={cardTaxPercent}
+                  onChange={(e) => {
+                    const val = Number(e.target.value);
+                    setCardTaxPercent(val);
+                    let cur = commandInput;
+                    if (cur.match(/cart[aã]o\s*\d*%/i)) {
+                      cur = cur.replace(/cart[aã]o\s*\d*%/i, `cartão ${val}%`);
+                      setCommandInput(cur);
+                    }
+                  }}
+                  className="bg-white border border-blue-300 rounded px-1.5 py-0.5 text-xs font-bold text-blue-900 outline-none cursor-pointer"
+                >
+                  <option value={0}>0%</option>
+                  <option value={3}>3%</option>
+                  <option value={5}>5%</option>
+                  <option value={10}>10%</option>
+                </select>
+              </div>
+            )}
+          </div>
         </form>
       </div>
+
+      {/* Completion Modal Window (Identical layout to POS input as requested) */}
+      {showCompletionModal && pendingAppointment && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-[99999] animate-in fade-in duration-150">
+          <div className="bg-white border border-slate-200 p-5 sm:p-6 rounded-3xl max-w-xl w-full shadow-2xl space-y-4 animate-in zoom-in-95 duration-150">
+            
+            {/* Modal Header */}
+            <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-emerald-600 text-white flex items-center justify-center font-black text-lg shadow-md shadow-emerald-900/20">
+                  $
+                </div>
+                <div>
+                  <span className="bg-emerald-100 text-emerald-800 text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider">
+                    Concluir Atendimento e Lançar no Caixa
+                  </span>
+                  <h3 className="text-base font-black text-slate-900 mt-0.5">
+                    {pendingAppointment.clientName}
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Procedimento: <span className="font-bold text-slate-800">{pendingAppointment.serviceName}</span>
+                    {pendingAppointment.professionalName && <span> • Profissional: <span className="font-bold text-slate-800">{pendingAppointment.professionalName}</span></span>}
+                    <span> • Horário: <span className="font-bold text-slate-800">{pendingAppointment.timeSlot}</span></span>
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowCompletionModal(false)}
+                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer"
+                title="Fechar janela e usar a tela do caixa"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* POS Input Exactly as Requested */}
+            <div className="space-y-3 pt-1">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
+                <div className="text-xs text-slate-600 font-medium">
+                  Digite o procedimento (ex: <i className="text-slate-800 font-semibold">unhas 34</i>, <i className="text-slate-800 font-semibold">barba 50 cartão 5%</i> ou <i className="text-slate-800 font-semibold">plano mensal 80</i>):
+                </div>
+                <span className="text-[11px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-100 flex items-center gap-1 self-start sm:self-auto">
+                  <Sparkles className="w-3 h-3" /> Lançamento Rápido POS
+                </span>
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                <input
+                  ref={modalInputRef}
+                  type="text"
+                  value={commandInput}
+                  onChange={(e) => setCommandInput(e.target.value)}
+                  placeholder="Ex: plano mensal 80 ou barba 50 cartão 5%"
+                  className="flex-1 px-3.5 py-2.5 sm:px-4 sm:py-3 rounded-xl border border-slate-300 text-sm font-medium focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-slate-900 bg-slate-50/50"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleLaunchCommand(e);
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={(e) => handleLaunchCommand(e)}
+                  style={{ backgroundColor: config.corCustom || '#2563eb' }}
+                  className="text-white font-extrabold text-sm px-6 py-2.5 sm:py-3 rounded-xl hover:opacity-90 active:scale-95 transition-all shadow-sm flex items-center justify-center gap-2 shrink-0 cursor-pointer"
+                >
+                  <Send className="w-4 h-4" />
+                  <span>Lançar no Caixa</span>
+                </button>
+              </div>
+
+              {/* Forma de Pagamento */}
+              <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100">
+                <span className="text-xs font-bold text-slate-500 mr-1">
+                  Forma de Pagamento:
+                </span>
+
+                <button
+                  type="button"
+                  onClick={() => handleSelectPaymentMethodQuick('pix')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                    activePaymentMethod === 'pix'
+                      ? 'bg-emerald-600 text-white shadow-xs scale-105'
+                      : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                  }`}
+                >
+                  <Zap className="w-3.5 h-3.5 text-amber-300 fill-amber-300" />
+                  <span>Pix</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleSelectPaymentMethodQuick('cartao')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                    activePaymentMethod === 'cartao'
+                      ? 'bg-blue-600 text-white shadow-xs scale-105'
+                      : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                  }`}
+                >
+                  <CreditCard className="w-3.5 h-3.5" />
+                  <span>Cartão</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleSelectPaymentMethodQuick('plano_mensal')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                    activePaymentMethod === 'plano_mensal'
+                      ? 'bg-purple-600 text-white shadow-xs scale-105'
+                      : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                  }`}
+                  title="Plano Mensal (1/8)"
+                >
+                  <CalendarIcon className="w-3.5 h-3.5" />
+                  <span>Plano Mensal (1/8)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleSelectPaymentMethodQuick('dinheiro')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                    activePaymentMethod === 'dinheiro'
+                      ? 'bg-amber-600 text-white shadow-xs scale-105'
+                      : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                  }`}
+                >
+                  <Coins className="w-3.5 h-3.5 text-amber-300" />
+                  <span>Dinheiro</span>
+                </button>
+
+                {activePaymentMethod === 'cartao' && (
+                  <div className="flex items-center gap-1.5 ml-auto text-xs bg-blue-50 border border-blue-200 px-2 py-1 rounded-lg">
+                    <span className="text-blue-900 font-bold">Taxa:</span>
+                    <select
+                      value={cardTaxPercent}
+                      onChange={(e) => {
+                        const val = Number(e.target.value);
+                        setCardTaxPercent(val);
+                        let cur = commandInput;
+                        if (cur.match(/cart[aã]o\s*\d*%/i)) {
+                          cur = cur.replace(/cart[aã]o\s*\d*%/i, `cartão ${val}%`);
+                          setCommandInput(cur);
+                        }
+                      }}
+                      className="bg-white border border-blue-300 rounded px-1.5 py-0.5 text-xs font-bold text-blue-900 outline-none cursor-pointer"
+                    >
+                      <option value={0}>0%</option>
+                      <option value={3}>3%</option>
+                      <option value={5}>5%</option>
+                      <option value={10}>10%</option>
+                    </select>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowCompletionModal(false);
+                  if (onClearPendingAppointment) onClearPendingAppointment();
+                }}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                Cancelar / Descartar
+              </button>
+              <button
+                type="button"
+                onClick={(e) => handleLaunchCommand(e)}
+                style={{ backgroundColor: config.corCustom || '#2563eb' }}
+                className="px-5 py-2.5 rounded-xl text-xs font-black text-white hover:opacity-90 active:scale-95 transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
+              >
+                <Send className="w-3.5 h-3.5" />
+                <span>Confirmar e Lançar no Caixa</span>
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
 
       {/* Header Bar with Count Badge & Actions */}
       <div className="bg-white p-3.5 sm:p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 sm:gap-4 overflow-hidden">
@@ -337,8 +780,19 @@ export const CaixaView: React.FC<CaixaViewProps> = ({
                   <div className="text-sm font-black text-slate-900">
                     R$ {(Number(tx.grossAmount) || 0).toFixed(2)}
                   </div>
-                  <span className="inline-block bg-slate-100 text-slate-700 text-[10px] font-bold px-2 py-0.5 rounded-md uppercase font-mono mt-1">
-                    {tx.paymentMethod}
+                  <span className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-md uppercase font-mono mt-1 ${
+                    tx.paymentMethod === 'pix' ? 'bg-emerald-100 text-emerald-800' :
+                    tx.paymentMethod === 'cartao_credito' || tx.paymentMethod === 'cartao_debito' ? 'bg-blue-100 text-blue-800' :
+                    tx.paymentMethod === 'plano_mensal' ? 'bg-purple-100 text-purple-800 font-extrabold' :
+                    tx.paymentMethod === 'dinheiro' ? 'bg-amber-100 text-amber-800' :
+                    'bg-slate-100 text-slate-700'
+                  }`}>
+                    {tx.paymentMethod === 'cartao_credito' ? 'CRÉDITO' :
+                     tx.paymentMethod === 'cartao_debito' ? 'DÉBITO' :
+                     tx.paymentMethod === 'plano_mensal' ? 'PLANO MENSAL' :
+                     tx.paymentMethod === 'pix' ? 'PIX' :
+                     tx.paymentMethod === 'dinheiro' ? 'DINHEIRO' :
+                     (tx.paymentMethod || '').toUpperCase()}
                   </span>
                 </div>
               </div>
@@ -419,8 +873,21 @@ export const CaixaView: React.FC<CaixaViewProps> = ({
                         <span className="block text-[10px] text-slate-500 font-normal">Cliente: {tx.clientName}</span>
                       )}
                     </td>
-                    <td className="p-3 text-center uppercase font-mono font-bold text-slate-600">
-                      {tx.paymentMethod}
+                    <td className="p-3 text-center font-mono font-bold">
+                      <span className={`px-2 py-0.5 rounded text-[10px] uppercase inline-block ${
+                        tx.paymentMethod === 'pix' ? 'bg-emerald-100 text-emerald-800' :
+                        tx.paymentMethod === 'cartao_credito' || tx.paymentMethod === 'cartao_debito' ? 'bg-blue-100 text-blue-800' :
+                        tx.paymentMethod === 'plano_mensal' ? 'bg-purple-100 text-purple-800 font-extrabold' :
+                        tx.paymentMethod === 'dinheiro' ? 'bg-amber-100 text-amber-800' :
+                        'bg-slate-100 text-slate-700'
+                      }`}>
+                        {tx.paymentMethod === 'cartao_credito' ? 'CRÉDITO' :
+                         tx.paymentMethod === 'cartao_debito' ? 'DÉBITO' :
+                         tx.paymentMethod === 'plano_mensal' ? 'PLANO MENSAL' :
+                         tx.paymentMethod === 'pix' ? 'PIX' :
+                         tx.paymentMethod === 'dinheiro' ? 'DINHEIRO' :
+                         (tx.paymentMethod || '').toUpperCase()}
+                      </span>
                     </td>
                     <td className="p-3 text-center font-bold text-slate-900">
                       R$ {(Number(tx.grossAmount) || 0).toFixed(2)}
