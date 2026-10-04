@@ -50,6 +50,13 @@ export const ClientePortalView: React.FC<ClientePortalViewProps> = ({
   const [clientNotes, setClientNotes] = useState('');
   const [isSuccess, setIsSuccess] = useState(false);
   const [lastAppointment, setLastAppointment] = useState<Appointment | null>(null);
+  const [robotNotificationInfo, setRobotNotificationInfo] = useState<{
+    recipientName: string;
+    recipientPhone: string;
+    isProf: boolean;
+    message: string;
+    waUrl: string;
+  } | null>(null);
 
   // Sync / Detect phone & name from URL params or stored clients
   useEffect(() => {
@@ -108,18 +115,33 @@ export const ClientePortalView: React.FC<ClientePortalViewProps> = ({
     return `${shiftedH}:${shiftedM}`;
   };
 
-  // Salon Services and Professionals
+  // Salon Services and Professionals (with their phones matched from storage)
   const services: ServiceItem[] = Storage.getServices(safeSalon.id);
+  const storedProfs = Storage.getProfessionals(safeSalon.id);
   const profsList = safeConfig.profs || [];
-  const profs: Professional[] = profsList.map((p, idx) => ({
-    id: p.id || `prof-${idx}`,
-    name: p.nome,
-    role: 'Especialista',
-    commissionPercent: p.porc,
-    active: true
-  }));
+  const profs: Professional[] = profsList.map((p, idx) => {
+    const matched = storedProfs.find(
+      sp => sp.id === p.id || sp.name.trim().toLowerCase() === p.nome.trim().toLowerCase()
+    );
+    return {
+      id: p.id || matched?.id || `prof-${idx}`,
+      name: p.nome,
+      role: matched?.role || 'Especialista',
+      commissionPercent: p.porc,
+      phone: matched?.phone || '',
+      active: true
+    };
+  });
 
-  // Submit Booking
+  // Helper to format Brazilian WhatsApp phone numbers
+  const formatWaPhone = (raw: string): string => {
+    const clean = (raw || '').replace(/\D/g, '');
+    if (!clean) return '';
+    if (clean.startsWith('55') && clean.length >= 12) return clean;
+    return `55${clean}`;
+  };
+
+  // Submit Booking & Automatic Robot WhatsApp Notification
   const handleConfirmBooking = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedTime) {
@@ -156,10 +178,10 @@ export const ClientePortalView: React.FC<ClientePortalViewProps> = ({
       origem: 'cliente'
     };
 
-    // Trigger parent callback to save in salon's appointments (immediately synced to cloud)
+    // 1. Trigger parent callback to save in salon's appointments (immediately synced to cloud)
     onAppointmentBooked(selectedDate, selectedTime, newAppointment);
 
-    // Push real-time booking alert message to chat and online feed
+    // 2. Push real-time booking alert message to salon chat and online feed
     try {
       Storage.addMessage({
         id: `msg_book_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
@@ -178,7 +200,7 @@ export const ClientePortalView: React.FC<ClientePortalViewProps> = ({
       });
     } catch {}
 
-    // Save client in salon's client list
+    // 3. Save client in salon's client list
     const currentClients = Storage.getClients(safeSalon.id);
     const exists = currentClients.some(c => c.phone === clientPhone.trim());
     if (!exists) {
@@ -193,11 +215,74 @@ export const ClientePortalView: React.FC<ClientePortalViewProps> = ({
       Storage.saveClients([...currentClients, newClientRecord], safeSalon.id);
     }
 
+    // 4. AUTOMATIC ROBOT WHATSAPP NOTIFICATION
+    // - If professional was selected: send directly to the professional's WhatsApp.
+    // - If no preference or professional has no phone: send directly to the salon's WhatsApp.
+    const matchedProf = selectedProf
+      ? storedProfs.find(
+          p => p.id === selectedProf.id || p.name.trim().toLowerCase() === selectedProf.name.trim().toLowerCase()
+        )
+      : null;
+    const profPhone = (selectedProf?.phone || matchedProf?.phone || '').replace(/\D/g, '');
+    const salonPhone = (safeSalon?.ownerPhone || safeConfig.chavePix || '').replace(/\D/g, '');
+
+    const isDirectToProf = Boolean(selectedProf && profPhone);
+    const targetPhone = isDirectToProf ? profPhone : salonPhone;
+    const recipientLabel = isDirectToProf
+      ? selectedProf!.name
+      : (safeConfig.nomeSalao || safeSalon.name || 'Salão');
+    const salonNameStr = safeConfig.nomeSalao || safeSalon.name || 'Salão';
+
+    const robotMsg = isDirectToProf
+      ? `🤖 *ROBÔ AGENDA FÁCIL: NOVO AGENDAMENTO CONFIRMADO!* ✂️\n\n` +
+        `Olá, *${selectedProf!.name}*! O cliente confirmou um agendamento diretamente com você:\n\n` +
+        `👤 *Cliente:* ${clientName.trim()}\n` +
+        `📱 *WhatsApp do Cliente:* ${clientPhone.trim()}\n` +
+        `✂️ *Serviço:* ${selectedService.name}\n` +
+        `📅 *Data:* ${selectedDate}\n` +
+        `⏰ *Horário:* ${selectedTime}\n` +
+        `💰 *Valor:* R$ ${(Number(selectedService.price) || 0).toFixed(2)}\n` +
+        (clientNotes.trim() ? `📝 *Observação:* ${clientNotes.trim()}\n` : '') +
+        `💈 *Salão:* ${salonNameStr}\n\n` +
+        `_Agendamento registrado automaticamente na sua agenda em tempo real._`
+      : `🤖 *ROBÔ AGENDA FÁCIL: NOVO AGENDAMENTO NO SALÃO!* 💈\n\n` +
+        `Olá, *${salonNameStr}*! Um novo cliente confirmou agendamento no salão (Sem preferência de profissional):\n\n` +
+        `👤 *Cliente:* ${clientName.trim()}\n` +
+        `📱 *WhatsApp do Cliente:* ${clientPhone.trim()}\n` +
+        `✂️ *Serviço:* ${selectedService.name}\n` +
+        `📅 *Data:* ${selectedDate}\n` +
+        `⏰ *Horário:* ${selectedTime}\n` +
+        `💰 *Valor:* R$ ${(Number(selectedService.price) || 0).toFixed(2)}\n` +
+        (clientNotes.trim() ? `📝 *Observação:* ${clientNotes.trim()}\n` : '') +
+        `_Agendamento registrado automaticamente na agenda do salão em tempo real._`;
+
+    const formattedTargetPhone = formatWaPhone(targetPhone);
+    const waUrl = formattedTargetPhone
+      ? `https://api.whatsapp.com/send?phone=${formattedTargetPhone}&text=${encodeURIComponent(robotMsg)}`
+      : `https://api.whatsapp.com/send?text=${encodeURIComponent(robotMsg)}`;
+
+    // Automatic robot dispatch to WhatsApp
+    try {
+      window.open(waUrl, '_blank');
+    } catch {}
+
+    setRobotNotificationInfo({
+      recipientName: recipientLabel,
+      recipientPhone: targetPhone,
+      isProf: isDirectToProf,
+      message: robotMsg,
+      waUrl
+    });
+
     setLastAppointment(newAppointment);
     setIsSuccess(true);
   };
 
   const handleShareWhatsapp = () => {
+    if (robotNotificationInfo?.waUrl) {
+      window.open(robotNotificationInfo.waUrl, '_blank');
+      return;
+    }
     if (!lastAppointment) return;
     const salonNameStr = safeSalon?.config?.nomeSalao || safeSalon?.name || 'Salão';
     const targetPhone = (safeSalon?.ownerPhone || '11999998888').replace(/\D/g, '');
@@ -935,13 +1020,32 @@ export const ClientePortalView: React.FC<ClientePortalViewProps> = ({
             </p>
           </div>
 
-          {/* WhatsApp Share Button */}
+          {/* Automatic Robot Notification Banner */}
+          <div className="bg-emerald-950/40 border border-emerald-500/40 rounded-2xl p-4 text-left space-y-2">
+            <div className="flex items-center gap-2 text-emerald-400 font-black text-xs">
+              <Sparkles className="w-4 h-4 text-emerald-300" />
+              <span>Notificação do Robô Enviada em Tempo Real via WhatsApp</span>
+            </div>
+            <p className="text-slate-300 text-[11px] leading-relaxed">
+              O robô registrou seu agendamento no salão e disparou a notificação automática no WhatsApp de:{' '}
+              <strong className="text-white font-bold">
+                {robotNotificationInfo ? robotNotificationInfo.recipientName : (lastAppointment?.professionalName || safeConfig.nomeSalao)}
+              </strong>
+              {robotNotificationInfo?.recipientPhone ? ` (${robotNotificationInfo.recipientPhone})` : ''}.
+            </p>
+          </div>
+
+          {/* WhatsApp Share / Robot Resend Button */}
           <button
             onClick={handleShareWhatsapp}
             className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold py-3 rounded-2xl text-xs flex items-center justify-center gap-2 shadow-lg transition-all active:scale-95"
           >
             <Share2 className="w-4 h-4" />
-            <span>Enviar Confirmação para o Salão via WhatsApp</span>
+            <span>
+              {robotNotificationInfo?.isProf
+                ? `Abrir / Reenviar no WhatsApp do Profissional (${robotNotificationInfo.recipientName})`
+                : `Abrir / Reenviar no WhatsApp do Salão (${robotNotificationInfo?.recipientName || safeConfig.nomeSalao})`}
+            </span>
           </button>
 
           {/* Cancel Appointment Button on Confirmation Screen */}
