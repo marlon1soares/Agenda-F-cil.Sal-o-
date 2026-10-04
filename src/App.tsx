@@ -435,28 +435,117 @@ export function App() {
     }
 
     const handleSync = (e?: any) => {
-      // If event targets a specific different salon, don't overwrite current salon's active state
+      // 1. Ignore events that have nothing to do with active salon's core operational data
+      // (Presence heartbeat, chat messages, system notices, admin credentials/payment, catalog, etc.)
+      const nonSalonKeys = [
+        'salaoOnlineUsers',
+        'salaoMessages',
+        'salaoNotices',
+        'salaoAdminCredentials',
+        'salaoAdminPaymentConfig',
+        'salaoUsedTrialCpfs',
+        'salaoCatalogo',
+        'salaoCatalogFolders',
+        'salaoFechamentos'
+      ];
+      if (e?.detail?.key && nonSalonKeys.includes(e.detail.key)) {
+        return;
+      }
+
+      // 2. If event targets a specific different salon, don't overwrite current salon's active state
       if (e?.detail?.salonId && e.detail.salonId !== activeSalonId) {
         if (e.detail.key === 'salaoAppsList' || !e.detail.key) {
-          setSalons(Storage.getSalons());
+          const currentSalons = Storage.getSalons();
+          setSalons(prev => JSON.stringify(prev) !== JSON.stringify(currentSalons) ? currentSalons : prev);
         }
         return;
       }
 
-      const currentSalons = Storage.getSalons();
-      setSalons(currentSalons);
-      const active = currentSalons.find(s => s.id === activeSalonId);
-      if (active && active.config) {
-        setConfig(active.config);
-      } else {
-        setConfig(Storage.getConfig(activeSalonId));
+      // 3. Surgical updates for specific keys
+      if (e?.detail?.key === 'salaoAppsList') {
+        const currentSalons = Storage.getSalons();
+        setSalons(prev => JSON.stringify(prev) !== JSON.stringify(currentSalons) ? currentSalons : prev);
+        const active = currentSalons.find(s => s.id === activeSalonId);
+        if (active && active.config) {
+          setConfig(prev => JSON.stringify(prev) !== JSON.stringify(active.config) ? active.config : prev);
+        }
+        return;
       }
-      setTransactions(Storage.getTransactions(activeSalonId));
-      setAppointments(Storage.getAppointments(activeSalonId));
-      setTimeAdjustments(Storage.getTimeAdjustments(activeSalonId));
-      setProfessionals(Storage.getProfessionals(activeSalonId));
-      setServices(Storage.getServices(activeSalonId));
-      setClients(Storage.getClients(activeSalonId));
+
+      if (e?.detail?.key === 'salaoConfig') {
+        const newCfg = Storage.getConfig(activeSalonId);
+        setConfig(prev => JSON.stringify(prev) !== JSON.stringify(newCfg) ? newCfg : prev);
+        return;
+      }
+
+      if (e?.detail?.key === 'salaoAgenda') {
+        const newApts = Storage.getAppointments(activeSalonId);
+        setAppointments(prev => JSON.stringify(prev) !== JSON.stringify(newApts) ? newApts : prev);
+        return;
+      }
+
+      if (e?.detail?.key === 'salaoLancamentos') {
+        const newTx = Storage.getTransactions(activeSalonId);
+        setTransactions(prev => JSON.stringify(prev) !== JSON.stringify(newTx) ? newTx : prev);
+        return;
+      }
+
+      if (e?.detail?.key === 'salaoAjustesHorarios') {
+        const newAdj = Storage.getTimeAdjustments(activeSalonId);
+        setTimeAdjustments(prev => JSON.stringify(prev) !== JSON.stringify(newAdj) ? newAdj : prev);
+        return;
+      }
+
+      if (e?.detail?.key === 'salaoProfissionais') {
+        const newProfs = Storage.getProfessionals(activeSalonId);
+        setProfessionals(prev => JSON.stringify(prev) !== JSON.stringify(newProfs) ? newProfs : prev);
+        return;
+      }
+
+      if (e?.detail?.key === 'salaoServicos') {
+        const newSrvs = Storage.getServices(activeSalonId);
+        setServices(prev => JSON.stringify(prev) !== JSON.stringify(newSrvs) ? newSrvs : prev);
+        return;
+      }
+
+      if (e?.detail?.key === 'salaoClientes') {
+        const newClis = Storage.getClients(activeSalonId);
+        setClients(prev => JSON.stringify(prev) !== JSON.stringify(newClis) ? newClis : prev);
+        return;
+      }
+
+      // 4. Remote / generic change - only update states where values actually differ
+      const currentSalons = Storage.getSalons();
+      setSalons(prev => JSON.stringify(prev) !== JSON.stringify(currentSalons) ? currentSalons : prev);
+
+      const active = currentSalons.find(s => s.id === activeSalonId);
+      const activeCfg = active && active.config ? active.config : Storage.getConfig(activeSalonId);
+      setConfig(prev => JSON.stringify(prev) !== JSON.stringify(activeCfg) ? activeCfg : prev);
+
+      setTransactions(prev => {
+        const next = Storage.getTransactions(activeSalonId);
+        return JSON.stringify(prev) !== JSON.stringify(next) ? next : prev;
+      });
+      setAppointments(prev => {
+        const next = Storage.getAppointments(activeSalonId);
+        return JSON.stringify(prev) !== JSON.stringify(next) ? next : prev;
+      });
+      setTimeAdjustments(prev => {
+        const next = Storage.getTimeAdjustments(activeSalonId);
+        return JSON.stringify(prev) !== JSON.stringify(next) ? next : prev;
+      });
+      setProfessionals(prev => {
+        const next = Storage.getProfessionals(activeSalonId);
+        return JSON.stringify(prev) !== JSON.stringify(next) ? next : prev;
+      });
+      setServices(prev => {
+        const next = Storage.getServices(activeSalonId);
+        return JSON.stringify(prev) !== JSON.stringify(next) ? next : prev;
+      });
+      setClients(prev => {
+        const next = Storage.getClients(activeSalonId);
+        return JSON.stringify(prev) !== JSON.stringify(next) ? next : prev;
+      });
     };
 
     window.addEventListener('salao_sync_data', handleSync);

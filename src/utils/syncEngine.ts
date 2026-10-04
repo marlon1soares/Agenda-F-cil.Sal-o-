@@ -40,6 +40,7 @@ class SyncEngine {
   private unsubscribePresence: (() => void) | null = null;
   private activeSalonId: string = '';
   private unsubscribeActiveSalon: (() => void) | null = null;
+  private lastProcessedRemoteTimestamp: number = 0;
 
   public getClientId(): string {
     return CLIENT_ID;
@@ -80,42 +81,125 @@ class SyncEngine {
     if (!salonId || !sData) return;
     try {
       let changed = false;
-      if (sData.appointments) {
-        localStorage.setItem(`salaoAgenda_${salonId}`, JSON.stringify(sData.appointments));
-        if (salonId === 'salon-parcas') {
-          localStorage.setItem('salaoAgenda', JSON.stringify(sData.appointments));
+
+      // 1. Appointments: Never overwrite existing appointments with empty object
+      if (sData.appointments && typeof sData.appointments === 'object') {
+        const currentRaw = localStorage.getItem(`salaoAgenda_${salonId}`);
+        const newRaw = JSON.stringify(sData.appointments);
+        if (currentRaw !== newRaw) {
+          const currentHasApts = currentRaw && currentRaw !== '{}' && Object.keys(JSON.parse(currentRaw) || {}).length > 0;
+          const newHasApts = Object.keys(sData.appointments).length > 0;
+          if (!currentHasApts || newHasApts) {
+            localStorage.setItem(`salaoAgenda_${salonId}`, newRaw);
+            if (salonId === 'salon-parcas') {
+              localStorage.setItem('salaoAgenda', newRaw);
+            }
+            changed = true;
+          }
         }
-        changed = true;
-      }
-      if (sData.transactions && Array.isArray(sData.transactions)) {
-        localStorage.setItem(`salaoLancamentos_${salonId}`, JSON.stringify(sData.transactions));
-        changed = true;
-      }
-      if (sData.timeAdjustments) {
-        localStorage.setItem(`salaoAjustesHorarios_${salonId}`, JSON.stringify(sData.timeAdjustments));
-        changed = true;
-      }
-      if (sData.professionals && Array.isArray(sData.professionals)) {
-        localStorage.setItem(`salaoProfissionais_${salonId}`, JSON.stringify(sData.professionals));
-        changed = true;
-      }
-      if (sData.services && Array.isArray(sData.services)) {
-        localStorage.setItem(`salaoServicos_${salonId}`, JSON.stringify(sData.services));
-        changed = true;
-      }
-      if (sData.clients && Array.isArray(sData.clients)) {
-        localStorage.setItem(`salaoClientes_${salonId}`, JSON.stringify(sData.clients));
-        changed = true;
-      }
-      if (sData.caixaFechamentos && Array.isArray(sData.caixaFechamentos)) {
-        localStorage.setItem(`salao_fechamentos_caixa_${salonId}`, JSON.stringify(sData.caixaFechamentos));
-        changed = true;
-      }
-      if (sData.config) {
-        localStorage.setItem(`salaoConfig_${salonId}`, JSON.stringify(sData.config));
-        changed = true;
       }
 
+      // 2. Transactions: Never wipe out existing transactions with empty array
+      if (sData.transactions && Array.isArray(sData.transactions)) {
+        const currentRaw = localStorage.getItem(`salaoLancamentos_${salonId}`);
+        const newRaw = JSON.stringify(sData.transactions);
+        if (currentRaw !== newRaw) {
+          const currentHasTx = currentRaw && currentRaw !== '[]' && (JSON.parse(currentRaw) || []).length > 0;
+          const newHasTx = sData.transactions.length > 0;
+          if (!currentHasTx || newHasTx) {
+            localStorage.setItem(`salaoLancamentos_${salonId}`, newRaw);
+            changed = true;
+          }
+        }
+      }
+
+      // 3. Time Adjustments
+      if (sData.timeAdjustments && typeof sData.timeAdjustments === 'object') {
+        const currentRaw = localStorage.getItem(`salaoAjustesHorarios_${salonId}`);
+        const newRaw = JSON.stringify(sData.timeAdjustments);
+        if (currentRaw !== newRaw) {
+          localStorage.setItem(`salaoAjustesHorarios_${salonId}`, newRaw);
+          changed = true;
+        }
+      }
+
+      // 4. Professionals: Never wipe out existing professionals
+      if (sData.professionals && Array.isArray(sData.professionals)) {
+        const currentRaw = localStorage.getItem(`salaoProfissionais_${salonId}`);
+        const newRaw = JSON.stringify(sData.professionals);
+        if (currentRaw !== newRaw) {
+          const currentHasProf = currentRaw && currentRaw !== '[]' && (JSON.parse(currentRaw) || []).length > 0;
+          const newHasProf = sData.professionals.length > 0;
+          if (!currentHasProf || newHasProf) {
+            localStorage.setItem(`salaoProfissionais_${salonId}`, newRaw);
+            changed = true;
+          }
+        }
+      }
+
+      // 5. Services: Never wipe out existing services
+      if (sData.services && Array.isArray(sData.services)) {
+        const currentRaw = localStorage.getItem(`salaoServicos_${salonId}`);
+        const newRaw = JSON.stringify(sData.services);
+        if (currentRaw !== newRaw) {
+          const currentHasSrv = currentRaw && currentRaw !== '[]' && (JSON.parse(currentRaw) || []).length > 0;
+          const newHasSrv = sData.services.length > 0;
+          if (!currentHasSrv || newHasSrv) {
+            localStorage.setItem(`salaoServicos_${salonId}`, newRaw);
+            changed = true;
+          }
+        }
+      }
+
+      // 6. Clients: Never wipe out existing clients
+      if (sData.clients && Array.isArray(sData.clients)) {
+        const currentRaw = localStorage.getItem(`salaoClientes_${salonId}`);
+        const newRaw = JSON.stringify(sData.clients);
+        if (currentRaw !== newRaw) {
+          const currentHasCli = currentRaw && currentRaw !== '[]' && (JSON.parse(currentRaw) || []).length > 0;
+          const newHasCli = sData.clients.length > 0;
+          if (!currentHasCli || newHasCli) {
+            localStorage.setItem(`salaoClientes_${salonId}`, newRaw);
+            changed = true;
+          }
+        }
+      }
+
+      // 7. Fechamentos
+      if (sData.caixaFechamentos && Array.isArray(sData.caixaFechamentos)) {
+        const currentRaw = localStorage.getItem(`salao_fechamentos_caixa_${salonId}`);
+        const newRaw = JSON.stringify(sData.caixaFechamentos);
+        if (currentRaw !== newRaw) {
+          localStorage.setItem(`salao_fechamentos_caixa_${salonId}`, newRaw);
+          changed = true;
+        }
+      }
+
+      // 8. Configuration: Strictly preserve customized local configuration
+      if (sData.config && typeof sData.config === 'object') {
+        const currentRaw = localStorage.getItem(`salaoConfig_${salonId}`);
+        const newRaw = JSON.stringify(sData.config);
+        if (currentRaw !== newRaw) {
+          let canUpdateConfig = true;
+          if (currentRaw) {
+            try {
+              const currentCfg = JSON.parse(currentRaw);
+              if (currentCfg && currentCfg.nomeSalao && (!sData.config.nomeSalao || (sData.config.nomeSalao === 'Controle Salão dos Parças' && currentCfg.nomeSalao !== 'Controle Salão dos Parças'))) {
+                canUpdateConfig = false;
+              }
+            } catch {}
+          }
+          if (canUpdateConfig) {
+            localStorage.setItem(`salaoConfig_${salonId}`, newRaw);
+            if (salonId === 'salon-parcas') {
+              localStorage.setItem('salaoConfig', newRaw);
+            }
+            changed = true;
+          }
+        }
+      }
+
+      // Only dispatch if actual data was modified on disk
       if (changed && typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('salao_sync_data', { detail: { source: 'remote', salonId } }));
       }
@@ -129,34 +213,22 @@ class SyncEngine {
     // 1. Initialize Firestore Real-time listener
     this.initFirestoreSync();
 
-    // 2. Initial State Fetch from Local Server (fallback if running Node server)
+    // 2. Initial State Fetch from Local Server (only once on startup)
     this.fetchServerState();
 
-    // 3. Connect to Server-Sent Events for Real-time Streaming (fallback)
+    // 3. Connect to Server-Sent Events for Real-time Streaming
     this.connectSSE();
 
-    // 4. Start Periodic Presence Heartbeat & Background Polling
+    // 4. Send Periodic Presence Heartbeat (keeps user active without polling state)
     this.startPresenceHeartbeat();
-    this.startBackupPolling();
 
     // 5. Send immediate presence on initialization
     this.broadcastCurrentPresence();
 
-    // 6. Listen to window focus or online to re-sync
+    // 6. Online listener - only reconnect SSE if connection was lost, without resetting state
     try {
       window.addEventListener('online', () => {
-        this.fetchServerState();
         this.connectSSE();
-      });
-
-      window.addEventListener('focus', () => {
-        this.fetchServerState();
-      });
-
-      document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'visible') {
-          this.fetchServerState();
-        }
       });
     } catch {
       // ignore
@@ -322,12 +394,7 @@ class SyncEngine {
   }
 
   private startBackupPolling() {
-    // Background polling fallback every 12 seconds in case SSE stream or snapshot was suspended
-    setInterval(() => {
-      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
-        this.fetchServerState();
-      }
-    }, 12000);
+    // Polling removed to prevent idle refreshing and accidental resets
   }
 
   public async fetchServerState(): Promise<FullSyncState | null> {
@@ -336,6 +403,9 @@ class SyncEngine {
       if (!res.ok) return null;
       const data = await res.json();
       if (data.success && data.state) {
+        if (data.state.lastUpdated && this.lastProcessedRemoteTimestamp && data.state.lastUpdated <= this.lastProcessedRemoteTimestamp) {
+          return data.state;
+        }
         this.applyRemoteState(data.state);
         return data.state;
       }
@@ -392,8 +462,18 @@ class SyncEngine {
     if (!state) return;
     if (senderId && senderId === CLIENT_ID) return; // ignore our own echo
 
+    // Prevent re-applying the exact same or older remote state
+    if (state.lastUpdated && this.lastProcessedRemoteTimestamp && state.lastUpdated <= this.lastProcessedRemoteTimestamp) {
+      return;
+    }
+    if (state.lastUpdated) {
+      this.lastProcessedRemoteTimestamp = state.lastUpdated;
+    }
+
     this.isApplyingRemote = true;
     try {
+      let hasAnyChange = false;
+
       // 0. Deletion of a specific salon (strictly remove that salon without touching others)
       if (state.deletedSalonId) {
         const dId = state.deletedSalonId;
@@ -412,6 +492,7 @@ class SyncEngine {
             const list = JSON.parse(localSalonsRaw);
             if (Array.isArray(list)) {
               localStorage.setItem('salaoAppsList', JSON.stringify(list.filter((s: any) => s.id !== dId)));
+              hasAnyChange = true;
             }
           }
         } catch {}
@@ -441,7 +522,7 @@ class SyncEngine {
         });
       }
 
-      // 3. Salons List (Multi-salon registry with independent preservation)
+      // 3. Salons List (Multi-salon registry with absolute preservation of all salons and configurations)
       if (state.salons && Array.isArray(state.salons) && state.salons.length > 0) {
         try { 
           const localSalonsRaw = localStorage.getItem('salaoAppsList');
@@ -450,40 +531,60 @@ class SyncEngine {
           if (Array.isArray(localSalons)) {
             localSalons.forEach((s: any) => { if (s && s.id) salonMap.set(s.id, s); });
           }
-          const mergedSalons = state.salons.map((remoteSalon: any) => {
+
+          // Merge without ever dropping any local salon, and without overwriting local custom config with defaults
+          state.salons.forEach((remoteSalon: any) => {
+            if (!remoteSalon || !remoteSalon.id) return;
             const local = salonMap.get(remoteSalon.id);
-            if (!local) return remoteSalon;
-            return {
-              ...local,
-              ...remoteSalon,
-              name: remoteSalon.name || local.name,
-              ownerName: remoteSalon.ownerName || local.ownerName,
-              ownerPhone: remoteSalon.ownerPhone || local.ownerPhone,
-              ownerEmail: remoteSalon.ownerEmail || local.ownerEmail,
-              ownerCpf: remoteSalon.ownerCpf || local.ownerCpf,
-              ownerRg: remoteSalon.ownerRg || local.ownerRg,
-              cep: remoteSalon.cep || local.cep,
-              logradouro: remoteSalon.logradouro || local.logradouro,
-              numero: remoteSalon.numero || local.numero,
-              bairro: remoteSalon.bairro || local.bairro,
-              cidade: remoteSalon.cidade || local.cidade,
-              uf: remoteSalon.uf || local.uf,
-              config: {
-                ...(local.config || {}),
-                ...(remoteSalon.config || {})
-              }
-            };
-          });
-          localStorage.setItem('salaoAppsList', JSON.stringify(mergedSalons));
-          mergedSalons.forEach((s: any) => {
-            if (s && s.id && s.config) {
-              localStorage.setItem(`salaoConfig_${s.id}`, JSON.stringify(s.config));
+            if (!local) {
+              salonMap.set(remoteSalon.id, remoteSalon);
+            } else {
+              // Local customized config takes precedence over remote default config
+              const localConfig = local.config || {};
+              const remoteConfig = remoteSalon.config || {};
+              const mergedConfig = {
+                ...remoteConfig,
+                ...localConfig
+              };
+              salonMap.set(remoteSalon.id, {
+                ...remoteSalon,
+                ...local,
+                name: local.name || remoteSalon.name,
+                ownerName: local.ownerName || remoteSalon.ownerName,
+                ownerPhone: local.ownerPhone || remoteSalon.ownerPhone,
+                ownerEmail: local.ownerEmail || remoteSalon.ownerEmail,
+                ownerCpf: local.ownerCpf || remoteSalon.ownerCpf,
+                ownerRg: local.ownerRg || remoteSalon.ownerRg,
+                cep: local.cep || remoteSalon.cep,
+                logradouro: local.logradouro || remoteSalon.logradouro,
+                numero: local.numero || remoteSalon.numero,
+                bairro: local.bairro || remoteSalon.bairro,
+                cidade: local.cidade || remoteSalon.cidade,
+                uf: local.uf || remoteSalon.uf,
+                config: mergedConfig
+              });
             }
           });
+
+          const mergedSalons = Array.from(salonMap.values());
+          const oldStr = JSON.stringify(localSalons);
+          const newStr = JSON.stringify(mergedSalons);
+          if (oldStr !== newStr) {
+            localStorage.setItem('salaoAppsList', newStr);
+            hasAnyChange = true;
+          }
         } catch {}
       }
+
       if (state.adminPaymentConfig && state.adminPaymentConfig.chavePix) {
-        try { localStorage.setItem('salaoAdminPaymentConfig', JSON.stringify(state.adminPaymentConfig)); } catch {}
+        try {
+          const old = localStorage.getItem('salaoAdminPaymentConfig');
+          const n = JSON.stringify(state.adminPaymentConfig);
+          if (old !== n) {
+            localStorage.setItem('salaoAdminPaymentConfig', n);
+            hasAnyChange = true;
+          }
+        } catch {}
       }
       if (state.adminCredentials && state.adminCredentials.cpf) {
         try {
@@ -499,8 +600,12 @@ class SyncEngine {
           if (!mergedMaster.password || mergedMaster.password === 'admin') {
             mergedMaster.password = 'Ana1@@theo';
           }
-          localStorage.setItem('salaoAdminCredentials', JSON.stringify(mergedMaster));
-          sessionStorage.setItem('salaoAdminCredentials', JSON.stringify(mergedMaster));
+          const n = JSON.stringify(mergedMaster);
+          if (currentLocalRaw !== n) {
+            localStorage.setItem('salaoAdminCredentials', n);
+            sessionStorage.setItem('salaoAdminCredentials', n);
+            hasAnyChange = true;
+          }
         } catch {}
       }
       if (state.adminCredentialsList && Array.isArray(state.adminCredentialsList) && state.adminCredentialsList.length > 0) {
@@ -529,25 +634,45 @@ class SyncEngine {
             return remoteCred;
           });
 
-          localStorage.setItem('salaoAdminCredentialsList', JSON.stringify(mergedList));
-          sessionStorage.setItem('salaoAdminCredentialsList', JSON.stringify(mergedList));
+          const n = JSON.stringify(mergedList);
+          if (currentListRaw !== n) {
+            localStorage.setItem('salaoAdminCredentialsList', n);
+            sessionStorage.setItem('salaoAdminCredentialsList', n);
+            hasAnyChange = true;
+          }
         } catch {}
       }
       if (state.messages && Array.isArray(state.messages)) {
-        try { localStorage.setItem('salaoMessages', JSON.stringify(state.messages)); } catch {}
+        try {
+          const old = localStorage.getItem('salaoMessages');
+          const n = JSON.stringify(state.messages);
+          if (old !== n) localStorage.setItem('salaoMessages', n);
+        } catch {}
       }
       if (state.notices && Array.isArray(state.notices)) {
-        try { localStorage.setItem('salaoNotices', JSON.stringify(state.notices)); } catch {}
+        try {
+          const old = localStorage.getItem('salaoNotices');
+          const n = JSON.stringify(state.notices);
+          if (old !== n) localStorage.setItem('salaoNotices', n);
+        } catch {}
       }
       if (state.onlineUsers && Array.isArray(state.onlineUsers)) {
-        try { localStorage.setItem('salaoOnlineUsers', JSON.stringify(state.onlineUsers)); } catch {}
+        try {
+          const old = localStorage.getItem('salaoOnlineUsers');
+          const n = JSON.stringify(state.onlineUsers);
+          if (old !== n) localStorage.setItem('salaoOnlineUsers', n);
+        } catch {}
       }
       if (state.usedTrialCpfs && Array.isArray(state.usedTrialCpfs)) {
-        try { localStorage.setItem('salaoUsedTrialCpfs', JSON.stringify(state.usedTrialCpfs)); } catch {}
+        try {
+          const old = localStorage.getItem('salaoUsedTrialCpfs');
+          const n = JSON.stringify(state.usedTrialCpfs);
+          if (old !== n) localStorage.setItem('salaoUsedTrialCpfs', n);
+        } catch {}
       }
 
-      // Atualizações de dados processadas silenciosamente sem emitir nenhum som
-      if (typeof window !== 'undefined') {
+      // Only dispatch if actual changes were made to persistent state
+      if (hasAnyChange && typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('salao_sync_data', { detail: { source: 'remote', state } }));
       }
     } finally {
