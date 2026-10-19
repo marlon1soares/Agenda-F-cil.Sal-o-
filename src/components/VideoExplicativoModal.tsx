@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Play, Pause, RotateCcw, ArrowLeft, X, 
-  FileVideo, Music, Film, ExternalLink, Download, RefreshCw, AlertCircle
+  FileVideo, Music, Film, ExternalLink, Download, RefreshCw, AlertCircle, Maximize2
 } from 'lucide-react';
 import { Storage } from '../utils/storage';
 import { VideoTutorialConfig } from '../types';
@@ -94,6 +94,14 @@ export const VideoExplicativoModal: React.FC<VideoExplicativoModalProps> = ({
     };
   }, [isOpen]);
 
+  useEffect(() => {
+    if (isOpen && videoPlayerRef.current) {
+      try {
+        videoPlayerRef.current.load();
+      } catch {}
+    }
+  }, [isOpen, videoConfig.customVideoUrl, videoReloadKey]);
+
   if (!isOpen) return null;
 
   const isAudioFile = videoConfig.fileType === 'audio' || 
@@ -131,6 +139,22 @@ export const VideoExplicativoModal: React.FC<VideoExplicativoModalProps> = ({
         videoPlayerRef.current.play().catch(() => {});
       } catch {}
     }
+  };
+
+  const handleOpenFullscreen = () => {
+    if (!videoPlayerRef.current) return;
+    const v = videoPlayerRef.current as any;
+    try {
+      if (v.requestFullscreen) {
+        v.requestFullscreen().catch(() => {});
+      } else if (v.webkitEnterFullscreen) {
+        v.webkitEnterFullscreen();
+      } else if (v.webkitRequestFullscreen) {
+        v.webkitRequestFullscreen();
+      } else if (v.msRequestFullscreen) {
+        v.msRequestFullscreen();
+      }
+    } catch {}
   };
 
   return (
@@ -310,9 +334,12 @@ export const VideoExplicativoModal: React.FC<VideoExplicativoModalProps> = ({
                   <video
                     key={`${videoConfig.customVideoUrl}_${videoReloadKey}`}
                     ref={videoPlayerRef}
+                    src={videoConfig.customVideoUrl}
                     controls
                     playsInline
-                    preload="auto"
+                    webkit-playsinline="true"
+                    x5-playsinline="true"
+                    preload="metadata"
                     className="w-full max-h-[480px] object-contain mx-auto bg-black"
                     onPlay={() => {
                       setIsVideoPlaying(true);
@@ -324,6 +351,7 @@ export const VideoExplicativoModal: React.FC<VideoExplicativoModalProps> = ({
                     }}
                   >
                     <source src={videoConfig.customVideoUrl} type="video/mp4" />
+                    <source src="/uploads/videos/video_explicativo_app.mp4" type="video/mp4" />
                     Seu dispositivo não suporta o formato padrão de vídeo HTML5.
                   </video>
 
@@ -378,15 +406,24 @@ export const VideoExplicativoModal: React.FC<VideoExplicativoModalProps> = ({
                     >
                       <RefreshCw className="w-3.5 h-3.5" />
                     </button>
+                    <button
+                      type="button"
+                      onClick={handleOpenFullscreen}
+                      className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-lg text-[11px] font-bold flex items-center gap-1 transition-all border border-slate-700 cursor-pointer"
+                      title="Abrir em tela cheia no player do celular ou computador"
+                    >
+                      <Maximize2 className="w-3 h-3" />
+                      <span>Tela Cheia</span>
+                    </button>
                     <a
                       href={videoConfig.customVideoUrl}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-lg text-[11px] font-bold flex items-center gap-1 transition-all border border-slate-700"
-                      title="Abrir diretamente em tela cheia no reprodutor nativo do seu celular/computador"
+                      title="Abrir vídeo em nova aba do navegador"
                     >
                       <ExternalLink className="w-3 h-3" />
-                      <span>Tela Cheia / Nova Aba</span>
+                      <span>Nova Aba</span>
                     </a>
                     <a
                       href={videoConfig.customVideoUrl}

@@ -817,12 +817,12 @@ export const Storage = {
       bacenPixCertificateConfigured: false,
       videoTutorialConfig: {
         youtubeUrl: '',
-        customVideoUrl: '/uploads/videos/V_deo_Aplicativo_do_App__1792379432220_bkd3.mp4',
+        customVideoUrl: '/uploads/videos/video_explicativo_app.mp4',
         videoTitle: 'Vídeo Explicativo do App - Agenda Fácil',
         useInteractivePlayer: false,
         fileType: 'video',
         fileName: 'Vídeo Aplicativo do App .mp4',
-        fileSize: '25.7 MB',
+        fileSize: '44.6 MB',
         uploadedAt: '2026-10-19T03:11:00.598Z'
       }
     };

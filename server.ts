@@ -36,11 +36,34 @@ if (!fs.existsSync(uploadsVideosDir)) {
   fs.mkdirSync(uploadsVideosDir, { recursive: true });
 }
 // Dedicated robust Range-streaming handler for videos (iOS Safari / Android / Chrome RFC 7233 compliance)
-app.get("/uploads/videos/:filename", (req, res, next) => {
-  const filename = path.basename(req.params.filename);
-  const filePath = path.resolve(uploadsVideosDir, filename);
-  if (!fs.existsSync(filePath)) {
+app.all(["/uploads/videos/:filename", "/uploads/videos/*"], (req, res, next) => {
+  if (req.method !== "GET" && req.method !== "HEAD" && req.method !== "OPTIONS") {
     return next();
+  }
+  if (req.method === "OPTIONS") {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "*");
+    return res.sendStatus(200);
+  }
+
+  const rawParam = req.params.filename || req.params[0] || "";
+  let filename = path.basename(rawParam);
+  let filePath = path.resolve(uploadsVideosDir, filename);
+
+  // If specific filename not found, check fallback files
+  if (!fs.existsSync(filePath)) {
+    const candidateAlias = path.resolve(uploadsVideosDir, "video_explicativo_app.mp4");
+    const candidateLuna = path.resolve(uploadsVideosDir, "video_tutorial_agenda_mais_facil_luna.mp4");
+    if (fs.existsSync(candidateAlias)) {
+      filePath = candidateAlias;
+      filename = "video_explicativo_app.mp4";
+    } else if (fs.existsSync(candidateLuna)) {
+      filePath = candidateLuna;
+      filename = "video_tutorial_agenda_mais_facil_luna.mp4";
+    } else {
+      return next();
+    }
   }
 
   const stat = fs.statSync(filePath);
@@ -58,6 +81,17 @@ app.get("/uploads/videos/:filename", (req, res, next) => {
   res.setHeader("Access-Control-Allow-Headers", "*");
   res.setHeader("Access-Control-Expose-Headers", "Content-Length, Content-Range, Accept-Ranges, Content-Type");
   res.setHeader("Accept-Ranges", "bytes");
+
+  // Handle HEAD requests (iOS Safari pre-flight check)
+  if (req.method === "HEAD") {
+    res.writeHead(200, {
+      "Content-Length": fileSize,
+      "Content-Type": contentType,
+      "Accept-Ranges": "bytes",
+      "Content-Disposition": "inline"
+    });
+    return res.end();
+  }
 
   const range = req.headers.range;
   if (range) {

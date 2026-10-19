@@ -228,12 +228,12 @@ const DEFAULT_STATE: SyncDatabaseState = {
     webhookUrl: "https://agendamaisfacil.vercel.app/api/webhook/mercadopago",
     videoTutorialConfig: {
       youtubeUrl: "",
-      customVideoUrl: "/uploads/videos/V_deo_Aplicativo_do_App__1792379432220_bkd3.mp4",
+      customVideoUrl: "/uploads/videos/video_explicativo_app.mp4",
       videoTitle: "Vídeo Explicativo do App - Agenda Fácil",
       useInteractivePlayer: false,
       fileType: "video",
       fileName: "Vídeo Aplicativo do App .mp4",
-      fileSize: "25.7 MB",
+      fileSize: "44.6 MB",
       uploadedAt: "2026-10-19T03:11:00.598Z"
     }
   },
@@ -295,6 +295,13 @@ class SyncStore {
           ...parsed,
           lastUpdated: parsed.lastUpdated || Date.now()
         };
+        if (parsed.adminPaymentConfig) {
+          merged.adminPaymentConfig = {
+            ...DEFAULT_STATE.adminPaymentConfig,
+            ...parsed.adminPaymentConfig,
+            videoTutorialConfig: parsed.adminPaymentConfig.videoTutorialConfig || DEFAULT_STATE.adminPaymentConfig.videoTutorialConfig
+          };
+        }
         if (parsed.adminCredentialsList && Array.isArray(parsed.adminCredentialsList) && parsed.adminCredentialsList.length > 0) {
           merged.adminCredentialsList = parsed.adminCredentialsList;
         }

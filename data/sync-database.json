@@ -311,15 +311,17 @@
   ],
   "onlineUsers": [
     {
-      "id": "client_cbg68to_1788317228381",
+      "id": "client_co7g22x_1792377554346",
       "name": "Théo Soares",
       "role": "cliente",
       "salonId": "salon-parcas",
       "status": "online",
-      "lastSeen": 1788755031789
+      "lastSeen": 1792405821779
     }
   ],
   "usedTrialCpfs": [],
-  "lastUpdated": 1788755031789,
-  "lastSenderId": "client_cbg68to_1788317228381"
+  "caixaFechamentos": [],
+  "lastUpdated": 1792405821779,
+  "lastSenderId": "client_cbg68to_1788317228381",
+  "salonData": {}
 }
