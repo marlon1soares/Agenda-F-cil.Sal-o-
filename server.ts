@@ -57,8 +57,8 @@ function getLunaVideoPath(): string | null {
   return null;
 }
 
-// Raw binary parser for video uploads (supports files up to 300MB)
-app.use(["/api/upload-video*", "/api/video-upload*"], express.raw({ limit: "300mb", type: ["video/*", "application/octet-stream", "application/binary"] }));
+// Raw binary parser for video & audio uploads (supports files up to 300MB: MP4, MP3, etc.)
+app.use(["/api/upload-video*", "/api/video-upload*"], express.raw({ limit: "300mb", type: ["video/*", "audio/*", "application/octet-stream", "application/binary"] }));
 
 // Upload custom MP4/video from computer directly (Supports Raw Binary, Stream, and JSON Base64)
 app.all(["/api/upload-video", "/api/upload-video-mp4", "/api/video-upload"], (req, res) => {

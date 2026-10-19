@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { X, Key, Scissors, CheckCircle2, AlertCircle, Crown, Eye, EyeOff, Store, ShoppingCart, Gift } from 'lucide-react';
+import { X, Key, Scissors, CheckCircle2, AlertCircle, Crown, Eye, EyeOff, Store, ShoppingCart, Gift, Play, Film } from 'lucide-react';
 import { SalonApp, UserRole } from '../types';
 import { Storage } from '../utils/storage';
 import { formatBRL } from '../utils/pricing';
+import { VideoExplicativoModal } from './VideoExplicativoModal';
 
 interface SalonAuthModalProps {
   isOpen: boolean;
@@ -30,6 +31,7 @@ export const SalonAuthModal: React.FC<SalonAuthModalProps> = ({
   const [errorMsg, setErrorMsg] = useState('');
   const [showQuickAccessOptions, setShowQuickAccessOptions] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
+  const [isExplicativoModalOpen, setIsExplicativoModalOpen] = useState(false);
   const adminPaymentConfig = Storage.getAdminPaymentConfig();
   const trialDays = adminPaymentConfig.diasGratuitos || 7;
   const p30Price = adminPaymentConfig.precoPlano30Dias || 30;
@@ -425,15 +427,27 @@ export const SalonAuthModal: React.FC<SalonAuthModalProps> = ({
             </div>
           </div>
 
-          {/* Submit Action Button - Diminuído e Otimizado */}
-          <div className="pt-1">
+          {/* Action Buttons: Green (Entrar como Salão) + Red (Vídeo Explicativo do App) Lado a Lado (Metade da Tela cada) */}
+          <div className="pt-1 grid grid-cols-2 gap-2">
             <button
               id="btn-submit-auth"
               type="submit"
-              className="w-full text-white font-extrabold py-2.5 px-3 rounded-xl shadow-md flex items-center justify-center gap-1.5 transition-all active:scale-98 text-xs sm:text-sm cursor-pointer bg-emerald-600 hover:bg-emerald-500 shadow-emerald-950/40"
+              className="w-full text-white font-extrabold py-2.5 px-2 rounded-xl shadow-md flex items-center justify-center gap-1.5 transition-all active:scale-98 text-[11px] sm:text-xs cursor-pointer bg-emerald-600 hover:bg-emerald-500 shadow-emerald-950/40 border border-emerald-500/30"
+              title="Entrar no painel do salão ou administração"
             >
-              <CheckCircle2 className="w-4 h-4 text-white" />
-              <span>Entrar como Salão / Administrador ➔</span>
+              <CheckCircle2 className="w-3.5 h-3.5 text-white shrink-0" />
+              <span className="truncate">Entrar como Salão ➔</span>
+            </button>
+
+            <button
+              id="btn-video-explicativo-app"
+              type="button"
+              onClick={() => setIsExplicativoModalOpen(true)}
+              className="w-full text-white font-extrabold py-2.5 px-2 rounded-xl shadow-md flex items-center justify-center gap-1.5 transition-all active:scale-98 text-[11px] sm:text-xs cursor-pointer bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 shadow-red-950/40 border border-red-500/40"
+              title="Assistir ou anexar vídeo explicativo do aplicativo em MP4 ou MP3"
+            >
+              <Play className="w-3.5 h-3.5 text-white fill-white shrink-0" />
+              <span className="truncate">Vídeo Explicativo do App</span>
             </button>
           </div>
 
@@ -467,6 +481,12 @@ export const SalonAuthModal: React.FC<SalonAuthModalProps> = ({
         </form>
 
       </div>
+
+      {/* Modal de Vídeo Explicativo em MP4 ou MP3 */}
+      <VideoExplicativoModal
+        isOpen={isExplicativoModalOpen}
+        onClose={() => setIsExplicativoModalOpen(false)}
+      />
     </div>
   );
 };

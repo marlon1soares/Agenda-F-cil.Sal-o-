@@ -267,10 +267,14 @@ export interface VideoTutorialChapterConfig {
 
 export interface VideoTutorialConfig {
   youtubeUrl: string; // e.g. https://www.youtube.com/watch?v=...
-  customVideoUrl?: string; // Direct mp4/video or embed link
+  customVideoUrl?: string; // Direct mp4/video, mp3/audio or embed link
   videoTitle?: string;
   useInteractivePlayer?: boolean; // Show simulated screen interactive video player
   chapters?: VideoTutorialChapterConfig[];
+  fileType?: 'video' | 'audio';
+  fileName?: string;
+  fileSize?: string;
+  uploadedAt?: string;
 }
 
 export interface AdminPaymentConfig {
