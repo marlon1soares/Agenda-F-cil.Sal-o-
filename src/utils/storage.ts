@@ -822,7 +822,7 @@ export const Storage = {
         useInteractivePlayer: false,
         fileType: 'video',
         fileName: 'Vídeo Aplicativo do App .mp4',
-        fileSize: '44.6 MB',
+        fileSize: '8.1 MB',
         uploadedAt: '2026-10-19T03:11:00.598Z'
       }
     };

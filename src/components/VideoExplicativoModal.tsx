@@ -17,12 +17,12 @@ export const VideoExplicativoModal: React.FC<VideoExplicativoModalProps> = ({
 }) => {
   const [videoConfig, setVideoConfig] = useState<VideoTutorialConfig>({
     youtubeUrl: '',
-    customVideoUrl: '/uploads/videos/V_deo_Aplicativo_do_App__1792379432220_bkd3.mp4',
+    customVideoUrl: '/uploads/videos/video_explicativo_app.mp4',
     videoTitle: 'Vídeo Explicativo do App - Agenda Fácil',
     useInteractivePlayer: false,
     fileType: 'video',
     fileName: 'Vídeo Aplicativo do App .mp4',
-    fileSize: '25.7 MB'
+    fileSize: '8.1 MB'
   });
 
   // Playback states
@@ -57,12 +57,12 @@ export const VideoExplicativoModal: React.FC<VideoExplicativoModalProps> = ({
       const adminPayment = Storage.getAdminPaymentConfig();
       const cfg = adminPayment.videoTutorialConfig || {
         youtubeUrl: '',
-        customVideoUrl: '/uploads/videos/V_deo_Aplicativo_do_App__1792379432220_bkd3.mp4',
+        customVideoUrl: '/uploads/videos/video_explicativo_app.mp4',
         videoTitle: 'Vídeo Explicativo do App - Agenda Fácil',
         useInteractivePlayer: false,
         fileType: 'video',
         fileName: 'Vídeo Aplicativo do App .mp4',
-        fileSize: '25.7 MB'
+        fileSize: '8.1 MB'
       };
       setVideoConfig(cfg);
     };
@@ -117,13 +117,26 @@ export const VideoExplicativoModal: React.FC<VideoExplicativoModalProps> = ({
   const handleTogglePlayVideo = () => {
     if (!videoPlayerRef.current) return;
     if (videoPlayerRef.current.paused) {
-      videoPlayerRef.current.play().then(() => {
-        setIsVideoPlaying(true);
-        setVideoError(null);
-      }).catch((err) => {
-        console.warn('Playback error on user interaction:', err);
-        setVideoError('Toque no player ou utilize a opção "Abrir Vídeo em Nova Aba".');
-      });
+      const playPromise = videoPlayerRef.current.play();
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            setIsVideoPlaying(true);
+            setVideoError(null);
+          })
+          .catch((err) => {
+            console.warn('Playback error on user interaction:', err);
+            if (videoPlayerRef.current) {
+              videoPlayerRef.current.muted = true;
+              videoPlayerRef.current.play().then(() => {
+                setIsVideoPlaying(true);
+                setVideoError(null);
+              }).catch(() => {
+                setVideoError('Toque no botão "Nova Aba" ou "Tela Cheia" para assistir no reprodutor nativo do seu aparelho.');
+              });
+            }
+          });
+      }
     } else {
       videoPlayerRef.current.pause();
       setIsVideoPlaying(false);
@@ -334,12 +347,11 @@ export const VideoExplicativoModal: React.FC<VideoExplicativoModalProps> = ({
                   <video
                     key={`${videoConfig.customVideoUrl}_${videoReloadKey}`}
                     ref={videoPlayerRef}
-                    src={videoConfig.customVideoUrl}
                     controls
                     playsInline
                     webkit-playsinline="true"
                     x5-playsinline="true"
-                    preload="metadata"
+                    preload="auto"
                     className="w-full max-h-[480px] object-contain mx-auto bg-black"
                     onPlay={() => {
                       setIsVideoPlaying(true);
@@ -350,21 +362,27 @@ export const VideoExplicativoModal: React.FC<VideoExplicativoModalProps> = ({
                       setVideoError('Caso o player não carregue no seu navegador, utilize os botões abaixo para assistir em tela cheia.');
                     }}
                   >
-                    <source src={videoConfig.customVideoUrl} type="video/mp4" />
+                    {videoConfig.customVideoUrl && (
+                      <source src={videoConfig.customVideoUrl} type="video/mp4" />
+                    )}
                     <source src="/uploads/videos/video_explicativo_app.mp4" type="video/mp4" />
+                    <source src="/uploads/videos/V_deo_Aplicativo_do_App__1792379432220_bkd3.mp4" type="video/mp4" />
+                    <source src="/uploads/videos/video_tutorial_agenda_mais_facil_luna.mp4" type="video/mp4" />
                     Seu dispositivo não suporta o formato padrão de vídeo HTML5.
                   </video>
 
                   {/* Touch/Click Overlay when paused for instant iOS/Android start */}
                   {!isVideoPlaying && !videoError && (
-                    <button
-                      type="button"
-                      onClick={handleTogglePlayVideo}
-                      className="absolute inset-0 m-auto w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-red-600/90 hover:bg-red-500 text-white flex items-center justify-center shadow-2xl shadow-red-950/80 transition-all hover:scale-105 active:scale-95 cursor-pointer z-10 border-2 border-white/30 backdrop-blur-sm"
-                      title="Clique para assistir"
-                    >
-                      <Play className="w-8 h-8 sm:w-10 sm:h-10 fill-white ml-1" />
-                    </button>
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+                      <button
+                        type="button"
+                        onClick={handleTogglePlayVideo}
+                        className="pointer-events-auto w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-red-600/95 hover:bg-red-500 text-white flex items-center justify-center shadow-2xl shadow-red-950/80 transition-all hover:scale-105 active:scale-95 cursor-pointer border-2 border-white/40 backdrop-blur-sm"
+                        title="Clique para assistir ao vídeo explicativo"
+                      >
+                        <Play className="w-8 h-8 sm:w-10 sm:h-10 fill-white ml-1" />
+                      </button>
+                    </div>
                   )}
                 </div>
 

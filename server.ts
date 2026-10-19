@@ -47,17 +47,32 @@ app.all(["/uploads/videos/:filename", "/uploads/videos/*"], (req, res, next) => 
     return res.sendStatus(200);
   }
 
-  const rawParam = req.params.filename || req.params[0] || "";
+  let rawParam = req.params.filename || req.params[0] || "";
+  try {
+    rawParam = decodeURIComponent(rawParam);
+  } catch {}
   let filename = path.basename(rawParam);
   let filePath = path.resolve(uploadsVideosDir, filename);
 
-  // If specific filename not found, check fallback files
+  // If specific filename not found, search directory for similar files or use canonical video
   if (!fs.existsSync(filePath)) {
     const candidateAlias = path.resolve(uploadsVideosDir, "video_explicativo_app.mp4");
+    const candidateOriginal = path.resolve(uploadsVideosDir, "V_deo_Aplicativo_do_App__1792379432220_bkd3.mp4");
     const candidateLuna = path.resolve(uploadsVideosDir, "video_tutorial_agenda_mais_facil_luna.mp4");
-    if (fs.existsSync(candidateAlias)) {
+    
+    // Check if any file in uploadsVideosDir matches loosely
+    const dirFiles = fs.readdirSync(uploadsVideosDir);
+    const matched = dirFiles.find(f => f.toLowerCase() === filename.toLowerCase() || f.includes(filename.slice(0, 10)));
+
+    if (matched && fs.existsSync(path.resolve(uploadsVideosDir, matched))) {
+      filePath = path.resolve(uploadsVideosDir, matched);
+      filename = matched;
+    } else if (fs.existsSync(candidateAlias)) {
       filePath = candidateAlias;
       filename = "video_explicativo_app.mp4";
+    } else if (fs.existsSync(candidateOriginal)) {
+      filePath = candidateOriginal;
+      filename = "V_deo_Aplicativo_do_App__1792379432220_bkd3.mp4";
     } else if (fs.existsSync(candidateLuna)) {
       filePath = candidateLuna;
       filename = "video_tutorial_agenda_mais_facil_luna.mp4";
