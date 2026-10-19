@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Play, Pause, RotateCcw, Volume2, VolumeX, X, ArrowLeft, Upload, 
-  FileVideo, Music, Film, CheckCircle2, ShieldCheck, Lock, Unlock, 
-  FolderOpen, Globe, AlertCircle, Sparkles, Download, Check
+  FileVideo, Music, Film, CheckCircle2, ShieldCheck,
+  FolderOpen, Globe, AlertCircle, Check, Loader2, Sparkles, ExternalLink
 } from 'lucide-react';
 import { Storage } from '../utils/storage';
 import { VideoTutorialConfig, AdminPaymentConfig } from '../types';
@@ -11,11 +11,13 @@ import { syncEngine } from '../utils/syncEngine';
 interface VideoExplicativoModalProps {
   isOpen: boolean;
   onClose: () => void;
+  isAdmin?: boolean;
 }
 
 export const VideoExplicativoModal: React.FC<VideoExplicativoModalProps> = ({
   isOpen,
-  onClose
+  onClose,
+  isAdmin = false
 }) => {
   const [activeTab, setActiveTab] = useState<'assistir' | 'admin'>('assistir');
   const [videoConfig, setVideoConfig] = useState<VideoTutorialConfig>({
@@ -24,17 +26,6 @@ export const VideoExplicativoModal: React.FC<VideoExplicativoModalProps> = ({
     videoTitle: 'Vídeo Explicativo do App - Agenda Fácil',
     useInteractivePlayer: false
   });
-
-  // Admin authentication state inside modal
-  const [isAdminUnlocked, setIsAdminUnlocked] = useState<boolean>(() => {
-    try {
-      return sessionStorage.getItem('salao_admin_authenticated') === 'true';
-    } catch {
-      return false;
-    }
-  });
-  const [adminPasswordInput, setAdminPasswordInput] = useState('');
-  const [adminAuthError, setAdminAuthError] = useState('');
 
   // Media upload & editing state
   const [customVideoUrl, setCustomVideoUrl] = useState('');
@@ -53,8 +44,6 @@ export const VideoExplicativoModal: React.FC<VideoExplicativoModalProps> = ({
   const [isAudioPlaying, setIsAudioPlaying] = useState(false);
   const [audioCurrentTime, setAudioCurrentTime] = useState(0);
   const [audioDuration, setAudioDuration] = useState(0);
-  const [audioVolume, setAudioVolume] = useState(1);
-  const [isMuted, setIsMuted] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const videoPlayerRef = useRef<HTMLVideoElement | null>(null);
@@ -79,14 +68,13 @@ export const VideoExplicativoModal: React.FC<VideoExplicativoModalProps> = ({
       setAttachedFileSize(cfg.fileSize || '');
       setSaveSuccessMsg('');
       setUploadError('');
-      setActiveTab('assistir');
 
-      // Check if session admin is active
-      try {
-        if (sessionStorage.getItem('salao_admin_authenticated') === 'true') {
-          setIsAdminUnlocked(true);
-        }
-      } catch {}
+      // If user entered as administrator, show the admin tab directly; otherwise, always show pure watch view
+      if (isAdmin) {
+        setActiveTab('admin');
+      } else {
+        setActiveTab('assistir');
+      }
     } else {
       // Pause playing media when modal closes
       if (videoPlayerRef.current) {
@@ -97,7 +85,7 @@ export const VideoExplicativoModal: React.FC<VideoExplicativoModalProps> = ({
       }
       setIsAudioPlaying(false);
     }
-  }, [isOpen]);
+  }, [isOpen, isAdmin]);
 
   if (!isOpen) return null;
 
@@ -119,49 +107,43 @@ export const VideoExplicativoModal: React.FC<VideoExplicativoModalProps> = ({
     return `${Math.round(bytes / 1024)} KB`;
   };
 
-  // Unlock Admin Section
-  const handleUnlockAdmin = (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    const pass = adminPasswordInput.trim();
-    if (!pass) {
-      setAdminAuthError('Por favor, digite a senha de administrador.');
-      return;
-    }
+  // Helper to immediately save to Storage and SyncEngine for all users
+  const saveImmediately = (patch: Partial<VideoTutorialConfig>) => {
+    const adminPayment = Storage.getAdminPaymentConfig();
+    const updatedCfg: VideoTutorialConfig = {
+      ...adminPayment.videoTutorialConfig,
+      youtubeUrl: youtubeUrl.trim(),
+      customVideoUrl: customVideoUrl.trim(),
+      videoTitle: videoTitle.trim() || 'Vídeo Explicativo do App - Agenda Fácil',
+      useInteractivePlayer: false,
+      fileType: fileType,
+      fileName: attachedFileName,
+      fileSize: attachedFileSize,
+      uploadedAt: new Date().toISOString(),
+      ...patch
+    };
 
-    // Official admin passwords check
-    const isValid = 
-      pass === 'Ana1@@theo' || 
-      pass === 'Ana1@theo' || 
-      pass === 'Ana1@luna' || 
-      pass === 'Ana1@@luna' || 
-      pass.toLowerCase() === 'ana1@@theo' ||
-      pass.toLowerCase() === 'ana1@luna' ||
-      pass === 'admin' || 
-      pass === 'admin123' || 
-      pass === '123456' || 
-      pass === '22622448805' ||
-      pass === '226.224.488-05';
+    const updatedAdminPayment: AdminPaymentConfig = {
+      ...adminPayment,
+      videoTutorialConfig: updatedCfg
+    };
 
-    if (isValid) {
-      setIsAdminUnlocked(true);
-      setAdminAuthError('');
-      try {
-        sessionStorage.setItem('salao_admin_authenticated', 'true');
-      } catch {}
-    } else {
-      setAdminAuthError('Senha de Administrador incorreta. Verifique e tente novamente.');
-    }
+    Storage.saveAdminPaymentConfig(updatedAdminPayment);
+    syncEngine.pushUpdate({ adminPaymentConfig: updatedAdminPayment });
+    setVideoConfig(updatedCfg);
+    setSaveSuccessMsg('✅ Salvo imediatamente! Todas as pessoas que acessarem o aplicativo já têm acesso ao vídeo oficial.');
   };
 
-  // Upload MP4 or MP3 file from PC
+  // Upload MP4 or MP3 file from PC and SAVE IMMEDIATELY
   const handleFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     const detectedType = file.type.startsWith('audio/') || file.name.match(/\.(mp3|wav|ogg|m4a)$/i) ? 'audio' : 'video';
+    const formattedSize = formatFileSize(file.size);
     setFileType(detectedType);
     setAttachedFileName(file.name);
-    setAttachedFileSize(formatFileSize(file.size));
+    setAttachedFileSize(formattedSize);
     setUploadError('');
     setIsUploading(true);
     setUploadProgress(10);
@@ -180,7 +162,7 @@ export const VideoExplicativoModal: React.FC<VideoExplicativoModalProps> = ({
     };
 
     const tryBase64Fallback = () => {
-      // Fallback: Read as Data URL so it is guaranteed to work even without backend / on static preview
+      // Fallback: Read as Data URL so it is guaranteed to work in any environment
       const reader = new FileReader();
       reader.onload = (event) => {
         const resultUrl = event.target?.result as string;
@@ -188,7 +170,15 @@ export const VideoExplicativoModal: React.FC<VideoExplicativoModalProps> = ({
           setCustomVideoUrl(resultUrl);
           setUploadProgress(100);
           setIsUploading(false);
-          setSaveSuccessMsg(`Arquivo "${file.name}" anexado com sucesso do seu computador! Clique no botão abaixo para Salvar.`);
+
+          // Salvar imediatamente conforme solicitado pelo usuário
+          saveImmediately({
+            customVideoUrl: resultUrl,
+            fileName: file.name,
+            fileSize: formattedSize,
+            fileType: detectedType,
+            videoTitle: videoTitle.trim() || 'Vídeo Explicativo do App - Agenda Fácil'
+          });
         } else {
           setIsUploading(false);
           setUploadError('Não foi possível ler o arquivo do seu computador.');
@@ -209,7 +199,15 @@ export const VideoExplicativoModal: React.FC<VideoExplicativoModalProps> = ({
             setCustomVideoUrl(res.url);
             setUploadProgress(100);
             setIsUploading(false);
-            setSaveSuccessMsg(`Arquivo "${file.name}" carregado com sucesso! Clique em "Salvar Vídeo" para ativar para todos.`);
+
+            // Salvar imediatamente conforme solicitado pelo usuário
+            saveImmediately({
+              customVideoUrl: res.url,
+              fileName: file.name,
+              fileSize: formattedSize,
+              fileType: detectedType,
+              videoTitle: videoTitle.trim() || 'Vídeo Explicativo do App - Agenda Fácil'
+            });
             return;
           }
         } catch {
@@ -234,28 +232,16 @@ export const VideoExplicativoModal: React.FC<VideoExplicativoModalProps> = ({
 
   // Save the video config permanently for all users, salons and clients
   const handleSaveVideoConfig = () => {
-    const adminPayment = Storage.getAdminPaymentConfig();
-    const updatedCfg: VideoTutorialConfig = {
+    saveImmediately({
       youtubeUrl: youtubeUrl.trim(),
       customVideoUrl: customVideoUrl.trim(),
       videoTitle: videoTitle.trim() || 'Vídeo Explicativo do App - Agenda Fácil',
       useInteractivePlayer: false,
       fileType: fileType,
       fileName: attachedFileName,
-      fileSize: attachedFileSize,
-      uploadedAt: new Date().toISOString()
-    };
+      fileSize: attachedFileSize
+    });
 
-    const updatedAdminPayment: AdminPaymentConfig = {
-      ...adminPayment,
-      videoTutorialConfig: updatedCfg
-    };
-
-    Storage.saveAdminPaymentConfig(updatedAdminPayment);
-    syncEngine.pushUpdate({ adminPaymentConfig: updatedAdminPayment });
-    setVideoConfig(updatedCfg);
-
-    setSaveSuccessMsg('✅ Vídeo explicativo salvo com sucesso! Qualquer pessoa que acessar o link terá acesso a este vídeo.');
     setTimeout(() => {
       setActiveTab('assistir');
     }, 1500);
@@ -263,24 +249,17 @@ export const VideoExplicativoModal: React.FC<VideoExplicativoModalProps> = ({
 
   // Remove attached video
   const handleRemoveAttached = () => {
-    if (confirm('Deseja remover o vídeo anexado atualmente?')) {
+    if (confirm('Deseja remover o vídeo ou áudio anexado?')) {
       setCustomVideoUrl('');
       setAttachedFileName('');
       setAttachedFileSize('');
       setYoutubeUrl('');
-      const adminPayment = Storage.getAdminPaymentConfig();
-      const updatedCfg: VideoTutorialConfig = {
-        ...adminPayment.videoTutorialConfig,
+      saveImmediately({
         customVideoUrl: '',
         fileName: '',
-        fileSize: ''
-      };
-      Storage.saveAdminPaymentConfig({
-        ...adminPayment,
-        videoTutorialConfig: updatedCfg
+        fileSize: '',
+        youtubeUrl: ''
       });
-      syncEngine.pushUpdate({ adminPaymentConfig: { ...adminPayment, videoTutorialConfig: updatedCfg } });
-      setVideoConfig(updatedCfg);
       setSaveSuccessMsg('Vídeo removido com sucesso.');
     }
   };
@@ -302,14 +281,17 @@ export const VideoExplicativoModal: React.FC<VideoExplicativoModalProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <span className="bg-red-500/20 text-red-400 text-[10px] font-black px-2 py-0.5 rounded-full border border-red-500/30 uppercase tracking-wider">
-                  Vídeo Explicativo
+                  Assista ao Vídeo Explicativo
                 </span>
-                <span className="text-[10px] text-slate-400 font-mono">
-                  {isAudioFile ? 'Formato MP3 / Áudio' : 'Formato MP4 / Vídeo'}
-                </span>
+                {isAdmin && (
+                  <span className="bg-amber-500/20 text-amber-300 text-[10px] font-black px-2 py-0.5 rounded-full border border-amber-500/40 uppercase tracking-wider flex items-center gap-1">
+                    <ShieldCheck className="w-3 h-3 text-amber-400" />
+                    <span>Administrador</span>
+                  </span>
+                )}
               </div>
               <h2 className="text-base sm:text-lg font-black text-white">
-                {videoConfig.videoTitle || 'Vídeo Explicativo do App'}
+                {videoConfig.videoTitle || 'Assista ao Vídeo Explicativo'}
               </h2>
             </div>
           </div>
@@ -319,11 +301,11 @@ export const VideoExplicativoModal: React.FC<VideoExplicativoModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold py-1.5 px-3 rounded-xl text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-sm active:scale-95"
-              title="Voltar para a página original"
+              className="bg-emerald-700 hover:bg-emerald-600 text-white border border-emerald-500/50 font-extrabold py-1.5 px-3 rounded-xl text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-sm active:scale-95"
+              title="Voltar para a página original (Entrar como Salão / Administrador)"
             >
-              <ArrowLeft className="w-3.5 h-3.5 text-emerald-400" />
-              <span className="hidden sm:inline">Voltar para o Início</span>
+              <ArrowLeft className="w-3.5 h-3.5 text-white" />
+              <span className="hidden sm:inline">Voltar para a Página Inicial</span>
               <span className="sm:hidden">Voltar</span>
             </button>
 
@@ -338,49 +320,51 @@ export const VideoExplicativoModal: React.FC<VideoExplicativoModalProps> = ({
           </div>
         </div>
 
-        {/* Navigation Tabs */}
-        <div className="px-5 pt-3 pb-0 bg-[#0e172a]/60 border-b border-slate-800 flex items-center justify-between flex-wrap gap-2 shrink-0">
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setActiveTab('assistir')}
-              className={`px-3 py-1.5 rounded-t-xl text-xs font-extrabold flex items-center gap-1.5 transition-colors cursor-pointer border-b-2 ${
-                activeTab === 'assistir'
-                  ? 'bg-slate-800/90 text-white border-red-500'
-                  : 'text-slate-400 hover:text-slate-200 border-transparent'
-              }`}
-            >
-              <Play className="w-3.5 h-3.5 text-red-400 fill-red-400" />
-              <span>Assistir ao Vídeo Explicativo</span>
-            </button>
+        {/* Navigation Tabs - ONLY VISIBLE IF LOGGED IN AS ADMINISTRATOR */}
+        {isAdmin && (
+          <div className="px-5 pt-3 pb-0 bg-[#0e172a]/80 border-b border-slate-800 flex items-center justify-between flex-wrap gap-2 shrink-0">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setActiveTab('admin')}
+                className={`px-3 py-1.5 rounded-t-xl text-xs font-extrabold flex items-center gap-1.5 transition-colors cursor-pointer border-b-2 ${
+                  activeTab === 'admin'
+                    ? 'bg-slate-800/90 text-white border-red-500'
+                    : 'text-slate-400 hover:text-slate-200 border-transparent'
+                }`}
+              >
+                <FolderOpen className="w-3.5 h-3.5 text-amber-400" />
+                <span>Anexar / Salvar Vídeo (Administrador)</span>
+              </button>
 
-            <button
-              type="button"
-              onClick={() => setActiveTab('admin')}
-              className={`px-3 py-1.5 rounded-t-xl text-xs font-extrabold flex items-center gap-1.5 transition-colors cursor-pointer border-b-2 ${
-                activeTab === 'admin'
-                  ? 'bg-slate-800/90 text-white border-red-500'
-                  : 'text-slate-400 hover:text-slate-200 border-transparent'
-              }`}
-            >
-              <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
-              <span>Anexar / Salvar Vídeo (Administrador)</span>
-            </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('assistir')}
+                className={`px-3 py-1.5 rounded-t-xl text-xs font-extrabold flex items-center gap-1.5 transition-colors cursor-pointer border-b-2 ${
+                  activeTab === 'assistir'
+                    ? 'bg-slate-800/90 text-white border-red-500'
+                    : 'text-slate-400 hover:text-slate-200 border-transparent'
+                }`}
+              >
+                <Play className="w-3.5 h-3.5 text-red-400 fill-red-400" />
+                <span>Assistir como Visitante</span>
+              </button>
+            </div>
+
+            {videoConfig.customVideoUrl && (
+              <span className="text-[11px] text-emerald-400 font-bold flex items-center gap-1 py-1">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>Vídeo Oficial Salvo</span>
+              </span>
+            )}
           </div>
-
-          {videoConfig.customVideoUrl && (
-            <span className="text-[11px] text-emerald-400 font-bold flex items-center gap-1 py-1">
-              <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>Vídeo Oficial Anexado</span>
-            </span>
-          )}
-        </div>
+        )}
 
         {/* Modal Body / Scrollable Content */}
         <div className="p-5 overflow-y-auto space-y-4 flex-1">
           
-          {/* TAB 1: WATCH THE EXPLANATORY VIDEO */}
-          {activeTab === 'assistir' && (
+          {/* TAB 1: WATCH THE EXPLANATORY VIDEO (Default & Only View for Public/Salons without Admin login) */}
+          {(activeTab === 'assistir' || !isAdmin) && (
             <div className="space-y-4">
               
               {/* Media Player Container */}
@@ -479,21 +463,6 @@ export const VideoExplicativoModal: React.FC<VideoExplicativoModalProps> = ({
                             <Play className="w-6 h-6 fill-white ml-0.5" />
                           )}
                         </button>
-
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (audioPlayerRef.current) {
-                              const newMute = !isMuted;
-                              setIsMuted(newMute);
-                              audioPlayerRef.current.muted = newMute;
-                            }
-                          }}
-                          className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition-all cursor-pointer"
-                          title={isMuted ? 'Desmutar' : 'Mutar'}
-                        >
-                          {isMuted ? <VolumeX className="w-4 h-4 text-red-400" /> : <Volume2 className="w-4 h-4" />}
-                        </button>
                       </div>
                     </div>
                   </div>
@@ -504,13 +473,14 @@ export const VideoExplicativoModal: React.FC<VideoExplicativoModalProps> = ({
                       ref={videoPlayerRef}
                       src={videoConfig.customVideoUrl}
                       controls
-                      autoPlay={false}
+                      autoPlay
+                      playsInline
                       className="w-full max-h-[460px] object-contain mx-auto bg-black"
                     />
                     <div className="p-3 bg-slate-900/90 border-t border-slate-800 flex items-center justify-between text-xs text-slate-300">
                       <div className="flex items-center gap-2">
                         <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
-                        <span className="font-bold">{videoConfig.videoTitle || 'Vídeo Explicativo'}</span>
+                        <span className="font-bold">{videoConfig.videoTitle || 'Assista ao Vídeo Explicativo'}</span>
                       </div>
                       {videoConfig.fileName && (
                         <span className="text-[11px] text-slate-400 font-mono">
@@ -538,29 +508,18 @@ export const VideoExplicativoModal: React.FC<VideoExplicativoModalProps> = ({
                   />
                 </div>
               ) : (
-                /* Empty state - No video attached yet */
-                <div className="bg-slate-900/80 border border-dashed border-slate-700 rounded-2xl p-8 text-center space-y-4">
+                /* Clean Empty state - No video attached yet */
+                <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-8 text-center space-y-4">
                   <div className="w-16 h-16 rounded-3xl bg-slate-800 flex items-center justify-center text-red-400 mx-auto border border-slate-700">
                     <FileVideo className="w-8 h-8" />
                   </div>
                   <div className="space-y-1.5 max-w-md mx-auto">
                     <h3 className="text-base font-black text-white">
-                      Nenhum Vídeo Explicativo Anexado Ainda
+                      Vídeo Explicativo do App
                     </h3>
                     <p className="text-xs text-slate-400 leading-relaxed">
-                      O administrador pode anexar um vídeo em MP4 ou áudio em MP3 baixado do computador. Ao salvar, todas as pessoas que abrirem o link terão acesso imediato!
+                      O vídeo explicativo oficial está sendo preparado pelo administrador e estará disponível aqui em breve!
                     </p>
-                  </div>
-
-                  <div className="pt-2">
-                    <button
-                      type="button"
-                      onClick={() => setActiveTab('admin')}
-                      className="bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-black py-2.5 px-4 rounded-xl text-xs flex items-center justify-center gap-2 mx-auto shadow-md transition-all active:scale-95 cursor-pointer"
-                    >
-                      <Upload className="w-4 h-4" />
-                      <span>Anexar Vídeo Agora (Administrador)</span>
-                    </button>
                   </div>
                 </div>
               )}
@@ -580,10 +539,10 @@ export const VideoExplicativoModal: React.FC<VideoExplicativoModalProps> = ({
                 <div className="bg-[#0e172a] border border-slate-800 p-3.5 rounded-xl space-y-1">
                   <div className="text-xs font-black text-white flex items-center gap-1.5">
                     <span className="w-2 h-2 rounded-full bg-red-400" />
-                    <span>Retorno Garantido</span>
+                    <span>Retorno à Tela Inicial</span>
                   </div>
                   <p className="text-[11px] text-slate-400 leading-relaxed">
-                    Após assistir o vídeo, basta clicar no botão abaixo para retornar imediatamente à tela inicial e entrar como Salão ou Administrador.
+                    Após assistir ao vídeo explicativo, clique no botão verde abaixo para retornar à página inicial e entrar como Salão ou Administrador.
                   </p>
                 </div>
               </div>
@@ -603,223 +562,187 @@ export const VideoExplicativoModal: React.FC<VideoExplicativoModalProps> = ({
             </div>
           )}
 
-          {/* TAB 2: ADMIN CONFIGURATION & ATTACHMENT */}
-          {activeTab === 'admin' && (
+          {/* TAB 2: ADMIN CONFIGURATION & ATTACHMENT - ONLY ACCESSIBLE BY ADMINISTRATOR */}
+          {isAdmin && activeTab === 'admin' && (
             <div className="space-y-4">
               
-              {!isAdminUnlocked ? (
-                /* Admin Password Authentication Barrier */
-                <form onSubmit={handleUnlockAdmin} className="bg-slate-900 border border-slate-800 p-6 rounded-2xl max-w-md mx-auto space-y-4">
-                  <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 mx-auto">
-                    <Lock className="w-6 h-6" />
+              <div className="space-y-4">
+                
+                {saveSuccessMsg && (
+                  <div className="bg-emerald-950/90 border border-emerald-600 p-3 rounded-xl flex items-center gap-2 text-emerald-200 text-xs font-bold animate-in fade-in">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <span>{saveSuccessMsg}</span>
+                  </div>
+                )}
+
+                {uploadError && (
+                  <div className="bg-rose-950/90 border border-rose-600 p-3 rounded-xl flex items-center gap-2 text-rose-200 text-xs font-bold">
+                    <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                    <span>{uploadError}</span>
+                  </div>
+                )}
+
+                {/* Hidden File Input */}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="video/mp4,audio/mpeg,audio/mp3,audio/wav,video/webm,video/quicktime,video/*,audio/*,.mp4,.mp3,.webm,.mov,.wav"
+                  className="hidden"
+                  onChange={handleFileSelected}
+                />
+
+                {/* Upload Box from Computer */}
+                <div className="bg-[#0e172a] border border-slate-800 rounded-2xl p-5 space-y-3">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <div className="flex items-center gap-2">
+                      <FolderOpen className="w-4 h-4 text-red-400" />
+                      <h4 className="text-xs font-black text-white">
+                        Baixar e Anexar do Meu Computador (.MP4 ou .MP3)
+                      </h4>
+                    </div>
+                    <span className="text-[10px] text-slate-400 bg-slate-800 px-2 py-0.5 rounded-full font-mono">
+                      Formatos: MP4, MP3, WebM, WAV
+                    </span>
                   </div>
 
-                  <div className="text-center space-y-1">
-                    <h3 className="text-sm font-black text-white">
-                      Área Restrita do Administrador
-                    </h3>
-                    <p className="text-xs text-slate-400 leading-relaxed">
-                      Digite sua senha de Administrador para liberar o anexo e configuração do vídeo oficial para todos os salões.
-                    </p>
+                  <p className="text-xs text-slate-400 leading-relaxed">
+                    Selecione o arquivo no seu computador. Ao anexar, ele será <strong className="text-emerald-400">salvo imediatamente</strong> para todas as pessoas que acessarem o link oficial do aplicativo.
+                  </p>
+
+                  {/* Drag and drop / Trigger button */}
+                  <div
+                    onClick={() => !isUploading && fileInputRef.current?.click()}
+                    className="border-2 border-dashed border-red-500/40 hover:border-red-400 bg-red-950/10 hover:bg-red-950/20 rounded-2xl p-6 text-center cursor-pointer transition-all space-y-2 group"
+                  >
+                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-red-600 to-rose-600 flex items-center justify-center text-white mx-auto shadow-md group-hover:scale-105 transition-transform">
+                      {isUploading ? (
+                        <Loader2 className="w-6 h-6 animate-spin" />
+                      ) : (
+                        <Upload className="w-6 h-6" />
+                      )}
+                    </div>
+                    <div>
+                      <span className="text-xs font-extrabold text-white block">
+                        Clique aqui para escolher arquivo no Computador (.mp4 ou .mp3)
+                      </span>
+                      <span className="text-[10px] text-slate-400 block mt-0.5">
+                        Salva imediatamente para todos os salões e visitantes
+                      </span>
+                    </div>
                   </div>
 
-                  {adminAuthError && (
-                    <div className="bg-rose-950/90 border border-rose-600 p-2.5 rounded-xl text-rose-200 text-xs font-bold flex items-center gap-2">
-                      <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
-                      <span>{adminAuthError}</span>
+                  {/* Upload progress */}
+                  {isUploading && (
+                    <div className="space-y-1.5 pt-2">
+                      <div className="flex items-center justify-between text-xs font-bold text-red-300">
+                        <span>Anexando e salvando imediatamente...</span>
+                        <span>{uploadProgress}%</span>
+                      </div>
+                      <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
+                        <div 
+                          className="bg-gradient-to-r from-red-600 to-rose-500 h-2 rounded-full transition-all duration-300"
+                          style={{ width: `${uploadProgress}%` }}
+                        />
+                      </div>
                     </div>
                   )}
 
+                  {/* Current Attached Media Indicator */}
+                  {customVideoUrl && (
+                    <div className="bg-slate-900 border border-emerald-500/40 p-3 rounded-xl flex items-center justify-between flex-wrap gap-2 text-xs">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                        <div>
+                          <span className="font-bold text-white block">
+                            {attachedFileName || 'Arquivo de mídia anexado'}
+                          </span>
+                          <span className="text-[10px] text-slate-400 font-mono">
+                            {fileType === 'audio' ? 'Áudio MP3' : 'Vídeo MP4'} {attachedFileSize ? `• ${attachedFileSize}` : ''}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => fileInputRef.current?.click()}
+                          className="text-[11px] font-bold text-sky-400 hover:text-sky-300 underline cursor-pointer"
+                        >
+                          Trocar Arquivo
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleRemoveAttached}
+                          className="text-[11px] font-bold text-rose-400 hover:text-rose-300 underline cursor-pointer ml-2"
+                        >
+                          Remover
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Title and Direct URL (Alternative) */}
+                <div className="bg-[#0e172a] border border-slate-800 rounded-2xl p-5 space-y-3">
                   <div className="space-y-1">
                     <label className="block text-xs font-bold text-slate-300">
-                      Senha de Administrador:
+                      Título Explicativo do Vídeo / Áudio:
                     </label>
                     <input
-                      type="password"
-                      placeholder="Digite a senha admin"
-                      value={adminPasswordInput}
-                      onChange={(e) => {
-                        setAdminPasswordInput(e.target.value);
-                        setAdminAuthError('');
-                      }}
-                      className="w-full bg-[#060a14] border border-slate-700 rounded-xl px-3 py-2 text-white text-xs font-mono focus:outline-none focus:border-red-500"
+                      type="text"
+                      value={videoTitle}
+                      onChange={(e) => setVideoTitle(e.target.value)}
+                      placeholder="Ex: Assista ao Vídeo Explicativo - Agenda Fácil"
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-red-500"
                     />
                   </div>
 
-                  <button
-                    type="submit"
-                    className="w-full bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-extrabold py-2.5 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-md"
-                  >
-                    <Unlock className="w-4 h-4" />
-                    <span>Liberar Anexo de Vídeo</span>
-                  </button>
-                </form>
-              ) : (
-                /* Unlocked Admin Uploader Form */
-                <div className="space-y-4">
-                  
-                  {saveSuccessMsg && (
-                    <div className="bg-emerald-950/90 border border-emerald-600 p-3 rounded-xl flex items-center gap-2 text-emerald-200 text-xs font-bold animate-in fade-in">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                      <span>{saveSuccessMsg}</span>
-                    </div>
-                  )}
-
-                  {uploadError && (
-                    <div className="bg-rose-950/90 border border-rose-600 p-3 rounded-xl flex items-center gap-2 text-rose-200 text-xs font-bold">
-                      <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
-                      <span>{uploadError}</span>
-                    </div>
-                  )}
-
-                  {/* Hidden File Input */}
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="video/mp4,audio/mpeg,audio/mp3,audio/wav,video/webm,video/quicktime,video/*,audio/*,.mp4,.mp3,.webm,.mov,.wav"
-                    className="hidden"
-                    onChange={handleFileSelected}
-                  />
-
-                  {/* Upload Box from Computer */}
-                  <div className="bg-[#0e172a] border border-slate-800 rounded-2xl p-5 space-y-3">
-                    <div className="flex items-center justify-between flex-wrap gap-2">
-                      <div className="flex items-center gap-2">
-                        <FolderOpen className="w-4 h-4 text-red-400" />
-                        <h4 className="text-xs font-black text-white">
-                          Baixar e Anexar do Meu Computador (.MP4 ou .MP3)
-                        </h4>
-                      </div>
-                      <span className="text-[10px] text-slate-400 bg-slate-800 px-2 py-0.5 rounded-full font-mono">
-                        Formatos: MP4, MP3, WebM, WAV
-                      </span>
-                    </div>
-
-                    <p className="text-xs text-slate-400 leading-relaxed">
-                      Selecione o arquivo gravado ou salvo no seu computador. Ele será anexado e sincronizado para que qualquer pessoa que acessar o link do aplicativo possa assistir.
-                    </p>
-
-                    {/* Drag and drop / Trigger button */}
-                    <div
-                      onClick={() => !isUploading && fileInputRef.current?.click()}
-                      className="border-2 border-dashed border-red-500/40 hover:border-red-400 bg-red-950/10 hover:bg-red-950/20 rounded-2xl p-6 text-center cursor-pointer transition-all space-y-2 group"
-                    >
-                      <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-red-600 to-rose-600 flex items-center justify-center text-white mx-auto shadow-md group-hover:scale-105 transition-transform">
-                        <Upload className="w-6 h-6" />
-                      </div>
-                      <div>
-                        <span className="text-xs font-extrabold text-white block">
-                          Clique aqui para procurar no seu Computador (.mp4 ou .mp3)
-                        </span>
-                        <span className="text-[10px] text-slate-400 block mt-0.5">
-                          Suporta arquivos de vídeo MP4 e áudios de narração MP3
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Upload progress */}
-                    {isUploading && (
-                      <div className="space-y-1.5 pt-2">
-                        <div className="flex items-center justify-between text-xs font-bold text-red-300">
-                          <span>Enviando arquivo do computador...</span>
-                          <span>{uploadProgress}%</span>
-                        </div>
-                        <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
-                          <div 
-                            className="bg-gradient-to-r from-red-600 to-rose-500 h-2 rounded-full transition-all duration-300"
-                            style={{ width: `${uploadProgress}%` }}
-                          />
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Current Attached Media Indicator */}
-                    {customVideoUrl && (
-                      <div className="bg-slate-900 border border-emerald-500/40 p-3 rounded-xl flex items-center justify-between flex-wrap gap-2 text-xs">
-                        <div className="flex items-center gap-2">
-                          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                          <div>
-                            <span className="font-bold text-white block">
-                              {attachedFileName || 'Arquivo de mídia anexado'}
-                            </span>
-                            <span className="text-[10px] text-slate-400 font-mono">
-                              {fileType === 'audio' ? 'Áudio MP3' : 'Vídeo MP4'} {attachedFileSize ? `• ${attachedFileSize}` : ''}
-                            </span>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => fileInputRef.current?.click()}
-                            className="text-[11px] font-bold text-sky-400 hover:text-sky-300 underline cursor-pointer"
-                          >
-                            Trocar Arquivo
-                          </button>
-                          <button
-                            type="button"
-                            onClick={handleRemoveAttached}
-                            className="text-[11px] font-bold text-rose-400 hover:text-rose-300 underline cursor-pointer ml-2"
-                          >
-                            Remover
-                          </button>
-                        </div>
-                      </div>
-                    )}
+                  <div className="space-y-1">
+                    <label className="block text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                      <Globe className="w-3.5 h-3.5 text-sky-400" />
+                      <span>Link Direto do Vídeo ou YouTube:</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={youtubeUrl}
+                      onChange={(e) => setYoutubeUrl(e.target.value)}
+                      placeholder="https://www.youtube.com/watch?v=... ou link direto .mp4"
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white text-xs font-mono focus:outline-none focus:border-red-500"
+                    />
                   </div>
-
-                  {/* Title and Direct URL (Alternative) */}
-                  <div className="bg-[#0e172a] border border-slate-800 rounded-2xl p-5 space-y-3">
-                    <div className="space-y-1">
-                      <label className="block text-xs font-bold text-slate-300">
-                        Título Explicativo do Vídeo / Áudio:
-                      </label>
-                      <input
-                        type="text"
-                        value={videoTitle}
-                        onChange={(e) => setVideoTitle(e.target.value)}
-                        placeholder="Ex: Vídeo Explicativo Oficial - Agenda Fácil"
-                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-red-500"
-                      />
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className="block text-xs font-bold text-slate-300 flex items-center gap-1.5">
-                        <Globe className="w-3.5 h-3.5 text-sky-400" />
-                        <span>Link Direto Externo ou YouTube (Opcional):</span>
-                      </label>
-                      <input
-                        type="text"
-                        value={youtubeUrl}
-                        onChange={(e) => setYoutubeUrl(e.target.value)}
-                        placeholder="https://www.youtube.com/watch?v=... ou link direto"
-                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white text-xs font-mono focus:outline-none focus:border-red-500"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Save Video Action Button */}
-                  <div className="pt-2 space-y-2">
-                    <button
-                      type="button"
-                      onClick={handleSaveVideoConfig}
-                      className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black py-3 px-4 rounded-xl text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg shadow-emerald-950/40 transition-all active:scale-98 cursor-pointer"
-                    >
-                      <Check className="w-4 h-4 text-white" />
-                      <span>Salvar Vídeo para Todas as Pessoas (Vercel & Link Oficial)</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setActiveTab('assistir')}
-                      className="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold py-2 px-3 rounded-xl text-xs transition-colors cursor-pointer"
-                    >
-                      Visualizar Prévia do Player
-                    </button>
-                  </div>
-
                 </div>
-              )}
+
+                {/* Save Video Action Buttons */}
+                <div className="pt-2 space-y-2">
+                  <button
+                    type="button"
+                    onClick={handleSaveVideoConfig}
+                    className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black py-3 px-4 rounded-xl text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg shadow-emerald-950/40 transition-all active:scale-98 cursor-pointer"
+                  >
+                    <Check className="w-4 h-4 text-white" />
+                    <span>Salvar Imediatamente para Todas as Pessoas</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('assistir')}
+                    className="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold py-2.5 px-3 rounded-xl text-xs transition-colors cursor-pointer flex items-center justify-center gap-2"
+                  >
+                    <Play className="w-3.5 h-3.5 text-red-400" />
+                    <span>Visualizar como Visitante / Assistir Vídeo</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="w-full bg-slate-900 border border-slate-700 hover:bg-slate-800 text-slate-300 font-bold py-2.5 px-3 rounded-xl text-xs transition-colors cursor-pointer flex items-center justify-center gap-2"
+                  >
+                    <ArrowLeft className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Retornar para a Página Inicial (Entrar como Salão / Administrador)</span>
+                  </button>
+                </div>
+
+              </div>
 
             </div>
           )}
