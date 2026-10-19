@@ -225,7 +225,17 @@ const DEFAULT_STATE: SyncDatabaseState = {
     mercadopagoClientId: "5794522915444902",
     mercadopagoClientSecret: "ziCC7svN4c0MnvYruGEGMFQ7tcGu5P0q",
     webhookSecret: "ae043f22ecf5be4ebb36625d10f92b6ae689578cde0152721c211351fc73a241",
-    webhookUrl: "https://agendamaisfacil.vercel.app/api/webhook/mercadopago"
+    webhookUrl: "https://agendamaisfacil.vercel.app/api/webhook/mercadopago",
+    videoTutorialConfig: {
+      youtubeUrl: "",
+      customVideoUrl: "/uploads/videos/V_deo_Aplicativo_do_App__1792379432220_bkd3.mp4",
+      videoTitle: "Vídeo Explicativo do App - Agenda Fácil",
+      useInteractivePlayer: false,
+      fileType: "video",
+      fileName: "Vídeo Aplicativo do App .mp4",
+      fileSize: "25.7 MB",
+      uploadedAt: "2026-10-19T03:11:00.598Z"
+    }
   },
   messages: [
     {

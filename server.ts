@@ -35,6 +35,62 @@ const uploadsVideosDir = path.resolve(process.cwd(), "public/uploads/videos");
 if (!fs.existsSync(uploadsVideosDir)) {
   fs.mkdirSync(uploadsVideosDir, { recursive: true });
 }
+// Dedicated robust Range-streaming handler for videos (iOS Safari / Android / Chrome RFC 7233 compliance)
+app.get("/uploads/videos/:filename", (req, res, next) => {
+  const filename = path.basename(req.params.filename);
+  const filePath = path.resolve(uploadsVideosDir, filename);
+  if (!fs.existsSync(filePath)) {
+    return next();
+  }
+
+  const stat = fs.statSync(filePath);
+  const fileSize = stat.size;
+  const ext = path.extname(filename).toLowerCase();
+  const contentType = (ext === ".mp4" || ext === ".m4v" || ext === ".mov") 
+    ? "video/mp4" 
+    : (ext === ".mp3") ? "audio/mpeg" 
+    : (ext === ".ogg") ? "audio/ogg" 
+    : (ext === ".wav") ? "audio/wav" 
+    : "application/octet-stream";
+
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "*");
+  res.setHeader("Access-Control-Expose-Headers", "Content-Length, Content-Range, Accept-Ranges, Content-Type");
+  res.setHeader("Accept-Ranges", "bytes");
+
+  const range = req.headers.range;
+  if (range) {
+    const parts = range.replace(/bytes=/, "").split("-");
+    const start = parseInt(parts[0], 10);
+    const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+
+    if (start >= fileSize || end >= fileSize || start > end) {
+      res.status(416).setHeader("Content-Range", `bytes */${fileSize}`);
+      return res.end();
+    }
+
+    const chunksize = (end - start) + 1;
+    const file = fs.createReadStream(filePath, { start, end });
+    res.writeHead(206, {
+      "Content-Range": `bytes ${start}-${end}/${fileSize}`,
+      "Accept-Ranges": "bytes",
+      "Content-Length": chunksize,
+      "Content-Type": contentType,
+      "Content-Disposition": "inline"
+    });
+    file.pipe(res);
+  } else {
+    res.writeHead(200, {
+      "Content-Length": fileSize,
+      "Content-Type": contentType,
+      "Accept-Ranges": "bytes",
+      "Content-Disposition": "inline"
+    });
+    fs.createReadStream(filePath).pipe(res);
+  }
+});
+
 app.use("/uploads/videos", express.static(uploadsVideosDir, {
   setHeaders: (res) => {
     res.setHeader("Accept-Ranges", "bytes");
@@ -60,8 +116,47 @@ function getLunaVideoPath(): string | null {
 // Raw binary parser for video & audio uploads (supports files up to 300MB: MP4, MP3, etc.)
 app.use(["/api/upload-video*", "/api/video-upload*"], express.raw({ limit: "300mb", type: ["video/*", "audio/*", "application/octet-stream", "application/binary"] }));
 
+function standardizeMediaFile(filePath: string): Promise<void> {
+  return new Promise((resolve) => {
+    const ext = path.extname(filePath).toLowerCase();
+    if (ext === ".mp4" || ext === ".mov" || ext === ".m4v" || ext === ".webm") {
+      const tempOut = filePath + ".standard.mp4";
+      const cmd = `ffmpeg -y -i "${filePath}" -c:v copy -c:a aac -ar 44100 -b:a 128k -movflags +faststart "${tempOut}"`;
+      exec(cmd, { timeout: 35000 }, (err) => {
+        if (!err && fs.existsSync(tempOut) && fs.statSync(tempOut).size > 1000) {
+          try {
+            fs.renameSync(tempOut, filePath);
+          } catch {}
+          resolve();
+        } else {
+          const cmdFallback = `ffmpeg -y -i "${filePath}" -c:v libx264 -pix_fmt yuv420p -profile:v baseline -level 3.1 -preset fast -c:a aac -ar 44100 -b:a 128k -movflags +faststart "${tempOut}"`;
+          exec(cmdFallback, { timeout: 60000 }, (err2) => {
+            if (!err2 && fs.existsSync(tempOut) && fs.statSync(tempOut).size > 1000) {
+              try { fs.renameSync(tempOut, filePath); } catch {}
+            }
+            try { if (fs.existsSync(tempOut)) fs.unlinkSync(tempOut); } catch {}
+            resolve();
+          });
+        }
+      });
+    } else if (ext === ".mp3" || ext === ".wav" || ext === ".m4a" || ext === ".ogg") {
+      const tempOut = filePath + ".standard.mp3";
+      const cmd = `ffmpeg -y -i "${filePath}" -c:a libmp3lame -ar 44100 -b:a 128k "${tempOut}"`;
+      exec(cmd, { timeout: 20000 }, (err) => {
+        if (!err && fs.existsSync(tempOut) && fs.statSync(tempOut).size > 1000) {
+          try { fs.renameSync(tempOut, filePath); } catch {}
+        }
+        try { if (fs.existsSync(tempOut)) fs.unlinkSync(tempOut); } catch {}
+        resolve();
+      });
+    } else {
+      resolve();
+    }
+  });
+}
+
 // Upload custom MP4/video from computer directly (Supports Raw Binary, Stream, and JSON Base64)
-app.all(["/api/upload-video", "/api/upload-video-mp4", "/api/video-upload"], (req, res) => {
+app.all(["/api/upload-video", "/api/upload-video-mp4", "/api/video-upload"], async (req, res) => {
   if (req.method === "OPTIONS") {
     return res.sendStatus(200);
   }
@@ -88,12 +183,14 @@ app.all(["/api/upload-video", "/api/upload-video-mp4", "/api/video-upload"], (re
     // Case 1: Raw binary buffer from express.raw
     if (Buffer.isBuffer(req.body) && req.body.length > 0) {
       fs.writeFileSync(targetFilePath, req.body);
+      await standardizeMediaFile(targetFilePath);
+      const stat = fs.statSync(targetFilePath);
       return res.json({
         success: true,
         url: `/uploads/videos/${finalFilename}`,
         filename: finalFilename,
         originalName: rawFilename,
-        size: req.body.length,
+        size: stat.size,
       });
     }
 
@@ -106,12 +203,14 @@ app.all(["/api/upload-video", "/api/upload-video-mp4", "/api/video-upload"], (re
         }
         const buffer = Buffer.from(b64.replace(/\s+/g, ""), "base64");
         fs.writeFileSync(targetFilePath, buffer);
+        await standardizeMediaFile(targetFilePath);
+        const stat = fs.statSync(targetFilePath);
         return res.json({
           success: true,
           url: `/uploads/videos/${finalFilename}`,
           filename: finalFilename,
           originalName: rawFilename,
-          size: buffer.length,
+          size: stat.size,
         });
       }
     }
@@ -119,16 +218,18 @@ app.all(["/api/upload-video", "/api/upload-video-mp4", "/api/video-upload"], (re
     // Case 3: Streaming chunk collection
     const chunks: Buffer[] = [];
     req.on("data", (chunk) => chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)));
-    req.on("end", () => {
+    req.on("end", async () => {
       const buffer = Buffer.concat(chunks);
       if (buffer.length > 0) {
         fs.writeFileSync(targetFilePath, buffer);
+        await standardizeMediaFile(targetFilePath);
+        const stat = fs.statSync(targetFilePath);
         return res.json({
           success: true,
           url: `/uploads/videos/${finalFilename}`,
           filename: finalFilename,
           originalName: rawFilename,
-          size: buffer.length,
+          size: stat.size,
         });
       } else {
         return res.status(400).json({ error: "Nenhum dado de vídeo foi recebido pelo servidor." });
