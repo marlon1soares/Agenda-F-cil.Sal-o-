@@ -714,6 +714,17 @@ _🤖 Mensagem automática enviada pelo Robô de Despacho Agenda Fácil._`;
                 </button>
               )}
 
+              {onOpenVideoConfig && (
+                <button
+                  onClick={onOpenVideoConfig}
+                  className="bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-extrabold px-2.5 sm:px-3 py-1.5 rounded-xl text-[11px] sm:text-xs flex items-center gap-1.5 shadow-sm transition-all active:scale-95 border border-red-400/40 cursor-pointer whitespace-nowrap shrink-0"
+                  title="Anexar e Configurar Vídeo Explicativo do Aplicativo"
+                >
+                  <Video className="w-3.5 h-3.5 text-white shrink-0" />
+                  <span>Anexar / Configurar Vídeo</span>
+                </button>
+              )}
+
             </div>
           </div>
 

@@ -32,59 +32,6 @@ export const SalonAuthModal: React.FC<SalonAuthModalProps> = ({
   const [showQuickAccessOptions, setShowQuickAccessOptions] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
   const [isExplicativoModalOpen, setIsExplicativoModalOpen] = useState(false);
-  const [isAdminExplicativoMode, setIsAdminExplicativoMode] = useState(false);
-
-  // Helper: checks if credentials entered on initial screen match Administrator
-  const isEnteredAdmin = () => {
-    try {
-      if (sessionStorage.getItem('salao_admin_authenticated') === 'true' || localStorage.getItem('salao_admin_authenticated') === 'true') {
-        return true;
-      }
-    } catch {}
-
-    const cleanSalonCpf = salonCpf.replace(/\D/g, '').trim();
-    const rawPass = passwordOrToken.trim();
-    if (!rawPass) return false;
-
-    const adminCredsList = Storage.getAdminCredentialsList();
-    const defaultMaster = Storage.getAdminCredentials();
-    const allAdminCreds = [...adminCredsList, defaultMaster];
-
-    return allAdminCreds.some((adminCred) => {
-      const adminCpfDigits = (adminCred.cpf || '').replace(/\D/g, '').trim();
-      const adminEmail = (adminCred.email || '').toLowerCase().trim();
-      const adminPassword = (adminCred.password || 'admin').trim();
-
-      const cpfMatches = 
-        (cleanSalonCpf && adminCpfDigits && cleanSalonCpf === adminCpfDigits) ||
-        (cleanSalonCpf && (cleanSalonCpf === '22622448805' || cleanSalonCpf === '30928763854' || cleanSalonCpf === '00000000000' || cleanSalonCpf === '12345678900' || cleanSalonCpf === '39281049100')) ||
-        (salonCpf.toLowerCase().trim() === adminEmail) ||
-        (salonCpf.toLowerCase().trim() === 'admin');
-
-      const passwordMatches = 
-        rawPass === adminPassword ||
-        rawPass.toLowerCase() === adminPassword.toLowerCase() ||
-        rawPass === 'Ana1@@theo' ||
-        rawPass === 'Ana1@theo' ||
-        rawPass.toLowerCase() === 'ana1@@theo' ||
-        rawPass === 'Ana1@luna' ||
-        rawPass === 'Ana1@@luna' ||
-        rawPass.toLowerCase() === 'ana1@luna' ||
-        rawPass.toUpperCase() === 'ADMIN' ||
-        rawPass === 'admin' ||
-        rawPass === '123456' ||
-        rawPass === 'admin123' ||
-        (defaultMaster.password && rawPass === defaultMaster.password);
-
-      return cpfMatches && passwordMatches;
-    });
-  };
-
-  const handleOpenVideoExplicativo = () => {
-    const adminDetected = isEnteredAdmin();
-    setIsAdminExplicativoMode(adminDetected);
-    setIsExplicativoModalOpen(true);
-  };
 
   const adminPaymentConfig = Storage.getAdminPaymentConfig();
   const trialDays = adminPaymentConfig.diasGratuitos || 7;
@@ -496,7 +443,7 @@ export const SalonAuthModal: React.FC<SalonAuthModalProps> = ({
             <button
               id="btn-video-explicativo-app"
               type="button"
-              onClick={handleOpenVideoExplicativo}
+              onClick={() => setIsExplicativoModalOpen(true)}
               className="w-full text-white font-extrabold py-2.5 px-2 rounded-xl shadow-md flex items-center justify-center gap-1.5 transition-all active:scale-98 text-[11px] sm:text-xs cursor-pointer bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 shadow-red-950/40 border border-red-500/40"
               title="Assistir ao vídeo explicativo do aplicativo em MP4 ou MP3"
             >
@@ -540,7 +487,6 @@ export const SalonAuthModal: React.FC<SalonAuthModalProps> = ({
       <VideoExplicativoModal
         isOpen={isExplicativoModalOpen}
         onClose={() => setIsExplicativoModalOpen(false)}
-        isAdmin={isAdminExplicativoMode}
       />
     </div>
   );

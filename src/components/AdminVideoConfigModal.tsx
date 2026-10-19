@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { VideoTutorialConfig, VideoTutorialChapterConfig } from '../types';
 import { Storage } from '../utils/storage';
+import { syncEngine } from '../utils/syncEngine';
 import { 
   Video, Sparkles, Youtube, Globe, Check, X, Play, RotateCcw, 
   MessageSquare, Sliders, ShieldCheck, HelpCircle, Save, ExternalLink,
@@ -359,12 +360,15 @@ export const AdminVideoConfigModal: React.FC<AdminVideoConfigModalProps> = ({
       chapters: chapters
     };
 
-    Storage.saveAdminPaymentConfig({
+    const updatedAdminPayment = {
       ...adminPayment,
       videoTutorialConfig: updatedVideoConfig
-    });
+    };
 
-    setSuccessMsg('Configurações de vídeo e narração salvas com sucesso!');
+    Storage.saveAdminPaymentConfig(updatedAdminPayment);
+    syncEngine.pushUpdate({ adminPaymentConfig: updatedAdminPayment });
+
+    setSuccessMsg('Configurações de vídeo salvas imediatamente para todos os visitantes!');
     setTimeout(() => {
       setSuccessMsg('');
       onClose();

@@ -1559,6 +1559,7 @@ export function App() {
         }}
         onOpenAdminChangePassword={() => setIsAdminChangePasswordOpen(true)}
         onOpenLiveHub={() => setIsLiveHubOpen(true)}
+        onOpenVideoConfig={() => setIsAdminVideoConfigOpen(true)}
       />
 
       {/* Admin Change Password & User Management Modal */}
