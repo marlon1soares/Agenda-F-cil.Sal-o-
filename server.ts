@@ -1635,6 +1635,32 @@ app.post("/api/auth/recover-password", async (req, res) => {
       `;
     }
 
+    const matchedAccounts: any[] = [];
+    matchedAdmins.forEach(a => {
+      matchedAccounts.push({
+        type: "admin",
+        role: "Administrador Geral",
+        title: "👑 Conta de Administrador Geral",
+        name: "Administrador Geral",
+        cpf: a.cpf,
+        password: a.password,
+        email: a.email
+      });
+    });
+
+    matchedSalons.forEach((s: any) => {
+      matchedAccounts.push({
+        type: "salao",
+        role: "Salão Parceiro",
+        title: `💈 ${s.config?.nomeSalao || s.name || 'Salão'}`,
+        name: s.ownerName || "Proprietário",
+        cpf: s.ownerCpf,
+        password: s.purchaseToken || s.appCode || "123456",
+        email: s.ownerEmail || s.config?.email,
+        salonId: s.id
+      });
+    });
+
     const transporter = getTransporter();
     const emailSubject = "Agenda Fácil - Recuperação de Senha e Acesso";
     const emailHtml = `
@@ -1653,6 +1679,9 @@ app.post("/api/auth/recover-password", async (req, res) => {
       </div>
     `;
 
+    let emailSent = false;
+    let emailStatusMessage = `Sua senha foi enviada para o e-mail ${cleanEmail}! Verifique sua caixa de entrada e spam.`;
+
     if (transporter) {
       try {
         const fromAddr = process.env.SMTP_FROM || `"Agenda Fácil" <${process.env.SMTP_USER || 'marlon1soares28@gmail.com'}>`;
@@ -1662,31 +1691,99 @@ app.post("/api/auth/recover-password", async (req, res) => {
           subject: emailSubject,
           html: emailHtml,
         });
-        console.log(`[RECOVER] Senha enviada com sucesso para ${cleanEmail}`);
-        return res.json({
-          success: true,
-          message: `Sua senha foi enviada para o e-mail ${cleanEmail}! Verifique sua caixa de entrada e spam.`
-        });
+        emailSent = true;
+        console.log(`[RECOVER] Senha enviada com sucesso por SMTP para ${cleanEmail}`);
       } catch (mailErr: any) {
-        console.warn("[RECOVER] Falha no envio SMTP direto, gerando resposta segura:", mailErr.message);
-        return res.json({
-          success: true,
-          message: `Sua senha foi enviada para o e-mail ${cleanEmail}! Verifique sua caixa de entrada e spam.`
-        });
+        console.warn("[RECOVER] Tentativa SMTP informou restrição do provedor (ex: Requer Senha de App do Google):", mailErr.message);
+        emailStatusMessage = `Dados localizados! Para envio automático via Gmail, configure a Senha de Aplicativo de 16 letras da conta Google. Você pode visualizar e redefinir sua senha abaixo imediatamente.`;
       }
     } else {
-      console.log(`[RECOVER SIMULATOR] Senha enviada para o e-mail: ${cleanEmail}`);
-      return res.json({
-        success: true,
-        message: `Sua senha foi enviada para o e-mail ${cleanEmail}! Verifique sua caixa de entrada e spam.`
-      });
+      console.log(`[RECOVER SIMULATOR] Senha processada para o e-mail: ${cleanEmail}`);
     }
+
+    return res.json({
+      success: true,
+      emailSent,
+      message: emailStatusMessage,
+      accounts: matchedAccounts
+    });
   } catch (err: any) {
     console.error("Erro na rota de recuperação de senha:", err);
     return res.status(500).json({
       success: false,
       error: "Ocorreu um erro no servidor ao tentar recuperar a senha."
     });
+  }
+});
+
+// Update Password with any characters chosen by user
+app.post("/api/auth/update-password", (req, res) => {
+  try {
+    const { email, cpf, newPassword, accountType, salonId } = req.body;
+    const cleanEmail = (email || "").trim().toLowerCase();
+    const cleanCpf = (cpf || "").replace(/\D/g, "").trim();
+    const cleanPassword = (newPassword || "").trim();
+
+    if (!cleanPassword || cleanPassword.length < 1) {
+      return res.status(400).json({
+        success: false,
+        error: "Por favor, digite a nova senha desejada."
+      });
+    }
+
+    const state = syncStore.getState();
+
+    if (accountType === 'admin' || !salonId) {
+      const masterAdmin = state.adminCredentials || { cpf: "226.224.488-05", email: "marlon1soares28@gmail.com", password: "Ana1@@theo" };
+      masterAdmin.password = cleanPassword;
+
+      const adminList = Array.isArray(state.adminCredentialsList) ? [...state.adminCredentialsList] : [];
+      const updatedList = adminList.map(a => {
+        const aCpf = (a.cpf || "").replace(/\D/g, "");
+        const aEmail = (a.email || "").toLowerCase().trim();
+        if ((cleanCpf && aCpf === cleanCpf) || (cleanEmail && aEmail === cleanEmail)) {
+          return { ...a, password: cleanPassword };
+        }
+        return a;
+      });
+
+      syncStore.updateState({
+        adminCredentials: { ...masterAdmin, password: cleanPassword },
+        adminCredentialsList: updatedList
+      });
+
+      return res.json({
+        success: true,
+        message: "Nova senha de administrador salva com sucesso!",
+        newPassword: cleanPassword
+      });
+    } else {
+      const salonsList = Array.isArray(state.salons) ? [...state.salons] : [];
+      const index = salonsList.findIndex((s: any) => s.id === salonId || (cleanCpf && (s.ownerCpf || '').replace(/\D/g, '') === cleanCpf));
+
+      if (index !== -1) {
+        salonsList[index] = {
+          ...salonsList[index],
+          purchaseToken: cleanPassword
+        };
+
+        syncStore.updateState({ salons: salonsList });
+
+        return res.json({
+          success: true,
+          message: `Nova senha do salão ${salonsList[index].config?.nomeSalao || salonsList[index].name} salva com sucesso!`,
+          newPassword: cleanPassword
+        });
+      }
+
+      return res.status(404).json({
+        success: false,
+        error: "Salão não encontrado para atualização de senha."
+      });
+    }
+  } catch (err: any) {
+    console.error("Erro ao atualizar senha:", err);
+    res.status(500).json({ success: false, error: "Erro interno ao atualizar a senha." });
   }
 });
 

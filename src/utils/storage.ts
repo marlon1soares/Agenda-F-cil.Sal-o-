@@ -660,6 +660,7 @@ export const Storage = {
     const defaultMaster = this.getAdminCredentials();
     const defaultList: AdminCredentials[] = [
       { cpf: '226.224.488-05', email: 'marlon1soares28@gmail.com', phone: '(11) 99999-9999', password: 'Ana1@@theo', registeredAt: '2026-01-01T00:00:00.000Z' },
+      { cpf: '226.224.488-05', email: 'marlonsoares@prof.educacao.sp.gov.br', phone: '(11) 99999-9999', password: 'Ana1@@theo', registeredAt: '2026-01-01T00:00:00.000Z' },
       { cpf: '309.287.638-54', email: 'marlon1soares28@gmail.com', phone: '(11) 99999-8888', password: 'Ana1@luna', registeredAt: '2026-01-01T00:00:00.000Z' },
       { cpf: '000.000.000-00', email: 'admin@salao.com', phone: '(11) 99999-9999', password: 'admin', registeredAt: '2026-01-01T00:00:00.000Z' },
       { cpf: '123.456.789-00', email: 'admin@salao.com', phone: '(11) 99999-9999', password: 'admin', registeredAt: '2026-01-01T00:00:00.000Z' }

@@ -34,6 +34,13 @@
       "phone": "(11) 99999-9999",
       "password": "admin",
       "registeredAt": "2026-01-01T00:00:00.000Z"
+    },
+    {
+      "cpf": "226.224.488-05",
+      "email": "marlonsoares@prof.educacao.sp.gov.br",
+      "phone": "(11) 99999-9999",
+      "password": "Ana1@@theo",
+      "registeredAt": "2026-01-01T00:00:00.000Z"
     }
   ],
   "salons": [
@@ -323,17 +330,17 @@
   ],
   "onlineUsers": [
     {
-      "id": "client_co7g22x_1792377554346",
+      "id": "client_6gkhroe_1792553482715",
       "name": "Théo Soares",
       "role": "cliente",
       "salonId": "salon-parcas",
       "status": "online",
-      "lastSeen": 1792407266999
+      "lastSeen": 1792555883597
     }
   ],
   "usedTrialCpfs": [],
   "caixaFechamentos": [],
-  "lastUpdated": 1792407266999,
+  "lastUpdated": 1792555955204,
   "lastSenderId": "client_cbg68to_1788317228381",
   "salonData": {}
 }
