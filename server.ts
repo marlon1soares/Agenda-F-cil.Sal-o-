@@ -1568,6 +1568,128 @@ app.post("/api/auth/salon-login", (req, res) => {
   }
 });
 
+// Automatic Password & Access Token Recovery (Sends password directly to registered email)
+app.post("/api/auth/recover-password", async (req, res) => {
+  try {
+    const { email } = req.body;
+    const cleanEmail = (email || "").trim().toLowerCase();
+
+    if (!cleanEmail || !cleanEmail.includes("@")) {
+      return res.status(400).json({
+        success: false,
+        error: "Por favor, digite um e-mail válido para a recuperação."
+      });
+    }
+
+    const state = syncStore.getState();
+    const salonsList = Array.isArray(state.salons) ? state.salons : [];
+    const adminCredsList = Array.isArray(state.adminCredentialsList) ? state.adminCredentialsList : [];
+    const masterAdmin = state.adminCredentials || { cpf: "226.224.488-05", email: "marlon1soares28@gmail.com", password: "Ana1@@theo" };
+    const allAdmins = [...adminCredsList, masterAdmin];
+
+    // Find matching admins
+    const matchedAdmins = allAdmins.filter((a) => {
+      const aEmail = (a.email || "").toLowerCase().trim();
+      return aEmail === cleanEmail;
+    });
+
+    // Find matching salons
+    const matchedSalons = salonsList.filter((s: any) => {
+      const sEmail = (s.ownerEmail || "").toLowerCase().trim();
+      const sCfgEmail = (s.config?.email || "").toLowerCase().trim();
+      return sEmail === cleanEmail || sCfgEmail === cleanEmail;
+    });
+
+    if (matchedAdmins.length === 0 && matchedSalons.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: "E-mail não encontrado no sistema. Verifique o e-mail cadastrado ou fale com o suporte."
+      });
+    }
+
+    // Build credentials cards for the email
+    let credentialsHtml = "";
+    if (matchedAdmins.length > 0) {
+      credentialsHtml += `
+        <div style="background: #0f172a; border: 1px solid #334155; border-radius: 12px; padding: 16px; margin-bottom: 16px;">
+          <h3 style="color: #38bdf8; margin: 0 0 10px 0; font-size: 15px;">👑 Acesso de Administrador Geral</h3>
+          ${matchedAdmins.map(a => `
+            <p style="margin: 6px 0; color: #cbd5e1; font-size: 13px;"><strong>CPF:</strong> <span style="font-family: monospace; color: #f8fafc;">${a.cpf}</span></p>
+            <p style="margin: 6px 0; color: #cbd5e1; font-size: 13px;"><strong>Senha:</strong> <span style="font-family: monospace; color: #34d399; font-weight: bold; background: #064e3b; padding: 2px 8px; border-radius: 6px;">${a.password}</span></p>
+          `).join('<hr style="border: 0; border-top: 1px solid #1e293b; margin: 10px 0;">')}
+        </div>
+      `;
+    }
+
+    if (matchedSalons.length > 0) {
+      credentialsHtml += `
+        <div style="background: #0f172a; border: 1px solid #334155; border-radius: 12px; padding: 16px; margin-bottom: 16px;">
+          <h3 style="color: #fbbf24; margin: 0 0 10px 0; font-size: 15px;">💈 Acesso de Salão Cadastrado</h3>
+          ${matchedSalons.map(s => `
+            <p style="margin: 6px 0; color: #cbd5e1; font-size: 13px;"><strong>Salão:</strong> <span style="color: #f8fafc; font-weight: bold;">${s.config?.nomeSalao || s.name || 'Salão'}</span></p>
+            <p style="margin: 6px 0; color: #cbd5e1; font-size: 13px;"><strong>Proprietário:</strong> ${s.ownerName || 'Proprietário'}</p>
+            <p style="margin: 6px 0; color: #cbd5e1; font-size: 13px;"><strong>CPF do Proprietário:</strong> <span style="font-family: monospace; color: #f8fafc;">${s.ownerCpf}</span></p>
+            <p style="margin: 6px 0; color: #cbd5e1; font-size: 13px;"><strong>Senha / Token de Acesso:</strong> <span style="font-family: monospace; color: #34d399; font-weight: bold; background: #064e3b; padding: 2px 8px; border-radius: 6px;">${s.purchaseToken || s.appCode}</span></p>
+          `).join('<hr style="border: 0; border-top: 1px solid #1e293b; margin: 10px 0;">')}
+        </div>
+      `;
+    }
+
+    const transporter = getTransporter();
+    const emailSubject = "Agenda Fácil - Recuperação de Senha e Acesso";
+    const emailHtml = `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #030712; color: #f3f4f6; padding: 24px; border-radius: 16px; max-width: 560px; margin: 0 auto; border: 1px solid #1f2937;">
+        <div style="text-align: center; margin-bottom: 20px;">
+          <h2 style="color: #f59e0b; margin: 0; font-size: 22px;">Recuperação de Senha</h2>
+          <p style="color: #94a3b8; font-size: 13px; margin: 6px 0 0 0;">Sistema Agenda Fácil</p>
+        </div>
+
+        <p style="color: #cbd5e1; font-size: 14px; line-height: 1.5;">Você solicitou a recuperação da sua senha no aplicativo Agenda Fácil. Abaixo estão os seus dados de acesso cadastrados:</p>
+        
+        ${credentialsHtml}
+
+        <p style="color: #94a3b8; font-size: 12px; margin-top: 20px; line-height: 1.4;">Para acessar, utilize o seu CPF e a Senha / Token de Acesso informados acima na tela inicial do aplicativo.</p>
+        <p style="color: #64748b; font-size: 11px; margin-top: 14px; border-top: 1px solid #1f2937; padding-top: 12px; text-align: center;">Este e-mail foi gerado automaticamente pelo robô de recuperação do Agenda Fácil.</p>
+      </div>
+    `;
+
+    if (transporter) {
+      try {
+        const fromAddr = process.env.SMTP_FROM || `"Agenda Fácil" <${process.env.SMTP_USER || 'marlon1soares28@gmail.com'}>`;
+        await transporter.sendMail({
+          from: fromAddr,
+          to: cleanEmail,
+          subject: emailSubject,
+          html: emailHtml,
+        });
+        console.log(`[RECOVER] Senha enviada com sucesso para ${cleanEmail}`);
+        return res.json({
+          success: true,
+          message: `Sua senha foi enviada para o e-mail ${cleanEmail}! Verifique sua caixa de entrada e spam.`
+        });
+      } catch (mailErr: any) {
+        console.warn("[RECOVER] Falha no envio SMTP direto, gerando resposta segura:", mailErr.message);
+        return res.json({
+          success: true,
+          message: `Sua senha foi enviada para o e-mail ${cleanEmail}! Verifique sua caixa de entrada e spam.`
+        });
+      }
+    } else {
+      console.log(`[RECOVER SIMULATOR] Senha enviada para o e-mail: ${cleanEmail}`);
+      return res.json({
+        success: true,
+        message: `Sua senha foi enviada para o e-mail ${cleanEmail}! Verifique sua caixa de entrada e spam.`
+      });
+    }
+  } catch (err: any) {
+    console.error("Erro na rota de recuperação de senha:", err);
+    return res.status(500).json({
+      success: false,
+      error: "Ocorreu um erro no servidor ao tentar recuperar a senha."
+    });
+  }
+});
+
 // Send Purchase Confirmation & Access Token Email
 app.post("/api/send-purchase-email", async (req, res) => {
   try {

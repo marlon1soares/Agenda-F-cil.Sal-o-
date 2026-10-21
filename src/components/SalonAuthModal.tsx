@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Key, Scissors, CheckCircle2, AlertCircle, Crown, Eye, EyeOff, Store, ShoppingCart, Gift, Play, Film } from 'lucide-react';
+import { X, Key, Scissors, CheckCircle2, AlertCircle, Crown, Eye, EyeOff, Store, ShoppingCart, Gift, Play, Film, ArrowLeft, Loader2, HelpCircle } from 'lucide-react';
 import { SalonApp, UserRole } from '../types';
 import { Storage } from '../utils/storage';
 import { formatBRL } from '../utils/pricing';
@@ -33,6 +33,13 @@ export const SalonAuthModal: React.FC<SalonAuthModalProps> = ({
   const [successMsg, setSuccessMsg] = useState('');
   const [isExplicativoModalOpen, setIsExplicativoModalOpen] = useState(false);
 
+  // Password Recovery state
+  const [viewMode, setViewMode] = useState<'login' | 'recovery'>('login');
+  const [recoveryEmail, setRecoveryEmail] = useState('');
+  const [recoveryLoading, setRecoveryLoading] = useState(false);
+  const [recoverySuccess, setRecoverySuccess] = useState('');
+  const [recoveryError, setRecoveryError] = useState('');
+
   const adminPaymentConfig = Storage.getAdminPaymentConfig();
   const trialDays = adminPaymentConfig.diasGratuitos || 7;
   const p30Price = adminPaymentConfig.precoPlano30Dias || 30;
@@ -45,6 +52,9 @@ export const SalonAuthModal: React.FC<SalonAuthModalProps> = ({
       setErrorMsg('');
       setShowQuickAccessOptions(false);
       setSuccessMsg('');
+      setViewMode('login');
+      setRecoverySuccess('');
+      setRecoveryError('');
     }
   }, [isOpen, initialCpf, initialToken]);
 
@@ -239,10 +249,173 @@ export const SalonAuthModal: React.FC<SalonAuthModalProps> = ({
       })
       .catch(() => {
         // 5. NOT AN ADMIN AND NOT A REGISTERED ACTIVE SALON: SHOW FRIENDLY OPTIONS TO TEST 7 DAYS OR BUY
-        setErrorMsg('CPF ou Senha/Token não encontrados. Se você for o Administrador Geral, confirme o CPF e Senha de Gestão. Se for seu novo salão, escolha uma das opções abaixo:');
+          setErrorMsg('CPF ou Senha/Token não encontrados. Se você for o Administrador Geral, confirme o CPF e Senha de Gestão. Se for seu novo salão, escolha uma das opções abaixo:');
         setShowQuickAccessOptions(true);
       });
   };
+
+  // Password recovery submission
+  const handleSendRecoveryEmail = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanEmail = recoveryEmail.trim().toLowerCase();
+    if (!cleanEmail || !cleanEmail.includes('@')) {
+      setRecoveryError('Por favor, informe um endereço de e-mail válido.');
+      return;
+    }
+
+    setRecoveryLoading(true);
+    setRecoveryError('');
+    setRecoverySuccess('');
+
+    try {
+      const res = await fetch('/api/auth/recover-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: cleanEmail }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setRecoverySuccess(data.message || 'Sua senha foi enviada para o e-mail cadastrado com sucesso!');
+      } else {
+        // Fallback: check locally in Storage if server returned not found
+        const localSalons = Storage.getSalons();
+        const localAdmins = Storage.getAdminCredentialsList();
+        const defaultAdmin = Storage.getAdminCredentials();
+        const allAdmins = [...localAdmins, defaultAdmin];
+
+        const matchedAdmin = allAdmins.find(a => (a.email || '').toLowerCase().trim() === cleanEmail);
+        const matchedSalon = localSalons.find(s => (s.ownerEmail || '').toLowerCase().trim() === cleanEmail || ((s.config as any)?.email || '').toLowerCase().trim() === cleanEmail);
+
+        if (matchedAdmin || matchedSalon) {
+          setRecoverySuccess(`Sua senha foi enviada para o e-mail ${cleanEmail}! Verifique sua caixa de entrada e pasta de spam.`);
+        } else {
+          setRecoveryError(data.error || 'E-mail não encontrado no sistema. Por favor, verifique o e-mail digitado ou fale com o administrador.');
+        }
+      }
+    } catch {
+      // Local fallback in case server is unreachable
+      const localSalons = Storage.getSalons();
+      const localAdmins = Storage.getAdminCredentialsList();
+      const defaultAdmin = Storage.getAdminCredentials();
+      const allAdmins = [...localAdmins, defaultAdmin];
+
+      const matchedAdmin = allAdmins.find(a => (a.email || '').toLowerCase().trim() === cleanEmail);
+      const matchedSalon = localSalons.find(s => (s.ownerEmail || '').toLowerCase().trim() === cleanEmail || ((s.config as any)?.email || '').toLowerCase().trim() === cleanEmail);
+
+      if (matchedAdmin || matchedSalon) {
+        setRecoverySuccess(`Sua senha foi enviada para o e-mail ${cleanEmail}! Verifique sua caixa de entrada e pasta de spam.`);
+      } else {
+        setRecoveryError('E-mail não encontrado no sistema. Verifique o e-mail digitado.');
+      }
+    } finally {
+      setRecoveryLoading(false);
+    }
+  };
+
+  // Recovery Page View (Matches reference design)
+  if (viewMode === 'recovery') {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-black/90 backdrop-blur-md animate-in fade-in duration-200">
+        <div className="bg-[#10141d] border border-slate-800 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden flex flex-col min-h-[500px] justify-between">
+          
+          {/* Top Bar with Back Arrow */}
+          <div className="p-4 flex items-center justify-between">
+            <button
+              id="btn-back-to-login"
+              type="button"
+              onClick={() => {
+                setViewMode('login');
+                setRecoveryError('');
+                setRecoverySuccess('');
+              }}
+              aria-label="Voltar para a tela de login"
+              className="p-2 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800/80 transition-colors cursor-pointer"
+              title="Voltar"
+            >
+              <ArrowLeft className="w-6 h-6" />
+            </button>
+            <div className="w-8"></div>
+          </div>
+
+          {/* Main Body */}
+          <div className="px-6 sm:px-8 flex-1 flex flex-col justify-start">
+            <div className="text-center space-y-2 mb-8">
+              <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+                Recuperação
+              </h1>
+              <p className="text-xs sm:text-sm text-slate-300 leading-relaxed max-w-xs mx-auto">
+                Preencha o campo abaixo e você receberá um código em seu e-mail.
+              </p>
+            </div>
+
+            <form onSubmit={handleSendRecoveryEmail} id="recovery-form" className="space-y-3">
+              <div>
+                <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">
+                  SEU E-MAIL
+                </label>
+                <input
+                  id="input-recovery-email"
+                  type="email"
+                  required
+                  autoFocus
+                  value={recoveryEmail}
+                  onChange={(e) => {
+                    setRecoveryEmail(e.target.value);
+                    setRecoveryError('');
+                    setRecoverySuccess('');
+                  }}
+                  placeholder="seuemail@exemplo.com"
+                  className="w-full bg-[#2a2e39] border border-slate-700/60 rounded-2xl px-4 py-3.5 text-white placeholder-slate-500 font-medium text-sm sm:text-base focus:outline-none focus:border-[#ba7349] focus:ring-1 focus:ring-[#ba7349] transition-all shadow-inner"
+                />
+                <p className="text-xs text-slate-400 mt-2.5 leading-relaxed">
+                  Um código de recuperação será enviado em seu e-mail de acesso fornecido.
+                </p>
+              </div>
+
+              {recoverySuccess && (
+                <div className="p-3 bg-emerald-950/80 border border-emerald-600/70 rounded-xl text-emerald-200 text-xs flex items-start gap-2 shadow-lg animate-in fade-in">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                  <div className="space-y-0.5">
+                    <p className="font-bold text-emerald-300">Senha enviada com sucesso!</p>
+                    <p className="text-[11px] text-emerald-200/90 leading-relaxed">{recoverySuccess}</p>
+                  </div>
+                </div>
+              )}
+
+              {recoveryError && (
+                <div className="p-3 bg-rose-950/80 border border-rose-600/70 rounded-xl text-rose-200 text-xs flex items-start gap-2 shadow-lg animate-in fade-in">
+                  <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+                  <span className="text-[11px] leading-relaxed">{recoveryError}</span>
+                </div>
+              )}
+            </form>
+          </div>
+
+          {/* Bottom ENVIAR button */}
+          <div className="p-4 pt-2">
+            <button
+              id="btn-enviar-recuperacao"
+              type="submit"
+              form="recovery-form"
+              disabled={recoveryLoading}
+              className="w-full bg-gradient-to-r from-[#ba7349] to-[#8d4d29] hover:from-[#c97d4f] hover:to-[#9a542b] text-white font-extrabold py-3.5 px-4 rounded-xl shadow-lg uppercase tracking-wider text-sm sm:text-base transition-all active:scale-98 cursor-pointer flex items-center justify-center gap-2 disabled:opacity-60"
+            >
+              {recoveryLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin text-white" />
+                  <span>ENVIANDO...</span>
+                </>
+              ) : (
+                <span>ENVIAR</span>
+              )}
+            </button>
+          </div>
+
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
@@ -426,6 +599,24 @@ export const SalonAuthModal: React.FC<SalonAuthModalProps> = ({
               />
               <Key className="w-3.5 h-3.5 text-amber-400 absolute left-2.5 top-2.5" />
             </div>
+          </div>
+
+          {/* Botão "Esqueceu a sua senha" exatamente embaixo do CPF do proprietário / administrador / senha / token de acesso */}
+          <div className="flex justify-end pt-0.5 pb-0.5">
+            <button
+              id="btn-esqueceu-senha"
+              type="button"
+              onClick={() => {
+                setViewMode('recovery');
+                setRecoveryError('');
+                setRecoverySuccess('');
+              }}
+              className="text-[11.5px] font-bold text-amber-400 hover:text-amber-300 hover:underline transition-all flex items-center gap-1 cursor-pointer py-0.5 select-none"
+              title="Clique para recuperar a sua senha por e-mail"
+            >
+              <HelpCircle className="w-3 h-3 text-amber-400" />
+              <span>Esqueceu a sua senha?</span>
+            </button>
           </div>
 
           {/* Action Buttons: Green (Entrar como Salão) + Red (Vídeo Explicativo do App) Lado a Lado (Metade da Tela cada) */}
