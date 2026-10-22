@@ -821,6 +821,12 @@ export const Storage = {
       mercadopagoClientSecret: 'ziCC7svN4c0MnvYruGEGMFQ7tcGu5P0q',
       bacenPixClientId: '',
       bacenPixCertificateConfigured: false,
+      smtpHost: 'smtp.gmail.com',
+      smtpPort: 587,
+      smtpProtocol: 'TLS',
+      smtpUser: 'marlon1soares28@gmail.com',
+      smtpPass: 'jhtlugrpxbxxkrjn',
+      smtpFrom: 'Agenda Fácil <marlon1soares28@gmail.com>',
       videoTutorialConfig: {
         youtubeUrl: '',
         customVideoUrl: '/uploads/videos/video_explicativo_app.mp4',
@@ -842,6 +848,10 @@ export const Storage = {
       return {
         ...defaults,
         ...parsed,
+        smtpHost: parsed.smtpHost || 'smtp.gmail.com',
+        smtpPort: parsed.smtpPort || 587,
+        smtpUser: parsed.smtpUser || 'marlon1soares28@gmail.com',
+        smtpPass: parsed.smtpPass || 'jhtlugrpxbxxkrjn',
         precoPlano30Dias: base30,
         precoPlano90Dias: (parsed.precoPlano90Dias !== undefined && parsed.precoPlano90Dias !== null && !isNaN(Number(parsed.precoPlano90Dias)) && Number(parsed.precoPlano90Dias) > 0)
           ? Number(parsed.precoPlano90Dias)

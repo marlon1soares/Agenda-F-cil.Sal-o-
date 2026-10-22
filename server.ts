@@ -400,14 +400,15 @@ const getGenAI = () => {
 };
 
 const getTransporter = () => {
-  const user = process.env.SMTP_USER || "marlon1soares28@gmail.com";
-  const pass = process.env.SMTP_PASS || "Ana1@@theo";
-  const host = process.env.SMTP_HOST || "smtp.gmail.com";
-  const port = parseInt(process.env.SMTP_PORT || "587", 10);
+  const adminConfig = syncStore.getState().adminPaymentConfig || {};
+  const user = (adminConfig.smtpUser || process.env.SMTP_USER || "marlon1soares28@gmail.com").trim();
+  const rawPass = (adminConfig.smtpPass || process.env.SMTP_PASS || "jhtlugrpxbxxkrjn").trim();
+  const pass = rawPass.replace(/\s+/g, "");
+  const host = (adminConfig.smtpHost || process.env.SMTP_HOST || "smtp.gmail.com").trim();
+  const port = parseInt(String(adminConfig.smtpPort || process.env.SMTP_PORT || "587"), 10);
 
   if (user && pass) {
-    // If it's a Gmail account, use service: 'gmail' or direct smtp.gmail.com with TLS
-    if (user.includes("@gmail.com")) {
+    if (host.includes("gmail.com") || user.includes("@gmail.com")) {
       return nodemailer.createTransport({
         service: "gmail",
         auth: { user, pass },
@@ -1763,11 +1764,12 @@ app.post("/api/auth/recover-password", async (req, res) => {
 
     const transporter = getTransporter();
     let emailSent = false;
-    let emailStatusMessage = `Sua senha foi enviada para o e-mail ${cleanEmail}! Verifique sua caixa de entrada e spam.`;
+    let emailErrorMessage = "";
 
     if (transporter) {
       try {
-        const fromAddr = process.env.SMTP_FROM || `"Agenda Fácil" <${process.env.SMTP_USER || 'marlon1soares28@gmail.com'}>`;
+        const adminConfig = syncStore.getState().adminPaymentConfig || {};
+        const fromAddr = process.env.SMTP_FROM || adminConfig.smtpFrom || `"Agenda Fácil" <${adminConfig.smtpUser || process.env.SMTP_USER || 'marlon1soares28@gmail.com'}>`;
         await transporter.sendMail({
           from: fromAddr,
           to: cleanEmail,
@@ -1775,17 +1777,35 @@ app.post("/api/auth/recover-password", async (req, res) => {
           html: emailHtml,
         });
         emailSent = true;
-        console.log(`[RECOVER ROBOT] E-mail enviado com sucesso para ${cleanEmail}`);
+        console.log(`[RECOVER ROBOT] ✓ E-mail enviado com sucesso pelo robô para ${cleanEmail}`);
       } catch (mailErr: any) {
-        console.warn("[RECOVER ROBOT] Aviso SMTP:", mailErr.message);
+        emailErrorMessage = mailErr.message || "Falha ao conectar ao servidor SMTP.";
+        console.warn("[RECOVER ROBOT] ✗ Falha no envio SMTP:", mailErr.message);
       }
     } else {
-      console.log(`[RECOVER ROBOT SIMULATOR] Senha processada para o e-mail: ${cleanEmail}`);
+      emailErrorMessage = "Servidor de envio SMTP não configurado.";
+    }
+
+    if (!emailSent) {
+      const isBadCreds = emailErrorMessage.includes("535") || 
+                         emailErrorMessage.includes("BadCredentials") || 
+                         emailErrorMessage.includes("Username and Password not accepted");
+
+      const userFriendlyMsg = isBadCreds
+        ? `O e-mail foi localizado no sistema (${cleanEmail}), mas o provedor (Google Gmail) bloqueou a conexão automática por segurança (Erro Google 535: exige Senha de Aplicativo de 16 caracteres gerada em myaccount.google.com/apppasswords). Acesse o Painel do Administrador Geral para salvar a Senha de Aplicativo do Robô.`
+        : `O robô não conseguiu despachar o e-mail no momento: ${emailErrorMessage}`;
+
+      return res.status(502).json({
+        success: false,
+        emailSent: false,
+        isBadCredentials: isBadCreds,
+        error: userFriendlyMsg
+      });
     }
 
     return res.json({
       success: true,
-      emailSent,
+      emailSent: true,
       message: `Senha enviada com sucesso! O robô enviou os dados de acesso para o e-mail ${cleanEmail}! Verifique sua caixa de entrada e pasta de spam.`
     });
   } catch (err: any) {
@@ -1793,6 +1813,76 @@ app.post("/api/auth/recover-password", async (req, res) => {
     return res.status(500).json({
       success: false,
       error: "Ocorreu um erro no servidor ao tentar recuperar a senha."
+    });
+  }
+});
+
+// Live SMTP Diagnostic & Verification Endpoint (Tests real sending with user credentials)
+app.post("/api/admin/test-smtp", async (req, res) => {
+  try {
+    const { smtpUser, smtpPass, smtpHost, smtpPort, recipient } = req.body;
+    const adminConfig = syncStore.getState().adminPaymentConfig || {};
+    const user = (smtpUser || adminConfig.smtpUser || process.env.SMTP_USER || "marlon1soares28@gmail.com").trim();
+    const rawPass = (smtpPass || adminConfig.smtpPass || process.env.SMTP_PASS || "").trim();
+    const pass = rawPass.replace(/\s+/g, "");
+    const host = (smtpHost || adminConfig.smtpHost || process.env.SMTP_HOST || "smtp.gmail.com").trim();
+    const port = parseInt(String(smtpPort || adminConfig.smtpPort || process.env.SMTP_PORT || "587"), 10);
+    const targetRecipient = (recipient || user).trim();
+
+    if (!pass) {
+      return res.status(400).json({
+        success: false,
+        error: "Por favor, digite a Senha de Aplicativo (16 letras) para testar o envio."
+      });
+    }
+
+    const testTransporter = (host.includes("gmail.com") || user.includes("@gmail.com"))
+      ? nodemailer.createTransport({ service: "gmail", auth: { user, pass } })
+      : nodemailer.createTransport({ host, port, secure: port === 465, auth: { user, pass }, tls: { rejectUnauthorized: false } });
+
+    await testTransporter.verify();
+
+    await testTransporter.sendMail({
+      from: `"Agenda Fácil Robô" <${user}>`,
+      to: targetRecipient,
+      subject: "🤖 Teste do Robô de E-mail - Agenda Fácil",
+      html: `
+        <div style="background-color: #0b1222; color: #fff; padding: 24px; border-radius: 16px; font-family: sans-serif; border: 1px solid #1e293b;">
+          <h2 style="color: #34d399; margin-top: 0;">✓ Robô de E-mail Conectado com Sucesso!</h2>
+          <p>Este é um e-mail de teste automático confirmando que a sua <strong>Senha de Aplicativo Google</strong> está 100% ativa e funcionando.</p>
+          <p>A partir de agora, qualquer usuário ou salão que esquecer a senha ou comprar o app receberá os e-mails instantaneamente em sua caixa de entrada.</p>
+          <hr style="border: 0; border-top: 1px solid #1e293b; margin: 18px 0;" />
+          <p style="color: #94a3b8; font-size: 12px; margin: 0;">Remetente autorizado: ${user} | Data/Hora: ${new Date().toLocaleString("pt-BR")}</p>
+        </div>
+      `
+    });
+
+    // Save verified working credentials to persistent state
+    const updatedAdminPaymentConfig = {
+      ...adminConfig,
+      smtpUser: user,
+      smtpPass: pass,
+      smtpHost: host,
+      smtpPort: port
+    };
+
+    syncStore.updateState({
+      adminPaymentConfig: updatedAdminPaymentConfig
+    });
+
+    return res.json({
+      success: true,
+      message: `✓ E-mail de teste enviado com sucesso para ${targetRecipient}! A conexão foi autorizada pelo Google.`
+    });
+  } catch (err: any) {
+    const errMsg = err.message || "";
+    const isGoogle535 = errMsg.includes("535") || errMsg.includes("BadCredentials") || errMsg.includes("Username and Password not accepted");
+    return res.status(400).json({
+      success: false,
+      isBadCredentials: isGoogle535,
+      error: isGoogle535
+        ? "Erro de Autenticação Google (535): O Google recusou a senha. Você precisa gerar uma 'Senha de Aplicativo' de 16 caracteres em myaccount.google.com/apppasswords com a Verificação em Duas Etapas ativa."
+        : `Erro ao enviar e-mail de teste: ${errMsg}`
     });
   }
 });

@@ -276,39 +276,13 @@ export const SalonAuthModal: React.FC<SalonAuthModalProps> = ({
       });
 
       const data = await res.json();
-      if (res.ok && data.success) {
-        setRecoverySuccess(`Sua senha foi enviada para o e-mail ${cleanEmail}! Verifique sua caixa de entrada e pasta de spam.`);
+      if (res.ok && data.success && data.emailSent) {
+        setRecoverySuccess(`✓ Sua senha foi enviada com sucesso para o e-mail ${cleanEmail}! Verifique sua caixa de entrada e pasta de spam.`);
       } else {
-        // Fallback: check locally in Storage
-        const localSalons = Storage.getSalons();
-        const localAdmins = Storage.getAdminCredentialsList();
-        const defaultAdmin = Storage.getAdminCredentials();
-        const allAdmins = [...localAdmins, defaultAdmin];
-
-        const matchedAdmin = allAdmins.find(a => (a.email || '').toLowerCase().trim() === cleanEmail);
-        const matchedSalon = localSalons.find(s => (s.ownerEmail || '').toLowerCase().trim() === cleanEmail || ((s.config as any)?.email || '').toLowerCase().trim() === cleanEmail);
-
-        if (matchedAdmin || matchedSalon) {
-          setRecoverySuccess(`Sua senha foi enviada para o e-mail ${cleanEmail}! Verifique sua caixa de entrada e pasta de spam.`);
-        } else {
-          setRecoveryError(data.error || 'E-mail não encontrado no sistema. Verifique se o e-mail digitado é o mesmo cadastrado.');
-        }
+        setRecoveryError(data.error || 'Não foi possível entregar o e-mail no momento. Verifique a conexão com o provedor de e-mail.');
       }
     } catch {
-      // Local fallback in case server is unreachable
-      const localSalons = Storage.getSalons();
-      const localAdmins = Storage.getAdminCredentialsList();
-      const defaultAdmin = Storage.getAdminCredentials();
-      const allAdmins = [...localAdmins, defaultAdmin];
-
-      const matchedAdmin = allAdmins.find(a => (a.email || '').toLowerCase().trim() === cleanEmail);
-      const matchedSalon = localSalons.find(s => (s.ownerEmail || '').toLowerCase().trim() === cleanEmail || ((s.config as any)?.email || '').toLowerCase().trim() === cleanEmail);
-
-      if (matchedAdmin || matchedSalon) {
-        setRecoverySuccess(`Sua senha foi enviada para o e-mail ${cleanEmail}! Verifique sua caixa de entrada e pasta de spam.`);
-      } else {
-        setRecoveryError('E-mail não encontrado no sistema. Verifique o e-mail digitado.');
-      }
+      setRecoveryError('Não foi possível conectar ao servidor de e-mail no momento. Tente novamente em instantes.');
     } finally {
       setRecoveryLoading(false);
     }

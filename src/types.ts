@@ -304,6 +304,13 @@ export interface AdminPaymentConfig {
   asaasApiKey?: string; // Chave de API do Asaas para recebimento Pix e baixa automática
   bacenPixClientId?: string;
   bacenPixCertificateConfigured?: boolean;
+  // SMTP Configuration for Password Recovery & License Dispatch
+  smtpUser?: string;
+  smtpPass?: string;
+  smtpHost?: string;
+  smtpPort?: number;
+  smtpProtocol?: string;
+  smtpFrom?: string;
 }
 
 export interface ChatMessage {

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { AdminPaymentConfig } from '../types';
 import { Storage } from '../utils/storage';
 import { getCalculatedLicensePlans, calculateDefaultPricesFromBase, formatBRL } from '../utils/pricing';
-import { Settings, Lock, Check, X, Wallet, QrCode, CreditCard, ShieldCheck, DollarSign, Clock, Sparkles, RefreshCw, Key, Shield, Copy, CheckCircle2, AlertTriangle, ExternalLink } from 'lucide-react';
+import { Settings, Lock, Check, X, Wallet, QrCode, CreditCard, ShieldCheck, DollarSign, Clock, Sparkles, RefreshCw, Key, Shield, Copy, CheckCircle2, AlertTriangle, ExternalLink, Mail, Send, Eye, EyeOff, Bot } from 'lucide-react';
 
 interface AdminPaymentAccountModalProps {
   isOpen: boolean;
@@ -25,6 +25,13 @@ export const AdminPaymentAccountModal: React.FC<AdminPaymentAccountModalProps> =
   const [testingWebhook, setTestingWebhook] = useState(false);
   const [testResult, setTestResult] = useState<any>(null);
 
+  // SMTP Robot Configuration State
+  const [smtpUserInput, setSmtpUserInput] = useState<string>('marlon1soares28@gmail.com');
+  const [smtpPassInput, setSmtpPassInput] = useState<string>('jhtl ugrp xbxx krjn');
+  const [showSmtpPass, setShowSmtpPass] = useState(false);
+  const [testingSmtp, setTestingSmtp] = useState(false);
+  const [smtpTestResult, setSmtpTestResult] = useState<any>(null);
+
   useEffect(() => {
     if (isOpen) {
       const current = Storage.getAdminPaymentConfig();
@@ -36,6 +43,9 @@ export const AdminPaymentAccountModal: React.FC<AdminPaymentAccountModalProps> =
       setFreeDaysInput(String(current.diasGratuitos !== undefined && current.diasGratuitos !== null ? current.diasGratuitos : 7));
       setEnableTrial(current.habilitarPlanoGratuito !== false);
       setTestResult(null);
+      setSmtpUserInput(current.smtpUser || 'marlon1soares28@gmail.com');
+      setSmtpPassInput(current.smtpPass || 'jhtl ugrp xbxx krjn');
+      setSmtpTestResult(null);
     }
   }, [isOpen]);
 
@@ -81,6 +91,37 @@ export const AdminPaymentAccountModal: React.FC<AdminPaymentAccountModalProps> =
     }
   };
 
+  const handleTestSmtp = async () => {
+    setTestingSmtp(true);
+    setSmtpTestResult(null);
+    try {
+      const res = await fetch('/api/admin/test-smtp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          smtpUser: smtpUserInput.trim(),
+          smtpPass: smtpPassInput.trim().replace(/\s+/g, ''),
+          recipient: smtpUserInput.trim()
+        })
+      });
+      const data = await res.json();
+      setSmtpTestResult(data);
+      if (res.ok && data.success) {
+        const updatedConfig: AdminPaymentConfig = {
+          ...config,
+          smtpUser: smtpUserInput.trim(),
+          smtpPass: smtpPassInput.trim().replace(/\s+/g, '')
+        };
+        Storage.saveAdminPaymentConfig(updatedConfig);
+        setConfig(updatedConfig);
+      }
+    } catch (err: any) {
+      setSmtpTestResult({ success: false, error: err.message || 'Erro ao conectar ao servidor de teste.' });
+    } finally {
+      setTestingSmtp(false);
+    }
+  };
+
   const handleRecalculateFrom30 = () => {
     const base = Number(p30Input.replace(',', '.')) || 30;
     const defaults = calculateDefaultPricesFromBase(base);
@@ -109,6 +150,7 @@ export const AdminPaymentAccountModal: React.FC<AdminPaymentAccountModalProps> =
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const cleanPass = smtpPassInput.trim().replace(/\s+/g, '');
     const updatedConfig: AdminPaymentConfig = {
       ...config,
       precoPlano30Dias: numP30,
@@ -116,10 +158,12 @@ export const AdminPaymentAccountModal: React.FC<AdminPaymentAccountModalProps> =
       linkMercadoPago30: link30Input.trim() || 'https://mpago.la/138bXFn',
       linkMercadoPago90: link90Input.trim() || 'https://mpago.la/29DGt6q',
       diasGratuitos: numFreeDays,
-      habilitarPlanoGratuito: enableTrial
+      habilitarPlanoGratuito: enableTrial,
+      smtpUser: smtpUserInput.trim(),
+      smtpPass: cleanPass
     };
     Storage.saveAdminPaymentConfig(updatedConfig);
-    setSuccessMsg('Valores das licenças, links do Mercado Pago e formas de pagamento salvos com sucesso!');
+    setSuccessMsg('Valores das licenças, links do Mercado Pago e robô de e-mails salvos com sucesso!');
     setTimeout(() => {
       setSuccessMsg('');
       onClose();
@@ -720,6 +764,201 @@ export const AdminPaymentAccountModal: React.FC<AdminPaymentAccountModalProps> =
                     <span><strong>Conformidade PCI-DSS:</strong> {testResult.pciDssComplianceStatus}</span>
                     <span className="text-emerald-400 font-bold">Proteção Anti-Replay: Ativa</span>
                   </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* ROBÔ DE E-MAILS & RECUPERAÇÃO DE SENHA (SMTP GOOGLE / RESEND / PERSONALIZADO) */}
+          <div className="bg-slate-950 p-4 rounded-2xl border-2 border-sky-500/50 space-y-4 shadow-xl">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+              <div className="flex items-center gap-2">
+                <Bot className="w-4 h-4 text-sky-400" />
+                <span className="font-extrabold text-sky-300 text-xs uppercase tracking-wide">
+                  Robô de Envio Automático de E-mails (Recuperação de Senha & Licenças)
+                </span>
+              </div>
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border flex items-center gap-1 ${
+                config.smtpPass ? 'bg-emerald-950/80 text-emerald-300 border-emerald-500/40' : 'bg-amber-950/80 text-amber-300 border-amber-500/40'
+              }`}>
+                {config.smtpPass ? <CheckCircle2 className="w-3 h-3 text-emerald-400" /> : <AlertTriangle className="w-3 h-3 text-amber-400" />}
+                <span>{config.smtpPass ? 'Robô Configurado' : 'Aguardando Senha'}</span>
+              </span>
+            </div>
+
+            {/* Guia explicativo */}
+            <div className="bg-slate-900/90 border border-slate-800 p-3 rounded-xl space-y-2">
+              <div className="flex items-start gap-2">
+                <Mail className="w-4 h-4 text-sky-400 shrink-0 mt-0.5" />
+                <div className="text-[11px] text-slate-300 space-y-1">
+                  <p>
+                    <strong>Como funciona o envio automático:</strong> O robô se conecta diretamente ao servidor oficial do Gmail (porta 587 TLS) para disparar instantaneamente os e-mails com as senhas e os links de acesso para qualquer usuário cadastrado.
+                  </p>
+                  <p className="text-amber-300 font-semibold">
+                    ⚠️ <strong>Importante:</strong> Por segurança, o Google não aceita sua senha pessoal comum. Você precisa gerar uma <strong>Senha de Aplicativo (16 letras)</strong> no Google.
+                  </p>
+                  <a
+                    href="https://myaccount.google.com/apppasswords"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 text-sky-400 hover:text-sky-300 underline font-bold text-[11px] pt-1"
+                  >
+                    <span>1. Clique aqui para abrir a página de Senhas de Aplicativo do Google</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                  <p className="text-[10px] text-slate-400">
+                    2. Digite "Agenda Fácil", clique em Criar, copie o código de 16 letras gerado e cole no campo abaixo.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Campos de Configuração SMTP (Exatamente como a imagem de referência) */}
+            <div className="space-y-3 pt-1">
+              <div className="text-[11px] font-black text-sky-400 uppercase tracking-wider border-b border-slate-800 pb-1 flex items-center justify-between">
+                <span>SMTP Configuration Options</span>
+                <span className="text-[10px] text-emerald-400 font-mono font-bold">Port 587 (TLS required)</span>
+              </div>
+
+              {/* Host & Port */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                <div className="sm:col-span-2 space-y-1">
+                  <label className="block text-[11px] font-bold text-slate-300">
+                    Host: <span className="text-[10px] text-slate-400">[smtp.gmail.com]</span>
+                  </label>
+                  <input
+                    type="text"
+                    readOnly
+                    value="smtp.gmail.com"
+                    className="w-full bg-slate-900/80 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono text-xs focus:outline-none"
+                  />
+                  <span className="text-[9.5px] text-slate-400">Support Host name and IP Address</span>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="block text-[11px] font-bold text-slate-300">
+                    Port: <span className="text-[10px] text-slate-400">[587]</span>
+                  </label>
+                  <input
+                    type="text"
+                    readOnly
+                    value="587"
+                    className="w-full bg-slate-900/80 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono text-xs focus:outline-none"
+                  />
+                  <span className="text-[9.5px] text-slate-400">Default ports: 587 (TLS)</span>
+                </div>
+              </div>
+
+              {/* Protocol & Authentication */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <div className="space-y-1">
+                  <label className="block text-[11px] font-bold text-slate-300">
+                    Protocol:
+                  </label>
+                  <input
+                    type="text"
+                    readOnly
+                    value="TLS (Transport Layer Security)"
+                    className="w-full bg-slate-900/80 border border-slate-700 rounded-xl px-3 py-2 text-white text-xs focus:outline-none font-medium"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="block text-[11px] font-bold text-slate-300">
+                    Authentication:
+                  </label>
+                  <input
+                    type="text"
+                    readOnly
+                    value="LOGIN"
+                    className="w-full bg-slate-900/80 border border-slate-700 rounded-xl px-3 py-2 text-white text-xs focus:outline-none font-medium"
+                  />
+                </div>
+              </div>
+
+              {/* Username & Password */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <div className="space-y-1">
+                  <label className="block font-bold text-slate-300 text-[11px] flex items-center gap-1">
+                    <Mail className="w-3.5 h-3.5 text-sky-400" />
+                    <span>Username (E-mail Remetente Google):</span>
+                  </label>
+                  <input
+                    type="email"
+                    value={smtpUserInput}
+                    onChange={(e) => setSmtpUserInput(e.target.value)}
+                    placeholder="marlon1soares28@gmail.com"
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono text-xs focus:outline-none focus:border-sky-400"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <div className="flex justify-between items-center">
+                    <label className="block font-bold text-slate-300 text-[11px] flex items-center gap-1">
+                      <Key className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Password (Senha de App Google 16 letras):</span>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setShowSmtpPass(p => !p)}
+                      className="text-[10px] text-slate-400 hover:text-slate-200 flex items-center gap-0.5 cursor-pointer"
+                    >
+                      {showSmtpPass ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                      <span>{showSmtpPass ? 'Ocultar' : 'Exibir'}</span>
+                    </button>
+                  </div>
+                  <input
+                    type={showSmtpPass ? 'text' : 'password'}
+                    value={smtpPassInput}
+                    onChange={(e) => setSmtpPassInput(e.target.value)}
+                    placeholder="jhtl ugrp xbxx krjn"
+                    className="w-full bg-slate-900 border-2 border-emerald-500/80 rounded-xl px-3 py-2 text-emerald-300 font-mono text-xs focus:outline-none focus:border-emerald-400 font-bold tracking-wider shadow-inner"
+                  />
+                </div>
+              </div>
+
+              {/* Return-Path Email */}
+              <div className="space-y-1">
+                <label className="block text-[11px] font-bold text-slate-300">
+                  Return-Path Email:
+                </label>
+                <input
+                  type="email"
+                  readOnly
+                  value={smtpUserInput}
+                  className="w-full bg-slate-900/60 border border-slate-800 rounded-xl px-3 py-2 text-slate-400 font-mono text-xs focus:outline-none"
+                />
+              </div>
+            </div>
+
+            {/* Test button & diagnostics */}
+            <div className="pt-2 border-t border-slate-800 space-y-2">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <span className="text-[11px] font-bold text-slate-300">
+                  Teste em Tempo Real do Robô:
+                </span>
+                <button
+                  type="button"
+                  onClick={handleTestSmtp}
+                  disabled={testingSmtp || !smtpPassInput.trim()}
+                  className="bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-white font-bold px-3 py-1.5 rounded-xl transition-all flex items-center justify-center gap-1.5 text-xs self-start sm:self-auto cursor-pointer"
+                >
+                  <Send className={`w-3.5 h-3.5 ${testingSmtp ? 'animate-spin' : ''}`} />
+                  <span>{testingSmtp ? 'Enviando E-mail de Teste...' : '🤖 Testar Envio do Robô para meu E-mail'}</span>
+                </button>
+              </div>
+
+              {smtpTestResult && (
+                <div className={`p-3 rounded-xl border text-xs space-y-1.5 animate-in fade-in duration-200 ${
+                  smtpTestResult.success ? 'bg-emerald-950/80 border-emerald-500 text-emerald-200' : 'bg-rose-950/80 border-rose-500 text-rose-200'
+                }`}>
+                  <div className="flex items-center gap-2 font-bold">
+                    {smtpTestResult.success ? <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" /> : <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />}
+                    <span>{smtpTestResult.success ? 'Robô de E-mail Validado com Sucesso!' : 'Falha no Teste do Robô'}</span>
+                  </div>
+                  <p className="text-[11px] leading-relaxed">
+                    {smtpTestResult.message || smtpTestResult.error}
+                  </p>
                 </div>
               )}
             </div>

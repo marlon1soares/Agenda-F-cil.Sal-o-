@@ -233,6 +233,12 @@ const DEFAULT_STATE: SyncDatabaseState = {
     mercadopagoClientSecret: "ziCC7svN4c0MnvYruGEGMFQ7tcGu5P0q",
     webhookSecret: "ae043f22ecf5be4ebb36625d10f92b6ae689578cde0152721c211351fc73a241",
     webhookUrl: "https://agendamaisfacil.vercel.app/api/webhook/mercadopago",
+    smtpHost: "smtp.gmail.com",
+    smtpPort: 587,
+    smtpProtocol: "TLS",
+    smtpUser: "marlon1soares28@gmail.com",
+    smtpPass: "jhtlugrpxbxxkrjn",
+    smtpFrom: "Agenda Fácil <marlon1soares28@gmail.com>",
     videoTutorialConfig: {
       youtubeUrl: "",
       customVideoUrl: "/uploads/videos/video_explicativo_app.mp4",
