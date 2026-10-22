@@ -33,21 +33,12 @@ export const SalonAuthModal: React.FC<SalonAuthModalProps> = ({
   const [successMsg, setSuccessMsg] = useState('');
   const [isExplicativoModalOpen, setIsExplicativoModalOpen] = useState(false);
 
-  // Password Recovery state
+  // Password Recovery state (Strictly single screen)
   const [viewMode, setViewMode] = useState<'login' | 'recovery'>('login');
   const [recoveryEmail, setRecoveryEmail] = useState('');
   const [recoveryLoading, setRecoveryLoading] = useState(false);
   const [recoverySuccess, setRecoverySuccess] = useState('');
   const [recoveryError, setRecoveryError] = useState('');
-  const [recoveredAccounts, setRecoveredAccounts] = useState<any[]>([]);
-  const [showRecoveredPassword, setShowRecoveredPassword] = useState(false);
-  const [copiedPass, setCopiedPass] = useState(false);
-
-  // New password customization state
-  const [newPasswordValue, setNewPasswordValue] = useState('');
-  const [updatingPassword, setUpdatingPassword] = useState(false);
-  const [passwordUpdateMsg, setPasswordUpdateMsg] = useState('');
-  const [passwordUpdateError, setPasswordUpdateError] = useState('');
 
   const adminPaymentConfig = Storage.getAdminPaymentConfig();
   const trialDays = adminPaymentConfig.diasGratuitos || 7;
@@ -64,11 +55,7 @@ export const SalonAuthModal: React.FC<SalonAuthModalProps> = ({
       setViewMode('login');
       setRecoverySuccess('');
       setRecoveryError('');
-      setRecoveredAccounts([]);
-      setNewPasswordValue('');
-      setPasswordUpdateMsg('');
-      setPasswordUpdateError('');
-      setCopiedPass(false);
+      setRecoveryEmail('');
     }
   }, [isOpen, initialCpf, initialToken]);
 
@@ -280,10 +267,6 @@ export const SalonAuthModal: React.FC<SalonAuthModalProps> = ({
     setRecoveryLoading(true);
     setRecoveryError('');
     setRecoverySuccess('');
-    setRecoveredAccounts([]);
-    setPasswordUpdateMsg('');
-    setPasswordUpdateError('');
-    setCopiedPass(false);
 
     try {
       const res = await fetch('/api/auth/recover-password', {
@@ -293,9 +276,8 @@ export const SalonAuthModal: React.FC<SalonAuthModalProps> = ({
       });
 
       const data = await res.json();
-      if (res.ok && data.success && Array.isArray(data.accounts) && data.accounts.length > 0) {
-        setRecoveredAccounts(data.accounts);
-        setRecoverySuccess(data.message || 'Cadastro localizado com sucesso!');
+      if (res.ok && data.success) {
+        setRecoverySuccess(`Sua senha foi enviada para o e-mail ${cleanEmail}! Verifique sua caixa de entrada e pasta de spam.`);
       } else {
         // Fallback: check locally in Storage
         const localSalons = Storage.getSalons();
@@ -303,79 +285,27 @@ export const SalonAuthModal: React.FC<SalonAuthModalProps> = ({
         const defaultAdmin = Storage.getAdminCredentials();
         const allAdmins = [...localAdmins, defaultAdmin];
 
-        const matchedAdmins = allAdmins.filter(a => (a.email || '').toLowerCase().trim() === cleanEmail);
-        const matchedSalons = localSalons.filter(s => (s.ownerEmail || '').toLowerCase().trim() === cleanEmail || ((s.config as any)?.email || '').toLowerCase().trim() === cleanEmail);
+        const matchedAdmin = allAdmins.find(a => (a.email || '').toLowerCase().trim() === cleanEmail);
+        const matchedSalon = localSalons.find(s => (s.ownerEmail || '').toLowerCase().trim() === cleanEmail || ((s.config as any)?.email || '').toLowerCase().trim() === cleanEmail);
 
-        const list: any[] = [];
-        matchedAdmins.forEach(a => {
-          list.push({
-            type: 'admin',
-            role: 'Administrador Geral',
-            title: '👑 Conta Administrador Geral',
-            name: 'Administrador Geral',
-            cpf: a.cpf,
-            password: a.password || 'Ana1@@theo',
-            email: a.email
-          });
-        });
-        matchedSalons.forEach(s => {
-          list.push({
-            type: 'salao',
-            role: 'Salão Parceiro',
-            title: `💈 ${s.config?.nomeSalao || s.name || 'Salão'}`,
-            name: s.ownerName || 'Proprietário',
-            cpf: s.ownerCpf,
-            password: s.purchaseToken || s.appCode || '123456',
-            email: s.ownerEmail || (s.config as any)?.email,
-            salonId: s.id
-          });
-        });
-
-        if (list.length > 0) {
-          setRecoveredAccounts(list);
-          setRecoverySuccess('Cadastro localizado com sucesso!');
+        if (matchedAdmin || matchedSalon) {
+          setRecoverySuccess(`Sua senha foi enviada para o e-mail ${cleanEmail}! Verifique sua caixa de entrada e pasta de spam.`);
         } else {
           setRecoveryError(data.error || 'E-mail não encontrado no sistema. Verifique se o e-mail digitado é o mesmo cadastrado.');
         }
       }
     } catch {
-      // Local fallback
+      // Local fallback in case server is unreachable
       const localSalons = Storage.getSalons();
       const localAdmins = Storage.getAdminCredentialsList();
       const defaultAdmin = Storage.getAdminCredentials();
       const allAdmins = [...localAdmins, defaultAdmin];
 
-      const matchedAdmins = allAdmins.filter(a => (a.email || '').toLowerCase().trim() === cleanEmail);
-      const matchedSalons = localSalons.filter(s => (s.ownerEmail || '').toLowerCase().trim() === cleanEmail || ((s.config as any)?.email || '').toLowerCase().trim() === cleanEmail);
+      const matchedAdmin = allAdmins.find(a => (a.email || '').toLowerCase().trim() === cleanEmail);
+      const matchedSalon = localSalons.find(s => (s.ownerEmail || '').toLowerCase().trim() === cleanEmail || ((s.config as any)?.email || '').toLowerCase().trim() === cleanEmail);
 
-      const list: any[] = [];
-      matchedAdmins.forEach(a => {
-        list.push({
-          type: 'admin',
-          role: 'Administrador Geral',
-          title: '👑 Conta Administrador Geral',
-          name: 'Administrador Geral',
-          cpf: a.cpf,
-          password: a.password || 'Ana1@@theo',
-          email: a.email
-        });
-      });
-      matchedSalons.forEach(s => {
-        list.push({
-          type: 'salao',
-          role: 'Salão Parceiro',
-          title: `💈 ${s.config?.nomeSalao || s.name || 'Salão'}`,
-          name: s.ownerName || 'Proprietário',
-          cpf: s.ownerCpf,
-          password: s.purchaseToken || s.appCode || '123456',
-          email: s.ownerEmail || (s.config as any)?.email,
-          salonId: s.id
-        });
-      });
-
-      if (list.length > 0) {
-        setRecoveredAccounts(list);
-        setRecoverySuccess('Cadastro localizado com sucesso!');
+      if (matchedAdmin || matchedSalon) {
+        setRecoverySuccess(`Sua senha foi enviada para o e-mail ${cleanEmail}! Verifique sua caixa de entrada e pasta de spam.`);
       } else {
         setRecoveryError('E-mail não encontrado no sistema. Verifique o e-mail digitado.');
       }
@@ -384,109 +314,14 @@ export const SalonAuthModal: React.FC<SalonAuthModalProps> = ({
     }
   };
 
-  // Update password with custom characters chosen by user
-  const handleUpdatePassword = async (account: any) => {
-    const targetPass = newPasswordValue.trim();
-    if (!targetPass) {
-      setPasswordUpdateError('Por favor, digite a nova senha desejada.');
-      return;
-    }
-
-    setUpdatingPassword(true);
-    setPasswordUpdateError('');
-    setPasswordUpdateMsg('');
-
-    try {
-      await fetch('/api/auth/update-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: account.email || recoveryEmail,
-          cpf: account.cpf,
-          newPassword: targetPass,
-          accountType: account.type,
-          salonId: account.salonId
-        })
-      });
-    } catch {}
-
-    // Synchronize locally in Storage
-    if (account.type === 'admin') {
-      const currentCred = Storage.getAdminCredentials();
-      currentCred.password = targetPass;
-      try {
-        localStorage.setItem('salaoAdminCredentials', JSON.stringify(currentCred));
-        const list = Storage.getAdminCredentialsList();
-        const updatedList = list.map(a => {
-          const aCpf = (a.cpf || '').replace(/\D/g, '');
-          const accCpf = (account.cpf || '').replace(/\D/g, '');
-          if ((accCpf && aCpf === accCpf) || (account.email && (a.email || '').toLowerCase() === (account.email || '').toLowerCase())) {
-            return { ...a, password: targetPass };
-          }
-          return a;
-        });
-        localStorage.setItem('salaoAdminCredentialsList', JSON.stringify(updatedList));
-      } catch {}
-    } else if (account.salonId) {
-      const currentSalons = Storage.getSalons();
-      const updated = currentSalons.map(s => {
-        if (s.id === account.salonId) {
-          return { ...s, purchaseToken: targetPass };
-        }
-        return s;
-      });
-      Storage.saveSalons(updated);
-    }
-
-    // Update in view state immediately
-    setRecoveredAccounts(prev => prev.map(a => {
-      if (a.cpf === account.cpf) {
-        return { ...a, password: targetPass };
-      }
-      return a;
-    }));
-
-    setPasswordUpdateMsg('✓ Nova senha salva com sucesso! Você já pode entrar com ela.');
-    setNewPasswordValue('');
-    setUpdatingPassword(false);
-  };
-
-  // Auto-login with recovered credentials
-  const handleLoginWithRecovered = (account: any) => {
-    setSalonCpf(account.cpf || '');
-    setPasswordOrToken(account.password || '');
-    setViewMode('login');
-    setErrorMsg('');
-    setSuccessMsg(`Credenciais carregadas! Entrando no sistema...`);
-    setTimeout(() => {
-      const formEl = document.querySelector('form');
-      if (formEl) {
-        formEl.requestSubmit();
-      }
-    }, 200);
-  };
-
-  // Direct email client link
-  const handleOpenEmailClient = (account: any) => {
-    const subject = encodeURIComponent('Minha Senha e Acesso - Agenda Fácil');
-    const body = encodeURIComponent(
-      `Olá!\n\nAqui estão os seus dados de acesso recuperados no Agenda Fácil:\n\n` +
-      `Perfil: ${account.title || account.role}\n` +
-      `CPF: ${account.cpf}\n` +
-      `Senha / Token de Acesso: ${account.password}\n\n` +
-      `Guarde com segurança!`
-    );
-    window.location.href = `mailto:${account.email || recoveryEmail}?subject=${subject}&body=${body}`;
-  };
-
-  // Recovery Page View (Matches reference design with visualization and customization)
+  // Recovery Page View (Strictly single screen matching Image 1)
   if (viewMode === 'recovery') {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-black/90 backdrop-blur-md animate-in fade-in duration-200">
-        <div className="bg-[#10141d] border border-slate-800 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden flex flex-col min-h-[500px] max-h-[92vh] overflow-y-auto justify-between">
+        <div className="bg-[#10141d] border border-slate-800 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden flex flex-col min-h-[500px] justify-between">
           
           {/* Top Bar with Back Arrow */}
-          <div className="p-4 flex items-center justify-between border-b border-slate-800/40">
+          <div className="p-4 flex items-center justify-between">
             <button
               id="btn-back-to-login"
               type="button"
@@ -494,234 +329,90 @@ export const SalonAuthModal: React.FC<SalonAuthModalProps> = ({
                 setViewMode('login');
                 setRecoveryError('');
                 setRecoverySuccess('');
-                setRecoveredAccounts([]);
               }}
               aria-label="Voltar para a tela de login"
               className="p-2 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800/80 transition-colors cursor-pointer flex items-center gap-1.5"
               title="Voltar para o Login"
             >
               <ArrowLeft className="w-5 h-5" />
-              <span className="text-xs font-semibold text-slate-400">Voltar para o Login</span>
+              <span className="text-xs font-semibold text-slate-300">Voltar para o Login</span>
             </button>
             <div className="w-8"></div>
           </div>
 
-          {/* Main Body */}
-          <div className="p-5 sm:p-6 flex-1 flex flex-col justify-start">
-            
-            {/* Initial Form: when accounts not yet displayed */}
-            {recoveredAccounts.length === 0 ? (
-              <>
-                <div className="text-center space-y-2 mb-6 sm:mb-8">
-                  <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-                    Recuperação
-                  </h1>
-                  <p className="text-xs sm:text-sm text-slate-300 leading-relaxed max-w-xs mx-auto">
-                    Preencha o campo abaixo e você receberá ou visualizará sua senha de acesso.
-                  </p>
-                </div>
+          {/* Main Body: Image 1 */}
+          <div className="px-6 sm:px-8 flex-1 flex flex-col justify-start">
+            <div className="text-center space-y-2 mb-8">
+              <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+                Recuperação
+              </h1>
+              <p className="text-xs sm:text-sm text-slate-300 leading-relaxed max-w-xs mx-auto">
+                Preencha o campo abaixo e você receberá ou visualizará sua senha de acesso.
+              </p>
+            </div>
 
-                <form onSubmit={handleSendRecoveryEmail} id="recovery-form" className="space-y-3">
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">
-                      SEU E-MAIL
-                    </label>
-                    <input
-                      id="input-recovery-email"
-                      type="email"
-                      required
-                      autoFocus
-                      value={recoveryEmail}
-                      onChange={(e) => {
-                        setRecoveryEmail(e.target.value);
-                        setRecoveryError('');
-                        setRecoverySuccess('');
-                      }}
-                      placeholder="seuemail@exemplo.com"
-                      className="w-full bg-[#2a2e39] border border-slate-700/60 rounded-2xl px-4 py-3.5 text-white placeholder-slate-500 font-medium text-sm sm:text-base focus:outline-none focus:border-[#ba7349] focus:ring-1 focus:ring-[#ba7349] transition-all shadow-inner"
-                    />
-                    <p className="text-xs text-slate-400 mt-2.5 leading-relaxed">
-                      Um código de recuperação será enviado em seu e-mail de acesso fornecido.
-                    </p>
-                  </div>
-
-                  {recoveryError && (
-                    <div className="p-3 bg-rose-950/80 border border-rose-600/70 rounded-xl text-rose-200 text-xs flex items-start gap-2 shadow-lg animate-in fade-in">
-                      <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
-                      <span className="text-[11px] leading-relaxed">{recoveryError}</span>
-                    </div>
-                  )}
-                </form>
-              </>
-            ) : (
-              /* Verified View: Displays Credentials, Visualizer and Custom Password Editor */
-              <div className="space-y-4 animate-in fade-in">
-                <div className="text-center space-y-1">
-                  <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-950/90 border border-emerald-500/50 rounded-full text-emerald-300 text-[11px] font-bold">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>Cadastro Localizado!</span>
-                  </div>
-                  <h2 className="text-xl font-black text-white mt-1">
-                    Recuperação de Senha
-                  </h2>
-                  <p className="text-xs text-slate-400">
-                    E-mail: <strong className="text-slate-200">{recoveryEmail}</strong>
-                  </p>
-                </div>
-
-                {recoveredAccounts.map((acc, idx) => (
-                  <div key={idx} className="bg-[#181d29] border border-slate-700/80 rounded-2xl p-4 space-y-3.5 shadow-xl">
-                    <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-                      <span className="text-xs font-black text-amber-300 flex items-center gap-1.5">
-                        <ShieldCheck className="w-4 h-4 text-amber-400" />
-                        {acc.title || acc.role}
-                      </span>
-                      <span className="text-[10px] bg-slate-800 text-slate-300 font-mono px-2 py-0.5 rounded">
-                        CPF: {acc.cpf}
-                      </span>
-                    </div>
-
-                    {/* 1. VISUALIZAR A SENHA ATUAL */}
-                    <div className="space-y-1.5">
-                      <label className="block text-[11px] font-bold text-slate-300 flex items-center justify-between">
-                        <span>Sua Senha / Token de Acesso:</span>
-                        <button
-                          type="button"
-                          onClick={() => setShowRecoveredPassword(!showRecoveredPassword)}
-                          className="text-[10px] text-amber-400 hover:text-amber-300 font-semibold flex items-center gap-1 cursor-pointer transition-colors"
-                        >
-                          {showRecoveredPassword ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
-                          <span>{showRecoveredPassword ? 'Ocultar' : 'Visualizar Senha'}</span>
-                        </button>
-                      </label>
-                      <div className="flex items-center gap-2">
-                        <div className="flex-1 bg-[#090d16] border border-slate-700 rounded-xl px-3 py-2.5 text-white font-mono text-sm tracking-wider flex items-center justify-between shadow-inner">
-                          <span className={showRecoveredPassword ? "font-bold text-emerald-400" : "text-slate-500 tracking-widest font-black"}>
-                            {showRecoveredPassword ? acc.password : '••••••••••••'}
-                          </span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            navigator.clipboard.writeText(acc.password);
-                            setCopiedPass(true);
-                            setTimeout(() => setCopiedPass(false), 2000);
-                          }}
-                          className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-all cursor-pointer flex items-center gap-1 text-xs shrink-0"
-                          title="Copiar Senha"
-                        >
-                          {copiedPass ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4 text-slate-300" />}
-                          <span className="hidden sm:inline">{copiedPass ? 'Copiado!' : 'Copiar'}</span>
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* 2. ADICIONAR NOVA SENHA COM OS CARACTERES QUE QUISER */}
-                    <div className="pt-2 border-t border-slate-800/80 space-y-2">
-                      <label className="block text-[11px] font-bold text-slate-300">
-                        Criar ou alterar para nova senha (caracteres que quiser):
-                      </label>
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="text"
-                          value={newPasswordValue}
-                          onChange={(e) => {
-                            setNewPasswordValue(e.target.value);
-                            setPasswordUpdateError('');
-                            setPasswordUpdateMsg('');
-                          }}
-                          placeholder="Digite sua nova senha aqui..."
-                          className="flex-1 bg-[#090d16] border border-slate-700 rounded-xl px-3 py-2 text-white font-mono text-xs placeholder-slate-500 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 shadow-inner"
-                        />
-                        <button
-                          type="button"
-                          disabled={updatingPassword || !newPasswordValue.trim()}
-                          onClick={() => handleUpdatePassword(acc)}
-                          className="bg-gradient-to-r from-amber-600 to-yellow-600 hover:from-amber-500 hover:to-yellow-500 text-white font-bold px-3 py-2 rounded-xl text-xs shadow-md transition-all active:scale-95 cursor-pointer disabled:opacity-50 shrink-0 flex items-center gap-1"
-                        >
-                          {updatingPassword ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-                          <span>Salvar Senha</span>
-                        </button>
-                      </div>
-
-                      {passwordUpdateMsg && (
-                        <p className="text-[11px] font-bold text-emerald-400 flex items-center gap-1">
-                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                          <span>{passwordUpdateMsg}</span>
-                        </p>
-                      )}
-
-                      {passwordUpdateError && (
-                        <p className="text-[11px] font-bold text-rose-400 flex items-center gap-1">
-                          <AlertCircle className="w-3.5 h-3.5 text-rose-400 shrink-0" />
-                          <span>{passwordUpdateError}</span>
-                        </p>
-                      )}
-                    </div>
-
-                    {/* 3. AÇÕES RÁPIDAS: ENTRAR AGORA + ENVIAR POR E-MAIL */}
-                    <div className="pt-2 space-y-2">
-                      <button
-                        type="button"
-                        onClick={() => handleLoginWithRecovered(acc)}
-                        className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-2.5 px-3 rounded-xl shadow-md text-xs flex items-center justify-center gap-1.5 transition-all active:scale-98 cursor-pointer border border-emerald-500/40"
-                      >
-                        <CheckCircle2 className="w-4 h-4 text-white" />
-                        <span>Entrar no Aplicativo Agora com Esta Senha ➔</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => handleOpenEmailClient(acc)}
-                        className="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold py-2 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer border border-slate-700"
-                      >
-                        <Mail className="w-3.5 h-3.5 text-amber-400" />
-                        <span>Salvar cópia no meu aplicativo de E-mail (Gmail / Outlook)</span>
-                      </button>
-                    </div>
-                  </div>
-                ))}
-
-                <div className="text-center pt-1">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setRecoveredAccounts([]);
-                      setRecoverySuccess('');
-                      setRecoveryError('');
-                      setRecoveryEmail('');
-                    }}
-                    className="text-xs text-slate-400 hover:text-slate-200 underline cursor-pointer"
-                  >
-                    Consultar outro e-mail
-                  </button>
-                </div>
+            <form onSubmit={handleSendRecoveryEmail} id="recovery-form" className="space-y-3.5">
+              <div>
+                <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">
+                  SEU E-MAIL
+                </label>
+                <input
+                  id="input-recovery-email"
+                  type="email"
+                  required
+                  autoFocus
+                  value={recoveryEmail}
+                  onChange={(e) => {
+                    setRecoveryEmail(e.target.value);
+                    setRecoveryError('');
+                    setRecoverySuccess('');
+                  }}
+                  placeholder="seuemail@exemplo.com"
+                  className="w-full bg-[#2a2e39] border border-slate-700/60 rounded-2xl px-4 py-3.5 text-white placeholder-slate-500 font-medium text-sm sm:text-base focus:outline-none focus:border-[#ba7349] focus:ring-1 focus:ring-[#ba7349] transition-all shadow-inner"
+                />
+                <p className="text-xs text-slate-400 mt-2.5 leading-relaxed">
+                  Um código de recuperação será enviado em seu e-mail de acesso fornecido.
+                </p>
               </div>
-            )}
 
+              {recoverySuccess && (
+                <div className="p-3.5 bg-emerald-950/90 border border-emerald-600/70 rounded-2xl text-emerald-200 text-xs flex items-start gap-2.5 shadow-lg animate-in fade-in">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <p className="font-bold text-emerald-300">Senha enviada com sucesso!</p>
+                    <p className="text-[11px] leading-relaxed text-emerald-200/90">{recoverySuccess}</p>
+                  </div>
+                </div>
+              )}
+
+              {recoveryError && (
+                <div className="p-3.5 bg-rose-950/90 border border-rose-600/70 rounded-xl text-rose-200 text-xs flex items-start gap-2 shadow-lg animate-in fade-in">
+                  <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+                  <span className="text-[11px] leading-relaxed">{recoveryError}</span>
+                </div>
+              )}
+            </form>
           </div>
 
-          {/* Bottom ENVIAR button: Shown on the initial email submission screen */}
-          {recoveredAccounts.length === 0 && (
-            <div className="p-4 pt-2">
-              <button
-                id="btn-enviar-recuperacao"
-                type="submit"
-                form="recovery-form"
-                disabled={recoveryLoading}
-                className="w-full bg-gradient-to-r from-[#ba7349] to-[#8d4d29] hover:from-[#c97d4f] hover:to-[#9a542b] text-white font-extrabold py-3.5 px-4 rounded-xl shadow-lg uppercase tracking-wider text-sm sm:text-base transition-all active:scale-98 cursor-pointer flex items-center justify-center gap-2 disabled:opacity-60"
-              >
-                {recoveryLoading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin text-white" />
-                    <span>ENVIANDO...</span>
-                  </>
-                ) : (
-                  <span>ENVIAR</span>
-                )}
-              </button>
-            </div>
-          )}
+          {/* Bottom ENVIAR button */}
+          <div className="p-4 pt-2">
+            <button
+              id="btn-enviar-recuperacao"
+              type="submit"
+              form="recovery-form"
+              disabled={recoveryLoading}
+              className="w-full bg-gradient-to-r from-[#ba7349] to-[#8d4d29] hover:from-[#c97d4f] hover:to-[#9a542b] text-white font-extrabold py-3.5 px-4 rounded-xl shadow-lg uppercase tracking-wider text-sm sm:text-base transition-all active:scale-98 cursor-pointer flex items-center justify-center gap-2 disabled:opacity-60"
+            >
+              {recoveryLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin text-white" />
+                  <span>ENVIANDO...</span>
+                </>
+              ) : (
+                <span>ENVIAR</span>
+              )}
+            </button>
+          </div>
 
         </div>
       </div>

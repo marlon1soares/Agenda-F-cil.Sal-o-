@@ -685,9 +685,14 @@ export const Storage = {
 
           for (const def of defaultList) {
             const defCpfDigits = def.cpf ? def.cpf.replace(/\D/g, '') : '';
+            const defEmail = (def.email || '').toLowerCase().trim();
             const exists = merged.some(c => {
               const cDigits = c.cpf ? c.cpf.replace(/\D/g, '') : '';
-              return defCpfDigits && cDigits && cDigits === defCpfDigits;
+              const cEmail = (c.email || '').toLowerCase().trim();
+              if (defCpfDigits && cDigits && defEmail && cEmail) {
+                return cDigits === defCpfDigits && cEmail === defEmail;
+              }
+              return (defCpfDigits && cDigits && cDigits === defCpfDigits) || (defEmail && cEmail && cEmail === defEmail);
             });
             if (!exists) {
               merged.push(def);

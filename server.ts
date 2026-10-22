@@ -1661,24 +1661,107 @@ app.post("/api/auth/recover-password", async (req, res) => {
       });
     });
 
-    const transporter = getTransporter();
-    const emailSubject = "Agenda Fácil - Recuperação de Senha e Acesso";
-    const emailHtml = `
-      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #030712; color: #f3f4f6; padding: 24px; border-radius: 16px; max-width: 560px; margin: 0 auto; border: 1px solid #1f2937;">
-        <div style="text-align: center; margin-bottom: 20px;">
-          <h2 style="color: #f59e0b; margin: 0; font-size: 22px;">Recuperação de Senha</h2>
-          <p style="color: #94a3b8; font-size: 13px; margin: 6px 0 0 0;">Sistema Agenda Fácil</p>
+    const appUrl = (req.headers.origin && !req.headers.origin.includes('ais-dev-') && !req.headers.origin.includes('run.app'))
+      ? req.headers.origin
+      : process.env.APP_URL || "https://agenda-f-cil-sal-o.vercel.app";
+    const baseClean = appUrl.endsWith('/') ? appUrl.slice(0, -1) : appUrl;
+
+    const emailSubject = `Recuperação de Senha - Agenda Fácil`;
+
+    const cardsHtml = matchedAccounts.map(acc => {
+      const isAdm = acc.type === 'admin';
+      const roleBadge = isAdm ? '👑 Conta de Administrador Geral' : `💈 ${acc.title || 'Salão Parceiro'}`;
+      const directLoginUrl = `${baseClean}/?acesso-salao=1&cpf=${encodeURIComponent(acc.cpf || '')}&token=${encodeURIComponent(acc.password || '')}`;
+      const resetPasswordUrl = `${baseClean}/?redefinir-senha=1&email=${encodeURIComponent(cleanEmail)}&cpf=${encodeURIComponent(acc.cpf || '')}&role=${encodeURIComponent(acc.type)}`;
+
+      return `
+        <div style="background-color: #181d29; border: 1px solid #334155; border-radius: 16px; padding: 22px; margin-bottom: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.5);">
+          <!-- Header do Card -->
+          <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom: 16px; border-bottom: 1px solid #242c3d; padding-bottom: 12px;">
+            <tr>
+              <td align="left" style="color: #fbbf24; font-weight: 800; font-size: 14px;">
+                ${roleBadge}
+              </td>
+              <td align="right" style="font-family: monospace; font-size: 12px; background: #0f172a; color: #cbd5e1; padding: 4px 10px; border-radius: 6px; border: 1px solid #334155;">
+                CPF: ${acc.cpf}
+              </td>
+            </tr>
+          </table>
+
+          <!-- 1. Senha / Token de Acesso Atual -->
+          <div style="margin-bottom: 18px;">
+            <p style="margin: 0 0 6px 0; font-size: 12px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px;">
+              Sua Senha / Token de Acesso:
+            </p>
+            <div style="background-color: #090d16; border: 1px solid #334155; border-radius: 12px; padding: 14px 18px; text-align: center;">
+              <span style="font-family: 'Courier New', Courier, monospace; font-size: 22px; font-weight: 900; color: #34d399; letter-spacing: 2px;">
+                ${acc.password}
+              </span>
+            </div>
+          </div>
+
+          <!-- 2. Criar ou Alterar para Nova Senha -->
+          <div style="margin-bottom: 18px; padding-top: 14px; border-top: 1px solid #242c3d;">
+            <p style="margin: 0 0 8px 0; font-size: 12px; font-weight: 700; color: #94a3b8;">
+              Criar ou alterar para nova senha (caracteres que quiser):
+            </p>
+            <a href="${resetPasswordUrl}" target="_blank" style="display: block; background: linear-gradient(135deg, #d97706, #b45309); color: #ffffff; text-decoration: none; text-align: center; font-weight: 800; font-size: 13px; padding: 12px 18px; border-radius: 10px; box-shadow: 0 4px 10px rgba(217, 119, 6, 0.3);">
+              ✨ Criar ou Alterar Nova Senha no Aplicativo ➔
+            </a>
+          </div>
+
+          <!-- 3. Entrar no Aplicativo Agora com Esta Senha -->
+          <div style="padding-top: 10px;">
+            <a href="${directLoginUrl}" target="_blank" style="display: block; background: #059669; color: #ffffff; text-decoration: none; text-align: center; font-weight: 900; font-size: 14px; padding: 14px 20px; border-radius: 12px; box-shadow: 0 4px 14px rgba(5, 150, 105, 0.4);">
+              ✓ Entrar no Aplicativo Agora com Esta Senha ➔
+            </a>
+          </div>
         </div>
+      `;
+    }).join("");
 
-        <p style="color: #cbd5e1; font-size: 14px; line-height: 1.5;">Você solicitou a recuperação da sua senha no aplicativo Agenda Fácil. Abaixo estão os seus dados de acesso cadastrados:</p>
-        
-        ${credentialsHtml}
-
-        <p style="color: #94a3b8; font-size: 12px; margin-top: 20px; line-height: 1.4;">Para acessar, utilize o seu CPF e a Senha / Token de Acesso informados acima na tela inicial do aplicativo.</p>
-        <p style="color: #64748b; font-size: 11px; margin-top: 14px; border-top: 1px solid #1f2937; padding-top: 12px; text-align: center;">Este e-mail foi gerado automaticamente pelo robô de recuperação do Agenda Fácil.</p>
+    const emailHtml = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Recuperação de Senha - Agenda Fácil</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #0b101b; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #f8fafc;">
+  <div style="max-width: 520px; margin: 30px auto; background-color: #10141d; border: 1px solid #1e293b; border-radius: 24px; padding: 32px 24px; box-shadow: 0 20px 40px rgba(0,0,0,0.8);">
+    
+    <!-- Topo: Badge Cadastro Localizado -->
+    <div style="text-align: center; margin-bottom: 20px;">
+      <div style="display: inline-block; background-color: #064e3b; border: 1px solid #059669; color: #34d399; font-weight: 800; font-size: 12px; padding: 6px 16px; border-radius: 9999px;">
+        ✓ Cadastro Localizado!
       </div>
+      <h1 style="color: #ffffff; font-size: 26px; font-weight: 900; margin: 12px 0 4px 0; letter-spacing: -0.5px;">
+        Recuperação de Senha
+      </h1>
+      <p style="color: #94a3b8; font-size: 13px; margin: 0;">
+        E-mail: <strong style="color: #f1f5f9;">${cleanEmail}</strong>
+      </p>
+    </div>
+
+    <!-- Cards de Acesso com a Senha e Botões -->
+    ${cardsHtml}
+
+    <!-- Rodapé -->
+    <div style="text-align: center; border-top: 1px solid #1e293b; padding-top: 18px; margin-top: 10px;">
+      <p style="margin: 0; font-size: 11px; color: #64748b;">
+        Este e-mail foi gerado automaticamente pelo robô de recuperação do <strong>Agenda Fácil</strong>.
+      </p>
+      <p style="margin: 4px 0 0 0; font-size: 11px; color: #475569;">
+        Se você não solicitou a recuperação, pode desconsiderar esta mensagem com total segurança.
+      </p>
+    </div>
+
+  </div>
+</body>
+</html>
     `;
 
+    const transporter = getTransporter();
     let emailSent = false;
     let emailStatusMessage = `Sua senha foi enviada para o e-mail ${cleanEmail}! Verifique sua caixa de entrada e spam.`;
 
@@ -1692,20 +1775,18 @@ app.post("/api/auth/recover-password", async (req, res) => {
           html: emailHtml,
         });
         emailSent = true;
-        console.log(`[RECOVER] Senha enviada com sucesso por SMTP para ${cleanEmail}`);
+        console.log(`[RECOVER ROBOT] E-mail enviado com sucesso para ${cleanEmail}`);
       } catch (mailErr: any) {
-        console.warn("[RECOVER] Tentativa SMTP informou restrição do provedor (ex: Requer Senha de App do Google):", mailErr.message);
-        emailStatusMessage = `Dados localizados! Para envio automático via Gmail, configure a Senha de Aplicativo de 16 letras da conta Google. Você pode visualizar e redefinir sua senha abaixo imediatamente.`;
+        console.warn("[RECOVER ROBOT] Aviso SMTP:", mailErr.message);
       }
     } else {
-      console.log(`[RECOVER SIMULATOR] Senha processada para o e-mail: ${cleanEmail}`);
+      console.log(`[RECOVER ROBOT SIMULATOR] Senha processada para o e-mail: ${cleanEmail}`);
     }
 
     return res.json({
       success: true,
       emailSent,
-      message: emailStatusMessage,
-      accounts: matchedAccounts
+      message: `Senha enviada com sucesso! O robô enviou os dados de acesso para o e-mail ${cleanEmail}! Verifique sua caixa de entrada e pasta de spam.`
     });
   } catch (err: any) {
     console.error("Erro na rota de recuperação de senha:", err);

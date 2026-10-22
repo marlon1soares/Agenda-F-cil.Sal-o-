@@ -23,6 +23,7 @@ import { EmployeeLinkModal } from './components/EmployeeLinkModal';
 import { LiveConnectionHubModal } from './components/LiveConnectionHubModal';
 import { AdminVideoConfigModal } from './components/AdminVideoConfigModal';
 import { AdminBroadcastModal } from './components/AdminBroadcastModal';
+import { ResetPasswordModal } from './components/ResetPasswordModal';
 
 import { Transaction, Appointment, SalonConfig, UserRole, Professional, ServiceItem, ClientRecord, SalonApp, CaixaFechamentoCiclo } from './types';
 import { Storage } from './utils/storage';
@@ -205,7 +206,8 @@ export function App() {
       // If direct purchase link, client portal, or specific employee link, don't open modal
       const isBuying = hasUrlAction('comprar-licenca', 'comprar', 'comprar_licenca', 'licenca', 'buy', 'compra', 'contratar');
       const orderTrackingParam = getUrlParam('confirmar-pedido') || getUrlParam('confirmar_pedido') || getUrlParam('pedido') || getUrlParam('order') || getUrlParam('acompanhar') || getUrlParam('pay');
-      if (isBuying || orderTrackingParam) return false;
+      const isResetPass = hasUrlAction('redefinir-senha', 'recuperar-senha', 'reset-password') || getUrlParam('redefinir-senha') === '1';
+      if (isBuying || orderTrackingParam || isResetPass) return false;
 
       const role = getUrlParam('role');
       const salon = getUrlParam('salon');
@@ -220,6 +222,32 @@ export function App() {
       return true;
     } catch {}
     return true;
+  });
+
+  const [isResetPasswordOpen, setIsResetPasswordOpen] = useState<boolean>(() => {
+    try {
+      return hasUrlAction('redefinir-senha', 'recuperar-senha', 'reset-password') || getUrlParam('redefinir-senha') === '1';
+    } catch {}
+    return false;
+  });
+  const [resetPasswordEmail, setResetPasswordEmail] = useState<string>(() => {
+    try {
+      return getUrlParam('email') || '';
+    } catch {}
+    return '';
+  });
+  const [resetPasswordCpf, setResetPasswordCpf] = useState<string>(() => {
+    try {
+      return getUrlParam('cpf') || '';
+    } catch {}
+    return '';
+  });
+  const [resetPasswordRole, setResetPasswordRole] = useState<'admin' | 'salao'>(() => {
+    try {
+      const r = getUrlParam('role');
+      return r === 'admin' ? 'admin' : 'salao';
+    } catch {}
+    return 'admin';
   });
   const [isAdminSalonsOpen, setIsAdminSalonsOpen] = useState(false);
   const [isAdminPaymentOpen, setIsAdminPaymentOpen] = useState(false);
@@ -290,6 +318,18 @@ export function App() {
           setIsBuyAppOpen(true);
         } else if (isBuying) {
           setIsBuyAppOpen(true);
+        }
+
+        const isResetPass = hasUrlAction('redefinir-senha', 'recuperar-senha', 'reset-password') || getUrlParam('redefinir-senha') === '1';
+        if (isResetPass) {
+          setIsResetPasswordOpen(true);
+          setIsSalonAuthOpen(false);
+          const emailP = getUrlParam('email');
+          const cpfP = getUrlParam('cpf');
+          const roleP = getUrlParam('role');
+          if (emailP) setResetPasswordEmail(emailP);
+          if (cpfP) setResetPasswordCpf(cpfP);
+          if (roleP === 'admin' || roleP === 'salao') setResetPasswordRole(roleP);
         }
 
         const isAccessLink = hasUrlAction('acesso-salao', 'acesso', 'login-salao', 'acessar-salao', 'painel-salao');
@@ -1691,6 +1731,20 @@ export function App() {
             setActiveTab('dashboard');
           }
           setIsSalonAuthOpen(false);
+        }}
+      />
+
+      {/* Password Reset Modal when opened via email link */}
+      <ResetPasswordModal
+        isOpen={isResetPasswordOpen}
+        onClose={() => setIsResetPasswordOpen(false)}
+        email={resetPasswordEmail}
+        cpf={resetPasswordCpf}
+        accountType={resetPasswordRole}
+        onPasswordChanged={(newPass) => {
+          setSalonAuthCredentials({ cpf: resetPasswordCpf, token: newPass });
+          setIsResetPasswordOpen(false);
+          setIsSalonAuthOpen(true);
         }}
       />
 
