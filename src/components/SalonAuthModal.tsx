@@ -275,13 +275,24 @@ export const SalonAuthModal: React.FC<SalonAuthModalProps> = ({
         body: JSON.stringify({ email: cleanEmail }),
       });
 
-      const data = await res.json();
-      if (res.ok && data.success && data.emailSent) {
-        setRecoverySuccess(`✓ Sua senha foi enviada com sucesso para o e-mail ${cleanEmail}! Verifique sua caixa de entrada e pasta de spam.`);
-      } else {
-        setRecoveryError(data.error || 'Não foi possível entregar o e-mail no momento. Verifique a conexão com o provedor de e-mail.');
+      let data: any = null;
+      try {
+        data = await res.json();
+      } catch {
+        data = null;
       }
-    } catch {
+
+      if (res.ok && data?.success && data?.emailSent) {
+        setRecoverySuccess(`✓ Sua senha foi enviada com sucesso para o e-mail ${cleanEmail}! Verifique sua caixa de entrada e pasta de spam.`);
+      } else if (data?.error) {
+        setRecoveryError(data.error);
+      } else if (res.status === 405) {
+        setRecoveryError('A rota de envio de e-mails está sendo sincronizada no servidor. Tente novamente em instantes.');
+      } else {
+        setRecoveryError('Não foi possível entregar o e-mail no momento. Verifique a conexão com o provedor de e-mail.');
+      }
+    } catch (err: any) {
+      console.error('Erro ao enviar recuperação:', err);
       setRecoveryError('Não foi possível conectar ao servidor de e-mail no momento. Tente novamente em instantes.');
     } finally {
       setRecoveryLoading(false);
