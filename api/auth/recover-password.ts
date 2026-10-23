@@ -148,88 +148,149 @@ export default async function handler(req: any, res: any) {
       const resetPasswordUrl = `${baseClean}/?redefinir-senha=1&email=${encodeURIComponent(cleanEmail)}&cpf=${encodeURIComponent(acc.cpf || '')}&role=${encodeURIComponent(acc.type)}`;
 
       return `
-        <div style="background-color: #181d29; border: 1px solid #334155; border-radius: 16px; padding: 22px; margin-bottom: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.5);">
-          <!-- Header do Card -->
-          <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom: 16px; border-bottom: 1px solid #242c3d; padding-bottom: 12px;">
-            <tr>
-              <td align="left" style="color: #fbbf24; font-weight: 800; font-size: 14px;">
-                ${roleBadge}
-              </td>
-              <td align="right" style="font-family: monospace; font-size: 12px; background: #0f172a; color: #cbd5e1; padding: 4px 10px; border-radius: 6px; border: 1px solid #334155;">
-                CPF: ${acc.cpf}
-              </td>
-            </tr>
-          </table>
+        <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #181d29; border: 1px solid #334155; border-radius: 14px; margin-bottom: 20px; text-align: left;">
+          <tr>
+            <td style="padding: 20px;">
+              <!-- Header do Card -->
+              <table width="100%" border="0" cellspacing="0" cellpadding="0" style="margin-bottom: 16px; border-bottom: 1px solid #242c3d; padding-bottom: 12px;">
+                <tr>
+                  <td align="left" style="color: #fbbf24; font-weight: bold; font-size: 14px;">
+                    ${roleBadge}
+                  </td>
+                  <td align="right" style="color: #cbd5e1; font-family: monospace; font-size: 12px; background-color: #0f172a; padding: 4px 8px; border-radius: 6px; border: 1px solid #334155;">
+                    CPF: ${acc.cpf}
+                  </td>
+                </tr>
+              </table>
 
-          <!-- 1. Senha / Token de Acesso Atual -->
-          <div style="margin-bottom: 18px;">
-            <p style="margin: 0 0 6px 0; font-size: 12px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px;">
-              Sua Senha / Token de Acesso:
-            </p>
-            <div style="background-color: #090d16; border: 1px solid #334155; border-radius: 12px; padding: 14px 18px; text-align: center;">
-              <span style="font-family: 'Courier New', Courier, monospace; font-size: 22px; font-weight: 900; color: #34d399; letter-spacing: 2px;">
-                ${acc.password}
-              </span>
-            </div>
-          </div>
+              <!-- 1. Senha / Token de Acesso Atual -->
+              <table width="100%" border="0" cellspacing="0" cellpadding="0" style="margin-bottom: 18px;">
+                <tr>
+                  <td style="color: #94a3b8; font-size: 11px; font-weight: bold; text-transform: uppercase; padding-bottom: 6px;">
+                    SUA SENHA / TOKEN DE ACESSO:
+                  </td>
+                </tr>
+                <tr>
+                  <td bgcolor="#090d16" align="center" style="background-color: #090d16; border: 1px solid #334155; border-radius: 10px; padding: 14px 18px;">
+                    <span style="font-family: monospace, 'Courier New', Courier; font-size: 24px; font-weight: bold; color: #34d399; letter-spacing: 2px;">
+                      ${acc.password}
+                    </span>
+                  </td>
+                </tr>
+              </table>
 
-          <!-- 2. Criar ou Alterar para Nova Senha -->
-          <div style="margin-bottom: 18px; padding-top: 14px; border-top: 1px solid #242c3d;">
-            <p style="margin: 0 0 8px 0; font-size: 12px; font-weight: 700; color: #94a3b8;">
-              Criar ou alterar para nova senha (caracteres que quiser):
-            </p>
-            <a href="${resetPasswordUrl}" target="_blank" style="display: block; background: linear-gradient(135deg, #d97706, #b45309); color: #ffffff; text-decoration: none; text-align: center; font-weight: 800; font-size: 13px; padding: 12px 18px; border-radius: 10px; box-shadow: 0 4px 10px rgba(217, 119, 6, 0.3);">
-              ✨ Criar ou Alterar Nova Senha no Aplicativo ➔
-            </a>
-          </div>
+              <!-- 2. Criar ou Alterar para Nova Senha -->
+              <table width="100%" border="0" cellspacing="0" cellpadding="0" style="margin-bottom: 14px; border-top: 1px solid #242c3d; padding-top: 14px;">
+                <tr>
+                  <td style="color: #cbd5e1; font-size: 12px; font-weight: bold; padding-bottom: 8px;">
+                    Criar ou alterar para nova senha (caracteres que quiser):
+                  </td>
+                </tr>
+                <tr>
+                  <td bgcolor="#d97706" align="center" style="background-color: #d97706; border-radius: 10px;">
+                    <a href="${resetPasswordUrl}" target="_blank" style="display: block; padding: 13px 18px; color: #ffffff; text-decoration: none; font-weight: bold; font-size: 13px; font-family: Arial, sans-serif;">
+                      ✨ Criar ou Alterar Nova Senha no Aplicativo ➔
+                    </a>
+                  </td>
+                </tr>
+              </table>
 
-          <!-- 3. Entrar no Aplicativo Agora com Esta Senha -->
-          <div style="padding-top: 10px;">
-            <a href="${directLoginUrl}" target="_blank" style="display: block; background: #059669; color: #ffffff; text-decoration: none; text-align: center; font-weight: 900; font-size: 14px; padding: 14px 20px; border-radius: 12px; box-shadow: 0 4px 14px rgba(5, 150, 105, 0.4);">
-              ✓ Entrar no Aplicativo Agora com Esta Senha ➔
-            </a>
-          </div>
-        </div>
+              <!-- 3. Entrar no Aplicativo Agora com Esta Senha -->
+              <table width="100%" border="0" cellspacing="0" cellpadding="0">
+                <tr>
+                  <td bgcolor="#059669" align="center" style="background-color: #059669; border-radius: 10px;">
+                    <a href="${directLoginUrl}" target="_blank" style="display: block; padding: 14px 18px; color: #ffffff; text-decoration: none; font-weight: bold; font-size: 14px; font-family: Arial, sans-serif;">
+                      ✓ Entrar no Aplicativo Agora com Esta Senha ➔
+                    </a>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
       `;
     }).join('');
+
+    const plainText = `
+==============================================
+AGENDA FÁCIL - RECUPERAÇÃO DE SENHA
+==============================================
+
+Olá! Localizamos seu cadastro no sistema:
+E-mail: ${cleanEmail}
+
+${allMatches.map(acc => `
+----------------------------------------------
+Perfil: ${acc.title || acc.role || 'Conta de Acesso'}
+CPF de Login: ${acc.cpf}
+
+SUA SENHA / TOKEN DE ACESSO ATUAL:
+>>> ${acc.password} <<<
+
+1) PARA CRIAR OU ALTERAR NOVA SENHA (qualquer caractere que desejar):
+${baseClean}/?redefinir-senha=1&email=${encodeURIComponent(cleanEmail)}&cpf=${encodeURIComponent(acc.cpf || '')}&role=${encodeURIComponent(acc.type)}
+
+2) PARA ENTRAR NO APLICATIVO AGORA COM ESTA SENHA:
+${baseClean}/?acesso-salao=1&cpf=${encodeURIComponent(acc.cpf || '')}&token=${encodeURIComponent(acc.password || '')}
+----------------------------------------------
+`).join('\n')}
+
+Este e-mail foi gerado automaticamente pelo robô de recuperação do Agenda Fácil.
+Se você não solicitou, pode desconsiderar com total segurança.
+`.trim();
 
     const emailHtml = `
 <!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Recuperação de Senha - Agenda Fácil</title>
 </head>
-<body style="margin: 0; padding: 0; background-color: #0b101b; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #f8fafc;">
-  <div style="max-width: 520px; margin: 30px auto; background-color: #10141d; border: 1px solid #1e293b; border-radius: 24px; padding: 32px 24px; box-shadow: 0 20px 40px rgba(0,0,0,0.8);">
-    
-    <!-- Topo: Badge Cadastro Localizado -->
-    <div style="text-align: center; margin-bottom: 20px;">
-      <div style="display: inline-block; background-color: #064e3b; border: 1px solid #059669; color: #34d399; font-weight: 800; font-size: 12px; padding: 6px 16px; border-radius: 9999px;">
-        ✓ Cadastro Localizado!
-      </div>
-      <h1 style="color: #ffffff; font-size: 26px; font-weight: 900; margin: 12px 0 4px 0; letter-spacing: -0.5px;">
-        Recuperação de Senha
-      </h1>
-      <p style="color: #94a3b8; font-size: 13px; margin: 0;">
-        E-mail: <strong style="color: #f1f5f9;">${cleanEmail}</strong>
-      </p>
-    </div>
+<body style="margin: 0; padding: 0; background-color: #0b101b; font-family: Arial, Helvetica, sans-serif; color: #ffffff;">
+  <table width="100%" border="0" cellspacing="0" cellpadding="0" bgcolor="#0b101b" style="background-color: #0b101b; width: 100%; margin: 0; padding: 20px 10px;">
+    <tr>
+      <td align="center">
+        <!-- Container Principal -->
+        <table width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width: 540px; width: 100%; background-color: #10141d; border: 1px solid #1e293b; border-radius: 20px; overflow: hidden;">
+          <tr>
+            <td style="padding: 28px 20px; text-align: center;">
 
-    <!-- Cards de Acesso com a Senha e Botões -->
-    ${cardsHtml}
+              <!-- Topo: Badge Cadastro Localizado -->
+              <table align="center" border="0" cellspacing="0" cellpadding="0" style="margin: 0 auto 16px auto;">
+                <tr>
+                  <td bgcolor="#064e3b" style="background-color: #064e3b; border: 1px solid #059669; border-radius: 20px; padding: 6px 18px; color: #34d399; font-size: 13px; font-weight: bold;">
+                    ✓ Cadastro Localizado!
+                  </td>
+                </tr>
+              </table>
 
-    <!-- Rodapé -->
-    <div style="text-align: center; border-top: 1px solid #1e293b; padding-top: 18px; margin-top: 10px;">
-      <p style="margin: 0; font-size: 11px; color: #64748b;">
-        Este e-mail foi gerado automaticamente pelo robô de recuperação do <strong>Agenda Fácil</strong>.
-      </p>
-      <p style="margin: 4px 0 0 0; font-size: 11px; color: #475569;">
-        Se você não solicitou a recuperação, pode desconsiderar esta mensagem com total segurança.
-      </p>
-    </div>
+              <h1 style="color: #ffffff; font-size: 24px; font-weight: 900; margin: 0 0 6px 0; font-family: Arial, sans-serif;">
+                Recuperação de Senha
+              </h1>
+              <p style="color: #94a3b8; font-size: 14px; margin: 0 0 22px 0;">
+                E-mail: <strong style="color: #ffffff;">${cleanEmail}</strong>
+              </p>
 
-  </div>
+              <!-- Cards de Acesso com a Senha e Botões -->
+              ${cardsHtml}
+
+              <!-- Rodapé -->
+              <table width="100%" border="0" cellspacing="0" cellpadding="0" style="margin-top: 20px; border-top: 1px solid #1e293b; padding-top: 16px;">
+                <tr>
+                  <td align="center" style="color: #64748b; font-size: 11px; line-height: 1.5;">
+                    <p style="margin: 0;">Este e-mail foi gerado automaticamente pelo robô do <strong>Agenda Fácil</strong>.</p>
+                    <p style="margin: 4px 0 0 0; color: #475569;">Se você não solicitou a recuperação, pode desconsiderar esta mensagem.</p>
+                  </td>
+                </tr>
+              </table>
+
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
 </body>
 </html>
     `;
@@ -247,7 +308,8 @@ export default async function handler(req: any, res: any) {
     await transporter.sendMail({
       from: '"Agenda Fácil" <marlon1soares28@gmail.com>',
       to: cleanEmail,
-      subject: 'Recuperação de Senha - Agenda Fácil',
+      subject: '🔑 Recuperação de Senha - Agenda Fácil',
+      text: plainText,
       html: emailHtml
     });
 
