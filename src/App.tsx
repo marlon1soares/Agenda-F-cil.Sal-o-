@@ -930,8 +930,53 @@ export function App() {
     );
   }
 
+  // When user opens password reset link from email (redefinir-senha=1):
+  if (isResetPasswordOpen) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center p-2 sm:p-4 text-slate-100 font-sans">
+        <ResetPasswordModal
+          isOpen={true}
+          onClose={() => {
+            try {
+              const url = new URL(window.location.href);
+              url.searchParams.delete('redefinir-senha');
+              url.searchParams.delete('recuperar-senha');
+              url.searchParams.delete('reset-password');
+              url.searchParams.delete('email');
+              url.searchParams.delete('cpf');
+              url.searchParams.delete('role');
+              window.history.replaceState({}, '', url.pathname + (url.search ? url.search : ''));
+            } catch {}
+            setIsResetPasswordOpen(false);
+            setIsPageClosed(false);
+            setIsSalonAuthOpen(true);
+          }}
+          email={resetPasswordEmail}
+          cpf={resetPasswordCpf}
+          accountType={resetPasswordRole}
+          onPasswordChanged={(newPass) => {
+            try {
+              const url = new URL(window.location.href);
+              url.searchParams.delete('redefinir-senha');
+              url.searchParams.delete('recuperar-senha');
+              url.searchParams.delete('reset-password');
+              url.searchParams.delete('email');
+              url.searchParams.delete('cpf');
+              url.searchParams.delete('role');
+              window.history.replaceState({}, '', url.pathname + (url.search ? url.search : ''));
+            } catch {}
+            setSalonAuthCredentials({ cpf: resetPasswordCpf, token: newPass });
+            setIsResetPasswordOpen(false);
+            setIsPageClosed(false);
+            setIsSalonAuthOpen(true);
+          }}
+        />
+      </div>
+    );
+  }
+
   // When user closes entrance modal without logging in or clicks exit:
-  if (isPageClosed || (!isAuthenticated && !isSalonAuthOpen && !isBuyAppOpen)) {
+  if (isPageClosed || (!isAuthenticated && !isSalonAuthOpen && !isBuyAppOpen && !isResetPasswordOpen)) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 text-slate-100 font-sans select-none">
         <div className="bg-[#0b1222] border border-slate-800 p-6 sm:p-8 rounded-3xl max-w-md w-full text-center shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-200">

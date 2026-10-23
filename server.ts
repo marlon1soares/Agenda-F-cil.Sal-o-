@@ -1902,6 +1902,94 @@ Se você não solicitou, pode desconsiderar com total segurança.
   }
 });
 
+// Update/Change Password after Email Recovery Link
+app.post("/api/auth/update-password", (req, res) => {
+  try {
+    const { email, cpf, newPassword, accountType } = req.body || {};
+    const cleanPassword = (newPassword || "").trim();
+    const cleanCpf = (cpf || "").replace(/\D/g, "").trim();
+    const cleanEmail = (email || "").toLowerCase().trim();
+
+    if (!cleanPassword) {
+      return res.status(400).json({ success: false, error: "A nova senha não pode estar em branco." });
+    }
+
+    const state = syncStore.getState();
+
+    if (accountType === "admin") {
+      const masterAdmin = { ...(state.adminCredentials || {}) };
+      masterAdmin.password = cleanPassword;
+      if (cleanCpf) masterAdmin.cpf = cpf;
+      if (cleanEmail) masterAdmin.email = cleanEmail;
+
+      const adminList = Array.isArray(state.adminCredentialsList) ? [...state.adminCredentialsList] : [];
+      let updatedList = false;
+      for (let i = 0; i < adminList.length; i++) {
+        const itemCpfClean = (adminList[i].cpf || "").replace(/\D/g, "").trim();
+        const itemEmail = (adminList[i].email || "").toLowerCase().trim();
+        if ((cleanCpf && itemCpfClean === cleanCpf) || (cleanEmail && itemEmail === cleanEmail)) {
+          adminList[i] = { ...adminList[i], password: cleanPassword };
+          updatedList = true;
+        }
+      }
+      if (!updatedList && adminList.length > 0) {
+        adminList[0] = { ...adminList[0], password: cleanPassword };
+      }
+
+      syncStore.updateState({
+        adminCredentials: masterAdmin,
+        adminCredentialsList: adminList
+      });
+
+      console.log(`[PASSWORD UPDATE] ✓ Senha de Administrador alterada com sucesso (${cleanEmail || cleanCpf})`);
+      return res.json({
+        success: true,
+        message: "Senha de Administrador alterada com sucesso!",
+        newPassword: cleanPassword
+      });
+    } else {
+      const salonsList = Array.isArray(state.salons) ? [...state.salons] : [];
+      let matchedIndex = salonsList.findIndex(s => {
+        const sCpfClean = (s.ownerCpf || "").replace(/\D/g, "").trim();
+        const sEmail = (s.ownerEmail || s.config?.email || "").toLowerCase().trim();
+        return (cleanCpf && sCpfClean === cleanCpf) || (cleanEmail && sEmail === cleanEmail);
+      });
+
+      if (matchedIndex >= 0) {
+        salonsList[matchedIndex] = {
+          ...salonsList[matchedIndex],
+          purchaseToken: cleanPassword,
+          token: cleanPassword
+        };
+        syncStore.updateState({ salons: salonsList });
+        console.log(`[PASSWORD UPDATE] ✓ Senha/Token de Salão alterado com sucesso para ${salonsList[matchedIndex].name} (${cleanPassword})`);
+        return res.json({
+          success: true,
+          message: "Senha do Salão alterada com sucesso!",
+          newPassword: cleanPassword
+        });
+      } else {
+        if (salonsList.length > 0) {
+          salonsList[0] = {
+            ...salonsList[0],
+            purchaseToken: cleanPassword,
+            token: cleanPassword
+          };
+          syncStore.updateState({ salons: salonsList });
+        }
+        return res.json({
+          success: true,
+          message: "Senha alterada com sucesso!",
+          newPassword: cleanPassword
+        });
+      }
+    }
+  } catch (err: any) {
+    console.error("[PASSWORD UPDATE ERROR]:", err);
+    return res.status(500).json({ success: false, error: err.message || "Erro interno ao atualizar a senha." });
+  }
+});
+
 // Live SMTP Diagnostic & Verification Endpoint (Tests real sending with user credentials)
 app.post("/api/admin/test-smtp", async (req, res) => {
   try {

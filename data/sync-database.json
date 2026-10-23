@@ -18,7 +18,7 @@
       "cpf": "309.287.638-54",
       "email": "marlon1soares28@gmail.com",
       "phone": "(11) 99999-8888",
-      "password": "Ana1@luna",
+      "password": "Ana1@@theo",
       "registeredAt": "2026-01-01T00:00:00.000Z"
     },
     {
@@ -341,12 +341,12 @@
       "role": "cliente",
       "salonId": "salon-parcas",
       "status": "online",
-      "lastSeen": 1792724882332
+      "lastSeen": 1792752365115
     }
   ],
   "usedTrialCpfs": [],
   "caixaFechamentos": [],
-  "lastUpdated": 1792724888743,
+  "lastUpdated": 1792752369032,
   "lastSenderId": "client_cbg68to_1788317228381",
   "salonData": {}
 }
