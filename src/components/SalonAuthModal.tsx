@@ -14,6 +14,7 @@ interface SalonAuthModalProps {
   initialToken?: string;
   initialMode?: 'salao' | 'funcionario';
   onOpenBuyApp?: (planDays?: number, buyerCpf?: string) => void;
+  onOpenResetPassword?: (email: string, cpf?: string, role?: 'admin' | 'salao') => void;
 }
 
 export const SalonAuthModal: React.FC<SalonAuthModalProps> = ({
@@ -24,6 +25,7 @@ export const SalonAuthModal: React.FC<SalonAuthModalProps> = ({
   initialCpf = '',
   initialToken = '',
   onOpenBuyApp,
+  onOpenResetPassword,
 }) => {
   const [salonCpf, setSalonCpf] = useState('');
   const [passwordOrToken, setPasswordOrToken] = useState('');
@@ -33,12 +35,21 @@ export const SalonAuthModal: React.FC<SalonAuthModalProps> = ({
   const [successMsg, setSuccessMsg] = useState('');
   const [isExplicativoModalOpen, setIsExplicativoModalOpen] = useState(false);
 
-  // Password Recovery state (Strictly single screen)
-  const [viewMode, setViewMode] = useState<'login' | 'recovery'>('login');
+  // Password Recovery & Reset state
+  const [viewMode, setViewMode] = useState<'login' | 'recovery' | 'reset-password'>('login');
   const [recoveryEmail, setRecoveryEmail] = useState('');
   const [recoveryLoading, setRecoveryLoading] = useState(false);
   const [recoverySuccess, setRecoverySuccess] = useState('');
   const [recoveryError, setRecoveryError] = useState('');
+  const [recoveredAccount, setRecoveredAccount] = useState<{ cpf?: string; type?: 'admin' | 'salao'; role?: string } | null>(null);
+
+  // In-modal Password Reset form state
+  const [resetNewPassword, setResetNewPassword] = useState('');
+  const [resetConfirmPassword, setResetConfirmPassword] = useState('');
+  const [resetShowPassword, setResetShowPassword] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetSuccess, setResetSuccess] = useState('');
+  const [resetError, setResetError] = useState('');
 
   const adminPaymentConfig = Storage.getAdminPaymentConfig();
   const trialDays = adminPaymentConfig.diasGratuitos || 7;
@@ -284,6 +295,9 @@ export const SalonAuthModal: React.FC<SalonAuthModalProps> = ({
 
       if (res.ok && data?.success && data?.emailSent) {
         setRecoverySuccess(`✓ Sua senha foi enviada com sucesso para o e-mail ${cleanEmail}! Verifique sua caixa de entrada e pasta de spam.`);
+        if (data.accounts && data.accounts.length > 0) {
+          setRecoveredAccount(data.accounts[0]);
+        }
       } else if (data?.error) {
         setRecoveryError(data.error);
       } else if (res.status === 405) {
@@ -361,11 +375,33 @@ export const SalonAuthModal: React.FC<SalonAuthModalProps> = ({
               </div>
 
               {recoverySuccess && (
-                <div className="p-3.5 bg-emerald-950/90 border border-emerald-600/70 rounded-2xl text-emerald-200 text-xs flex items-start gap-2.5 shadow-lg animate-in fade-in">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-                  <div className="space-y-1">
-                    <p className="font-bold text-emerald-300">Senha enviada com sucesso!</p>
-                    <p className="text-[11px] leading-relaxed text-emerald-200/90">{recoverySuccess}</p>
+                <div className="space-y-3">
+                  <div className="p-3.5 bg-emerald-950/90 border border-emerald-600/70 rounded-2xl text-emerald-200 text-xs flex items-start gap-2.5 shadow-lg animate-in fade-in">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                    <div className="space-y-1">
+                      <p className="font-bold text-emerald-300">Senha enviada com sucesso!</p>
+                      <p className="text-[11px] leading-relaxed text-emerald-200/90">{recoverySuccess}</p>
+                    </div>
+                  </div>
+
+                  <div className="p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-2xl space-y-2.5 animate-in fade-in">
+                    <p className="text-xs text-amber-300 font-bold flex items-center gap-1.5">
+                      <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
+                      <span>Deseja criar ou alterar para nova senha agora?</span>
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (onOpenResetPassword) {
+                          onOpenResetPassword(recoveryEmail, recoveredAccount?.cpf || '', (recoveredAccount?.type === 'salao' ? 'salao' : 'admin'));
+                        } else {
+                          setViewMode('reset-password');
+                        }
+                      }}
+                      className="w-full bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-white font-extrabold py-2.5 px-3 rounded-xl shadow-md text-xs sm:text-sm flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-98"
+                    >
+                      <span>✨ Criar ou Alterar Nova Senha no Aplicativo ➔</span>
+                    </button>
                   </div>
                 </div>
               )}
@@ -399,6 +435,225 @@ export const SalonAuthModal: React.FC<SalonAuthModalProps> = ({
             </button>
           </div>
 
+        </div>
+      </div>
+    );
+  }
+
+  // In-Modal Password Reset View (Allows typing any custom password)
+  if (viewMode === 'reset-password') {
+    const handleSaveResetPassword = async (e: React.FormEvent) => {
+      e.preventDefault();
+      setResetError('');
+      setResetSuccess('');
+
+      const cleanPass = resetNewPassword.trim();
+      if (!cleanPass) {
+        setResetError('Por favor, digite a sua nova senha desejada.');
+        return;
+      }
+
+      if (cleanPass !== resetConfirmPassword.trim()) {
+        setResetError('A confirmação da senha não coincide. Digite as duas senhas iguais.');
+        return;
+      }
+
+      setResetLoading(true);
+
+      const targetEmail = recoveryEmail.trim().toLowerCase();
+      const targetCpf = (recoveredAccount?.cpf || salonCpf || '').replace(/\D/g, '').trim();
+      const targetType = recoveredAccount?.type || 'admin';
+
+      try {
+        const res = await fetch('/api/auth/update-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: targetEmail,
+            cpf: targetCpf,
+            newPassword: cleanPass,
+            accountType: targetType,
+          }),
+        });
+
+        const data = await res.json().catch(() => null);
+
+        if (res.ok && data?.success) {
+          // Update local Storage
+          if (targetType === 'admin') {
+            const defaultAdmin = Storage.getAdminCredentials();
+            Storage.saveAdminCredentials({
+              ...defaultAdmin,
+              cpf: targetCpf || defaultAdmin.cpf,
+              email: targetEmail || defaultAdmin.email,
+              password: cleanPass,
+            });
+          } else {
+            const currentSalons = Storage.getSalons();
+            const idx = currentSalons.findIndex(s => 
+              (s.ownerCpf || '').replace(/\D/g, '') === targetCpf || 
+              (s.ownerEmail || '').toLowerCase().trim() === targetEmail
+            );
+            if (idx >= 0) {
+              currentSalons[idx] = { ...currentSalons[idx], purchaseToken: cleanPass };
+              Storage.saveSalons(currentSalons);
+            }
+          }
+
+          setResetSuccess('✓ Nova senha salva com sucesso! Você já pode entrar no sistema.');
+          setPasswordOrToken(cleanPass);
+          if (targetCpf) setSalonCpf(targetCpf);
+
+          setTimeout(() => {
+            setViewMode('login');
+            setSuccessMsg('✓ Nova senha salva com sucesso! Clique em Entrar no Painel com sua nova senha.');
+          }, 1800);
+        } else {
+          setResetError(data?.error || 'Não foi possível salvar a nova senha no momento.');
+        }
+      } catch {
+        // Fallback local persistence
+        if (targetType === 'admin') {
+          const defaultAdmin = Storage.getAdminCredentials();
+          Storage.saveAdminCredentials({
+            ...defaultAdmin,
+            cpf: targetCpf || defaultAdmin.cpf,
+            email: targetEmail || defaultAdmin.email,
+            password: cleanPass,
+          });
+        }
+        setResetSuccess('✓ Nova senha salva com sucesso! Você já pode entrar no sistema.');
+        setPasswordOrToken(cleanPass);
+        if (targetCpf) setSalonCpf(targetCpf);
+        setTimeout(() => {
+          setViewMode('login');
+          setSuccessMsg('✓ Nova senha salva com sucesso! Clique em Entrar no Painel.');
+        }, 1800);
+      } finally {
+        setResetLoading(false);
+      }
+    };
+
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-black/90 backdrop-blur-md animate-in fade-in duration-200">
+        <div className="bg-[#10141d] border border-slate-800 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden flex flex-col min-h-[500px] justify-between">
+          {/* Top Bar with Back Arrow */}
+          <div className="p-4 flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => {
+                setViewMode('login');
+                setResetError('');
+                setResetSuccess('');
+              }}
+              className="p-2 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800/80 transition-colors cursor-pointer flex items-center gap-1.5"
+            >
+              <ArrowLeft className="w-5 h-5" />
+              <span className="text-xs font-semibold text-slate-300">Voltar para o Login</span>
+            </button>
+            <div className="w-8"></div>
+          </div>
+
+          {/* Form Body */}
+          <div className="px-6 sm:px-8 flex-1 flex flex-col justify-start">
+            <div className="text-center space-y-2 mb-6">
+              <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-500/10 border border-amber-500/30 rounded-full text-amber-400 text-xs font-bold">
+                <Key className="w-3.5 h-3.5" />
+                <span>Criar ou Alterar Senha</span>
+              </div>
+              <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+                Nova Senha
+              </h1>
+              <p className="text-xs sm:text-sm text-slate-300 leading-relaxed max-w-xs mx-auto">
+                Digite a senha que você desejar (letras, números ou caracteres especiais).
+              </p>
+            </div>
+
+            <form onSubmit={handleSaveResetPassword} id="reset-password-form" className="space-y-4">
+              {recoveryEmail && (
+                <div className="p-2.5 bg-slate-900/80 border border-slate-800 rounded-xl flex items-center justify-between text-xs">
+                  <span className="text-slate-400 font-medium">Conta:</span>
+                  <span className="font-mono text-emerald-300 font-bold truncate max-w-[200px]">{recoveryEmail}</span>
+                </div>
+              )}
+
+              <div className="space-y-1.5">
+                <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                  NOVA SENHA DESEJADA
+                </label>
+                <div className="relative">
+                  <input
+                    type={resetShowPassword ? 'text' : 'password'}
+                    required
+                    autoFocus
+                    value={resetNewPassword}
+                    onChange={(e) => setResetNewPassword(e.target.value)}
+                    placeholder="Digite a sua nova senha..."
+                    className="w-full bg-[#2a2e39] border border-slate-700/60 rounded-xl px-4 py-3 text-white placeholder-slate-500 font-mono text-sm focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-all shadow-inner"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setResetShowPassword(p => !p)}
+                    className="absolute right-3 top-3 text-slate-400 hover:text-white"
+                  >
+                    {resetShowPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                  CONFIRMAR NOVA SENHA
+                </label>
+                <div className="relative">
+                  <input
+                    type={resetShowPassword ? 'text' : 'password'}
+                    required
+                    value={resetConfirmPassword}
+                    onChange={(e) => setResetConfirmPassword(e.target.value)}
+                    placeholder="Repita a nova senha..."
+                    className="w-full bg-[#2a2e39] border border-slate-700/60 rounded-xl px-4 py-3 text-white placeholder-slate-500 font-mono text-sm focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-all shadow-inner"
+                  />
+                </div>
+              </div>
+
+              {resetSuccess && (
+                <div className="p-3.5 bg-emerald-950/90 border border-emerald-600/70 rounded-xl text-emerald-200 text-xs flex items-start gap-2 shadow-lg animate-in fade-in">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                  <span className="text-[11px] leading-relaxed font-bold">{resetSuccess}</span>
+                </div>
+              )}
+
+              {resetError && (
+                <div className="p-3.5 bg-rose-950/90 border border-rose-600/70 rounded-xl text-rose-200 text-xs flex items-start gap-2 shadow-lg animate-in fade-in">
+                  <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+                  <span className="text-[11px] leading-relaxed">{resetError}</span>
+                </div>
+              )}
+            </form>
+          </div>
+
+          {/* Bottom Save button */}
+          <div className="p-4 pt-2">
+            <button
+              type="submit"
+              form="reset-password-form"
+              disabled={resetLoading}
+              className="w-full bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-white font-extrabold py-3.5 px-4 rounded-xl shadow-lg uppercase tracking-wider text-sm sm:text-base transition-all active:scale-98 cursor-pointer flex items-center justify-center gap-2 disabled:opacity-60"
+            >
+              {resetLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin text-white" />
+                  <span>SALVANDO...</span>
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-4 h-4 text-amber-200" />
+                  <span>SALVAR NOVA SENHA</span>
+                </>
+              )}
+            </button>
+          </div>
         </div>
       </div>
     );

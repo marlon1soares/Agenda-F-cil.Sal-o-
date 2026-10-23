@@ -25,6 +25,9 @@ export function getPublicAppUrl(forceProductionVercel = false): string {
 
   // 2. Use current active domain/origin so Computer <-> Mobile connect to the same live sync server
   const origin = window.location.origin;
+  if (origin.includes('run.app') || origin.includes('ais-dev-') || origin.includes('ais-pre-') || origin.includes('localhost')) {
+    return DEFAULT_PRODUCTION_URL + '/';
+  }
   const pathname = window.location.pathname || '/';
   let base = origin + pathname;
   if (!base.endsWith('/')) base += '/';

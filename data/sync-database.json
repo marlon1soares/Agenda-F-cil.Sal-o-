@@ -341,12 +341,12 @@
       "role": "cliente",
       "salonId": "salon-parcas",
       "status": "online",
-      "lastSeen": 1792722930191
+      "lastSeen": 1792724882332
     }
   ],
   "usedTrialCpfs": [],
   "caixaFechamentos": [],
-  "lastUpdated": 1792722930191,
+  "lastUpdated": 1792724888743,
   "lastSenderId": "client_cbg68to_1788317228381",
   "salonData": {}
 }

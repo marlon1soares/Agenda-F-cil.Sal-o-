@@ -1662,10 +1662,27 @@ app.post("/api/auth/recover-password", async (req, res) => {
       });
     });
 
-    const appUrl = (req.headers.origin && !req.headers.origin.includes('ais-dev-') && !req.headers.origin.includes('run.app'))
-      ? req.headers.origin
-      : process.env.APP_URL || "https://agenda-f-cil-sal-o.vercel.app";
-    const baseClean = appUrl.endsWith('/') ? appUrl.slice(0, -1) : appUrl;
+    const adminConfig = syncStore.getState().adminPaymentConfig || {};
+    const officialProductionUrl = (adminConfig.productionUrl && adminConfig.productionUrl.trim())
+      ? adminConfig.productionUrl.trim()
+      : "https://agendamaisfacil.vercel.app";
+
+    let baseClean = officialProductionUrl.replace(/\/$/, "");
+
+    // Only override if client provided an explicit non-internal custom production domain
+    const candidateOrigin = (req.headers.origin || req.headers.referer || "").trim();
+    if (
+      candidateOrigin &&
+      !candidateOrigin.includes("run.app") &&
+      !candidateOrigin.includes("ais-") &&
+      !candidateOrigin.includes("localhost") &&
+      !candidateOrigin.includes("127.0.0.1")
+    ) {
+      try {
+        const parsed = new URL(candidateOrigin);
+        baseClean = `${parsed.protocol}//${parsed.host}`;
+      } catch {}
+    }
 
     const emailSubject = `Recuperação de Senha - Agenda Fácil`;
 
@@ -1806,7 +1823,13 @@ app.post("/api/auth/recover-password", async (req, res) => {
     return res.json({
       success: true,
       emailSent: true,
-      message: `Senha enviada com sucesso! O robô enviou os dados de acesso para o e-mail ${cleanEmail}! Verifique sua caixa de entrada e pasta de spam.`
+      message: `Senha enviada com sucesso! O robô enviou os dados de acesso para o e-mail ${cleanEmail}! Verifique sua caixa de entrada e pasta de spam.`,
+      accounts: matchedAccounts.map(a => ({
+        type: a.type,
+        cpf: a.cpf,
+        email: cleanEmail,
+        role: a.role
+      }))
     });
   } catch (err: any) {
     console.error("Erro na rota de recuperação de senha:", err);

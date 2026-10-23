@@ -336,7 +336,7 @@ export function App() {
         const tokenParam = getUrlParam('token') || getUrlParam('senha') || getUrlParam('tok') || getUrlParam('chave');
         const cpfParam = getUrlParam('cpf') || getUrlParam('login') || getUrlParam('doc');
 
-        if (tokenParam || cpfParam) {
+        if (!isResetPass && (tokenParam || (isAccessLink && cpfParam))) {
           setSalonAuthCredentials({ cpf: cpfParam || '', token: tokenParam || '' });
           
           // Auto-authenticate if credentials match
@@ -1710,6 +1710,13 @@ export function App() {
         initialToken={salonAuthCredentials.token}
         initialMode={salonAuthMode}
         onOpenBuyApp={handleOpenBuyAppWithPlan}
+        onOpenResetPassword={(email, cpf, role) => {
+          setResetPasswordEmail(email || '');
+          setResetPasswordCpf(cpf || '');
+          setResetPasswordRole(role || 'admin');
+          setIsSalonAuthOpen(false);
+          setIsResetPasswordOpen(true);
+        }}
         onSuccess={(salon, authenticatedRole, matchedEmployeeName) => {
           handleSelectSalon(salon);
           const roleToSet = authenticatedRole || salonAuthMode || 'salao';

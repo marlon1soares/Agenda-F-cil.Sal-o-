@@ -114,9 +114,32 @@ export default async function handler(req: any, res: any) {
       }
     }
 
-    const host = req.headers['host'] || 'agendamaisfacil.vercel.app';
-    const proto = req.headers['x-forwarded-proto'] || 'https';
-    const baseClean = `${proto}://${host}`;
+    const officialProductionUrl = 'https://agendamaisfacil.vercel.app';
+    let baseClean = officialProductionUrl;
+    const candidateOrigin = (req.headers['origin'] || req.headers['referer'] || '').trim();
+    const candidateHost = (req.headers['host'] || '').trim();
+
+    if (
+      candidateOrigin &&
+      !candidateOrigin.includes('run.app') &&
+      !candidateOrigin.includes('ais-') &&
+      !candidateOrigin.includes('localhost') &&
+      !candidateOrigin.includes('127.0.0.1')
+    ) {
+      try {
+        const parsed = new URL(candidateOrigin);
+        baseClean = `${parsed.protocol}//${parsed.host}`;
+      } catch {}
+    } else if (
+      candidateHost &&
+      !candidateHost.includes('run.app') &&
+      !candidateHost.includes('ais-') &&
+      !candidateHost.includes('localhost') &&
+      !candidateHost.includes('127.0.0.1')
+    ) {
+      const proto = req.headers['x-forwarded-proto'] || 'https';
+      baseClean = `${proto}://${candidateHost}`.replace(/\/$/, '');
+    }
 
     const cardsHtml = allMatches.map(acc => {
       const isAdm = acc.type === 'admin';
@@ -231,7 +254,13 @@ export default async function handler(req: any, res: any) {
     return res.status(200).json({
       success: true,
       emailSent: true,
-      message: `Senha enviada com sucesso! O robô enviou os dados de acesso para o e-mail ${cleanEmail}! Verifique sua caixa de entrada e pasta de spam.`
+      message: `Senha enviada com sucesso! O robô enviou os dados de acesso para o e-mail ${cleanEmail}! Verifique sua caixa de entrada e pasta de spam.`,
+      accounts: allMatches.map(a => ({
+        type: a.type,
+        role: a.role,
+        cpf: a.cpf,
+        email: cleanEmail
+      }))
     });
   } catch (err: any) {
     console.error('Erro na rota serverless de recuperação:', err);
